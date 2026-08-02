@@ -1,0 +1,44 @@
+@import "tailwindcss";
+
+/*
+ * Tasapp se usa de pie, en un negocio, a plena luz o de noche: por eso el tema
+ * es oscuro fijo, con números grandes y alto contraste.
+ */
+:root {
+  --background: #0b1120;
+  --surface: #131c2f;
+  --surface-strong: #1b273f;
+  --border: #26324c;
+  --foreground: #f1f5f9;
+  --muted: #94a3b8;
+  --accent: #34d399;
+  --accent-strong: #10b981;
+  --warning: #fbbf24;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-strong: var(--surface-strong);
+  --color-border-soft: var(--border);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-strong: var(--accent-strong);
+  --color-warning: var(--warning);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  /* Evita el rebote al arrastrar sobre el teclado numérico en móvil. */
+  overscroll-behavior-y: none;
+}
+
+/* Los números se leen mejor alineados en columnas de ancho fijo. */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
