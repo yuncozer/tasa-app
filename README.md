@@ -108,10 +108,36 @@ Los proveedores se consultan con `Promise.allSettled`: que Binance esté caído 
 la tasa del BCV. Lo que falte se marca en la interfaz como "dato no disponible" y queda
 explicado en `/api/health`.
 
+## PWA
+
+Tasapp se instala en la pantalla de inicio y abre a pantalla completa. El manifiesto lo
+genera `app/manifest.ts` y los iconos salen del propio logo con `npm run iconos`
+(`scripts/generar-iconos.mjs`), que rasteriza el SVG con sharp; los PNG se versionan, así
+que solo hay que regenerarlos si cambia el logo.
+
+El service worker (`public/sw.js`) está escrito a mano —la alternativa que sugiere Next,
+Serwist, exige configuración de webpack y aquí se usa Turbopack— y se registra solo en
+producción:
+
+| Petición | Estrategia | Por qué |
+| --- | --- | --- |
+| Navegación a `/` | Red primero, con copia de respaldo | Sin señal la app abre igual, con las últimas tasas vistas |
+| `/_next/static/`, iconos | Caché primero, revalidando detrás | Son inmutables |
+| `/api/**` | **Nunca se cachea** | Una tasa vieja servida como fresca es justo el daño que hay que evitar |
+
+Cuando no hay conexión aparece una franja arriba —"Sin conexión · tasas de hace 3 horas"—
+porque enseñar tasas viejas sin decirlo es lo único de esta app capaz de causar un
+perjuicio real.
+
+Las notificaciones push quedan fuera por ahora: exigen claves VAPID, guardar las
+suscripciones y un proceso que vigile las tasas.
+
 ## Estructura
 
 ```
-app/            páginas y rutas API (App Router, sin carpeta src/)
-components/     panel de tasas, calculadora y teclado numérico
+app/            páginas, rutas API y manifiesto (App Router, sin carpeta src/)
+components/     panel de tasas, calculadora, teclado numérico y piezas de la PWA
 lib/            proveedores, agregación, conversión y formato
+public/         service worker e iconos generados
+scripts/        generación de iconos a partir del logo
 ```
