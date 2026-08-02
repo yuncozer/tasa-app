@@ -99,6 +99,26 @@ El documento de partida proponía otros endpoints que, al verificarlos, ya no se
 
 ## Caché y actualización
 
+Hay tres cachés, cada una resolviendo algo distinto:
+
+| Dónde | Alcance | Para qué |
+| --- | --- | --- |
+| Memoria de la función (`lib/cache.ts`) | Una instancia, 5 min | Que dos visitas seguidas no consulten dos veces |
+| CDN (`Cache-Control` con `s-maxage`) | Todos los usuarios, 1 min | Que el tráfico no llegue a las fuentes |
+| Service worker (`public/sw.js`) | Un dispositivo | Que la app abra sin conexión |
+
+La de la CDN es la que acota el trato a las fuentes: Vercel levanta una instancia
+nueva por cada pico de tráfico y cada una nace con la caché en memoria vacía, así
+que sin ella el número de consultas al BCV crecería con las visitas. Con
+`s-maxage=60` reciben como mucho una por minuto, entren dos personas o dos mil, y
+`stale-while-revalidate=300` hace que al vencer el minuto se sirva la copia
+anterior al instante mientras se refresca por detrás.
+
+El navegador no guarda copia propia (`max-age=0`): así una corrección nuestra nunca
+queda pegada en el teléfono de nadie. Y lo que pide datos frescos a propósito
+—`/api/rates?refresh=1`, `/api/health` y los errores— responde `no-store`.
+
+
 `lib/cache.ts` guarda la fotografía de tasas 5 minutos en memoria, deduplica peticiones
 simultáneas y, si un proveedor falla, conserva el último valor bueno en lugar de dejar la
 tarjeta vacía. El botón "Actualizar tasas" navega con `?actualizar=<marca>` para forzar una

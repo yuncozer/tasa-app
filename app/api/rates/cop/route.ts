@@ -1,4 +1,4 @@
-import { apiError } from "@/lib/api";
+import { apiError, apiJson } from "@/lib/api";
 import { getRates } from "@/lib/rates";
 
 /**
@@ -15,7 +15,7 @@ export async function GET() {
       return apiError("No se pudo obtener la tasa del peso", new Error(status?.error ?? ""));
     }
 
-    return Response.json({
+    return apiJson({
       trm: snapshot.trm,
       copMercado: snapshot.copMercado,
       bsPorPesoOficial: snapshot.rates.COP_OFICIAL.bsPerUnit,

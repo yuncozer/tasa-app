@@ -9,7 +9,11 @@ export async function GET() {
 
     return Response.json(
       { status: healthy ? "ok" : "degraded", fetchedAt: snapshot.fetchedAt, providers: snapshot.providers },
-      { status: healthy ? 200 : 207 },
+      {
+        status: healthy ? 200 : 207,
+        // Un diagnóstico cacheado no sirve: hay que poder ver el estado de ahora.
+        headers: { "Cache-Control": "no-store" },
+      },
     );
   } catch (error) {
     return apiError("No se pudo consultar el estado de los proveedores", error, 503);

@@ -1,4 +1,4 @@
-import { apiError } from "@/lib/api";
+import { apiError, apiJson } from "@/lib/api";
 import { getRates } from "@/lib/rates";
 
 /**
@@ -15,7 +15,7 @@ export async function GET() {
       return apiError("No se pudo obtener la tasa Binance P2P", new Error(status?.error ?? ""));
     }
 
-    return Response.json({
+    return apiJson({
       ves: snapshot.binance.ves,
       cop: snapshot.binance.cop,
       source: "Binance P2P",

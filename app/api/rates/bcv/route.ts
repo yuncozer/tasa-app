@@ -1,4 +1,4 @@
-import { apiError } from "@/lib/api";
+import { apiError, apiJson } from "@/lib/api";
 import { getRates } from "@/lib/rates";
 
 /** `GET /api/rates/bcv` — dólar y euro oficiales. */
@@ -10,7 +10,7 @@ export async function GET() {
 
     if (!status?.ok) return apiError("No se pudo obtener la tasa BCV", new Error(status?.error ?? ""));
 
-    return Response.json({
+    return apiJson({
       usd: USD_BCV.bsPerUnit,
       eur: EUR_BCV.bsPerUnit,
       source: USD_BCV.source,
