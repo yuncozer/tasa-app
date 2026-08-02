@@ -17,7 +17,8 @@ npm install
 npm run dev     # http://localhost:3000
 ```
 
-No hace falta ninguna variable de entorno ni clave de API.
+No hace falta ninguna clave de API. Hay dos variables de entorno opcionales, ver
+[Variables de entorno](#variables-de-entorno).
 
 ## Cómo calcula
 
@@ -33,7 +34,7 @@ Ejemplo con las tasas del 2 de agosto de 2026:
 | Paso | Cálculo | Resultado |
 | --- | --- | --- |
 | 100 $ a tasa BCV | 100 × 748,7864 | 74.878,64 Bs |
-| esos Bs en dólares Binance | 74.878,64 ÷ 846,38 | 88,47 $ |
+| esos Bs en dólares Binance (venta) | 74.878,64 ÷ 846,38 | 88,47 $ |
 | esos Bs en euros BCV | 74.878,64 ÷ 861,1867 | 86,95 € |
 | esos Bs en pesos oficiales | 74.878,64 ÷ 0,2382 | 314.414 COP |
 | esos Bs en pesos de frontera | 74.878,64 ÷ 0,2683 | 279.039 COP |
@@ -59,7 +60,7 @@ mercado es la mejor aproximación verificable.
 | --- | --- | --- |
 | `GET` | `/api/rates` | Todas las tasas. `?refresh=1` salta la caché |
 | `GET` | `/api/rates/bcv` | Dólar y euro oficiales |
-| `GET` | `/api/rates/binance` | Mercado P2P en VES y en COP, con compra, venta y punto medio |
+| `GET` | `/api/rates/binance` | Mercado P2P en VES y en COP, con compra, venta y punto medio, para una operación de referencia |
 | `GET` | `/api/rates/cop` | TRM, precio P2P del peso y sus dos valores en Bs |
 | `POST` | `/api/convert` | Equivalencias de un monto |
 | `GET` | `/api/health` | Estado de cada proveedor (`200` sano, `207` degradado) |
@@ -70,8 +71,9 @@ curl -X POST localhost:3000/api/convert \
   -d '{"amount":100,"from":"USD_BCV"}'
 ```
 
-Bases válidas en `from`: `USD_BCV`, `USD_BINANCE`, `EUR_BCV`, `COP_OFICIAL`, `COP_FRONTERA`,
-`VES`. Los errores siempre responden `{ "error": "...", "detail": "..." }`.
+Bases válidas en `from`: `USD_BCV`, `USD_BINANCE_BUY`, `USD_BINANCE_SELL`, `EUR_BCV`,
+`COP_OFICIAL`, `COP_FRONTERA`, `VES`. Los errores siempre responden
+`{ "error": "...", "detail": "..." }`.
 
 ## Fuentes de datos
 
@@ -79,7 +81,7 @@ Bases válidas en `from`: `USD_BCV`, `USD_BINANCE`, `EUR_BCV`, `COP_OFICIAL`, `C
 | --- | --- | --- |
 | Dólar y euro BCV | `https://www.bcv.org.ve/` | Se lee el HTML de la portada. Su certificado TLS está vencido, así que la petición usa `node:https` sin validarlo, acotado a ese host |
 | Dólar BCV (respaldo) | `https://ve.dolarapi.com/v1/dolares/oficial` | Solo publica el dólar; cuando entra en juego, el euro queda sin dato |
-| Mercado P2P (VES y COP) | `POST https://p2p.binance.com/bapi/c2c/v2/friendly/c2c/adv/search` | Endpoint público de la web de Binance. Se consulta con `fiat: VES` y `fiat: COP`, tomando la mediana recortada de 20 anuncios por lado |
+| Mercado P2P (VES y COP) | `POST https://p2p.binance.com/bapi/c2c/v2/friendly/c2c/adv/search` | Endpoint público de la web de Binance. Se consulta con `fiat: VES` y `fiat: COP`. La tasa final es la mediana recortada de los anuncios que cubren una operación de referencia de $100 (en VES, además vía Pago Móvil; configurable, ver abajo); si ese filtro no trae anuncios, cae al valor sin filtrar |
 | TRM oficial | `https://www.datos.gov.co/resource/32sa-8pi3.json` | Datos abiertos de Colombia, sin clave. Es la TRM certificada por la Superintendencia Financiera |
 | TRM (respaldo) | `https://open.er-api.com/v6/latest/USD` | Cotización internacional del peso. No es la TRM, así que cuando entra en juego la tarjeta lo indica y `/api/health` lo explica |
 
@@ -96,6 +98,17 @@ El documento de partida proponía otros endpoints que, al verificarlos, ya no se
 - `api.frankfurter.dev` → 404, y Frankfurter solo cubre monedas del BCE (sin COP ni VES).
 - `api.exchangerate.host` → exige `access_key`.
 - Binance vía SDK → innecesario, el endpoint REST público basta.
+
+## Variables de entorno
+
+Ambas son opcionales; sin definirlas, la app usa $100 vía Pago Móvil como operación de
+referencia para la tasa Binance P2P en VES (en COP se filtra solo por monto). Ver
+`.env.example`.
+
+| Variable | Default | Qué controla |
+| --- | --- | --- |
+| `BINANCE_REFERENCE_USD_AMOUNT` | `100` | Monto (en USD) de la operación de referencia usada para filtrar anuncios por `transAmount`, en VES y en COP |
+| `BINANCE_REFERENCE_PAY_TYPE` | `PagoMovil` | Identificador de Binance para el método de pago usado en el filtro `payTypes`, solo en VES |
 
 ## Caché y actualización
 

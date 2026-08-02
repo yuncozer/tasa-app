@@ -9,7 +9,8 @@
 /** Bases de cotización que maneja Tasapp. */
 export type RateKey =
   | "USD_BCV"
-  | "USD_BINANCE"
+  | "USD_BINANCE_BUY"
+  | "USD_BINANCE_SELL"
   | "EUR_BCV"
   | "COP_OFICIAL"
   | "COP_FRONTERA"

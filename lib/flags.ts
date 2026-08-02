@@ -12,7 +12,8 @@ import type { RateKey } from "@/lib/types";
  */
 export const FLAGS: Record<RateKey, string> = {
   USD_BCV: "🇺🇸",
-  USD_BINANCE: "🇺🇸",
+  USD_BINANCE_BUY: "🇺🇸",
+  USD_BINANCE_SELL: "🇺🇸",
   EUR_BCV: "🇪🇺",
   COP_OFICIAL: "🇨🇴",
   COP_FRONTERA: "🇨🇴",

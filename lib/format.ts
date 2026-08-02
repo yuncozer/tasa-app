@@ -8,7 +8,8 @@ import type { RateKey } from "@/lib/types";
 
 const DECIMALS: Record<RateKey, number> = {
   USD_BCV: 2,
-  USD_BINANCE: 2,
+  USD_BINANCE_BUY: 2,
+  USD_BINANCE_SELL: 2,
   EUR_BCV: 2,
   COP_OFICIAL: 0,
   COP_FRONTERA: 0,

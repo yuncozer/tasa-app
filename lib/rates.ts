@@ -17,7 +17,8 @@ const TTL_MS = 5 * 60 * 1000;
 
 const RATE_META: Record<RateKey, Pick<Rate, "label" | "shortLabel" | "symbol">> = {
   USD_BCV: { label: "Dólar BCV", shortLabel: "$ BCV", symbol: "$" },
-  USD_BINANCE: { label: "Dólar Binance", shortLabel: "$ Binance", symbol: "$" },
+  USD_BINANCE_BUY: { label: "Dólar Binance (compra)", shortLabel: "$ Bin. compra", symbol: "$" },
+  USD_BINANCE_SELL: { label: "Dólar Binance (venta)", shortLabel: "$ Bin. venta", symbol: "$" },
   EUR_BCV: { label: "Euro BCV", shortLabel: "€ BCV", symbol: "€" },
   COP_OFICIAL: { label: "Peso oficial", shortLabel: "COP oficial", symbol: "COP" },
   COP_FRONTERA: { label: "Peso frontera", shortLabel: "COP frontera", symbol: "COP" },
@@ -27,7 +28,8 @@ const RATE_META: Record<RateKey, Pick<Rate, "label" | "shortLabel" | "symbol">> 
 /** Orden en que se muestran las tasas y los resultados. */
 export const RATE_ORDER: RateKey[] = [
   "USD_BCV",
-  "USD_BINANCE",
+  "USD_BINANCE_BUY",
+  "USD_BINANCE_SELL",
   "EUR_BCV",
   "COP_OFICIAL",
   "COP_FRONTERA",
@@ -116,14 +118,19 @@ async function buildSnapshot(): Promise<RatesSnapshot> {
       bcvData?.source ?? "BCV",
       bcvData?.updatedAt ?? null,
     ),
-    USD_BINANCE: buildRate(
-      "USD_BINANCE",
-      vesData?.mid ?? null,
+    USD_BINANCE_BUY: buildRate(
+      "USD_BINANCE_BUY",
+      vesData?.buy ?? null,
       "Binance P2P",
       vesData ? now : null,
-      vesData
-        ? `Compra ${vesData.buy.toFixed(2)} · venta ${vesData.sell.toFixed(2)}`
-        : undefined,
+      "Ref. $100 vía Pago Móvil",
+    ),
+    USD_BINANCE_SELL: buildRate(
+      "USD_BINANCE_SELL",
+      vesData?.sell ?? null,
+      "Binance P2P",
+      vesData ? now : null,
+      "Ref. $100 vía Pago Móvil",
     ),
     EUR_BCV: buildRate(
       "EUR_BCV",
