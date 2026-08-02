@@ -1,4 +1,4 @@
-import { formatDate } from "@/lib/format";
+import { formatDate, formatRelative } from "@/lib/format";
 
 /**
  * Letra pequeña de la app: cuándo se consultaron las tasas y el aviso legal.
@@ -9,8 +9,8 @@ import { formatDate } from "@/lib/format";
 export function Footer({ fetchedAt }: { fetchedAt: string }) {
   return (
     <footer className="mt-2 flex flex-col gap-3 border-t border-[color:var(--border)] pt-4 text-xs leading-relaxed text-[color:var(--muted)]">
-      <p className="text-center">
-        Tasas consultadas el {formatDate(fetchedAt)} · se actualizan cada 5 minutos
+      <p className="text-center" title={formatDate(fetchedAt)}>
+        Tasas consultadas {formatRelative(fetchedAt)} · se actualizan cada 5 minutos
       </p>
 
       <p>

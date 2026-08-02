@@ -1,4 +1,4 @@
-import { formatDate, formatRate } from "@/lib/format";
+import { formatDate, formatRate, formatRelative } from "@/lib/format";
 
 interface RateCardProps {
   label: string;
@@ -50,8 +50,9 @@ export function RateCard({ label, flag, value, source, updatedAt, note }: RateCa
         ) : (
           <>
             {note && <p>{note}</p>}
-            <p className="truncate">
-              {source} · {formatDate(updatedAt)}
+            {/* La fecha exacta queda en el título, al alcance del ratón. */}
+            <p className="truncate" title={formatDate(updatedAt)}>
+              {source} · {formatRelative(updatedAt)}
             </p>
           </>
         )}
