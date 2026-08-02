@@ -117,6 +117,29 @@ fija que quedaría obsoleta al primer despliegue.
 `VERSION` en `public/sw.js` se sube **a mano**: si cambias la estrategia y no lo
 haces, quedan copias viejas colgadas en los dispositivos.
 
+### La tasa Binance es una operación de referencia, no el mejor anuncio
+
+El precio del mejor anuncio sin filtrar **no es representativo**: en Binance P2P la
+tasa cambia según el monto (los anuncios tienen límites min/max) y, en VES, según el
+método de pago. Por eso `lib/providers/binance.ts` no usa el listado sin filtrar:
+primero hace un fetch de sondeo (sin filtros) para tener un precio aproximado, y con
+él calcula cuánto vale en moneda local una operación de referencia
+(`BINANCE_REFERENCE_USD_AMOUNT` dólares, default 100; en VES además vía
+`BINANCE_REFERENCE_PAY_TYPE`, default Pago Móvil). La tasa final es la mediana
+recortada de los anuncios que cubren esa operación. Si el filtro no trae anuncios
+(poca liquidez con ese monto/método), cae al precio de sondeo en vez de romper el
+fetch — no lo cambies a lanzar un error ahí, es degradación intencional.
+
+En COP solo se filtra por monto: no hay un identificador de método de pago
+colombiano verificado, así que forzar uno arriesga vaciar el resultado sin
+necesidad.
+
+Compra y venta ya no se promedian en una sola tasa: son dos `RateKey`
+independientes (`USD_BINANCE_BUY` / `USD_BINANCE_SELL`), porque la diferencia entre
+ambas es real (verificado en vivo: ~847 vs ~838, más de un 1 %) y esconderla en un
+promedio daba una imagen falsa de lo que se paga o se recibe. `BinanceDetail.mid`
+se conserva porque `COP_FRONTERA` lo sigue usando para el cruce VES↔COP.
+
 ### El aviso legal se queda
 
 El pie declara que los datos son de terceros, que Tasapp no fija ni certifica
