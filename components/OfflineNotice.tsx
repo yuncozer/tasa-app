@@ -32,10 +32,12 @@ export function OfflineNotice({ fetchedAt }: { fetchedAt: string }) {
 
   if (!sinConexion) return null;
 
+  // Se ancla al área segura y no al borde: instalada en iPhone, el borde queda
+  // bajo la barra de estado.
   return (
     <div
       role="status"
-      className="sticky top-0 z-10 -mx-4 mb-1 border-b border-[color:var(--warning)]/40 bg-[color:var(--warning)]/15 px-4 py-2 text-center text-xs font-medium text-[color:var(--warning)] backdrop-blur sm:-mx-6 sm:px-6"
+      className="sticky top-[env(safe-area-inset-top)] z-10 -mx-4 mb-1 border-b border-[color:var(--warning)]/40 bg-[color:var(--warning)]/15 px-4 py-2 text-center text-xs font-medium text-[color:var(--warning)] backdrop-blur sm:-mx-6 sm:px-6"
     >
       Sin conexión · tasas de {formatRelative(fetchedAt)}
     </div>

@@ -27,8 +27,11 @@ export default async function Home({
 
   const snapshot = await getRates();
 
+  // El margen superior respeta el área segura porque, instalada en iPhone, la app
+  // se dibuja por debajo de la barra de estado: sin eso, la hora y la batería se
+  // montan sobre el nombre.
   return (
-    <main className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-6 px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-6 sm:px-6">
+    <main className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-6 px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(1.5rem,env(safe-area-inset-top))] sm:px-6">
       <OfflineNotice fetchedAt={snapshot.fetchedAt} />
 
       <header className="flex items-center gap-3">
