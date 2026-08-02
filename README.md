@@ -33,14 +33,25 @@ Ejemplo con las tasas del 2 de agosto de 2026:
 | Paso | Cálculo | Resultado |
 | --- | --- | --- |
 | 100 $ a tasa BCV | 100 × 748,7864 | 74.878,64 Bs |
-| esos Bs en dólares Binance | 74.878,64 ÷ 846,4575 | 88,46 $ |
+| esos Bs en dólares Binance | 74.878,64 ÷ 846,38 | 88,47 $ |
 | esos Bs en euros BCV | 74.878,64 ÷ 861,1867 | 86,95 € |
-| esos Bs en pesos (cruce BCV) | 74.878,64 ÷ 0,23378 | 320.289 COP |
-| esos Bs en pesos (cruce Binance) | 74.878,64 ÷ 0,26428 | 283.331 COP |
+| esos Bs en pesos oficiales | 74.878,64 ÷ 0,2382 | 314.414 COP |
+| esos Bs en pesos de frontera | 74.878,64 ÷ 0,2683 | 279.039 COP |
 
-El peso no cotiza contra el bolívar: su precio en Bs es un cruce vía dólar
-(`bsPorPeso = bsPorDólar ÷ pesosPorDólar`). Por eso se publican **dos** cruces, el oficial
-y el del mercado P2P, que es el que suele regir en la práctica.
+### Los dos precios del peso
+
+El peso no cotiza contra el bolívar: su precio en Bs sale de cruzar dos dólares, y según
+cuáles se usen salen dos números que en la frontera conviven:
+
+```
+Peso oficial   = dólar BCV        ÷ TRM                 = 748,79 ÷ 3.144,14 = 0,2382 Bs
+Peso frontera  = dólar Binance VES ÷ dólar Binance COP  = 846,38 ÷ 3.154,08 = 0,2683 Bs
+```
+
+El **oficial** cruza las dos tasas de papel: la del BCV y la TRM del Banco de la República.
+El de **frontera** cruza los dos mercados P2P, que es lo que de verdad se paga: hoy un 12,6 %
+por encima. No existe API pública de las casas de cambio de Cúcuta, así que ese cruce de
+mercado es la mejor aproximación verificable.
 
 ## API REST
 
@@ -48,8 +59,8 @@ y el del mercado P2P, que es el que suele regir en la práctica.
 | --- | --- | --- |
 | `GET` | `/api/rates` | Todas las tasas. `?refresh=1` salta la caché |
 | `GET` | `/api/rates/bcv` | Dólar y euro oficiales |
-| `GET` | `/api/rates/binance` | Dólar P2P con compra, venta y punto medio |
-| `GET` | `/api/rates/cop` | Pesos por dólar y los dos cruces en Bs |
+| `GET` | `/api/rates/binance` | Mercado P2P en VES y en COP, con compra, venta y punto medio |
+| `GET` | `/api/rates/cop` | TRM, precio P2P del peso y sus dos valores en Bs |
 | `POST` | `/api/convert` | Equivalencias de un monto |
 | `GET` | `/api/health` | Estado de cada proveedor (`200` sano, `207` degradado) |
 
@@ -59,7 +70,7 @@ curl -X POST localhost:3000/api/convert \
   -d '{"amount":100,"from":"USD_BCV"}'
 ```
 
-Bases válidas en `from`: `USD_BCV`, `USD_BINANCE`, `EUR_BCV`, `COP_BCV`, `COP_BINANCE`,
+Bases válidas en `from`: `USD_BCV`, `USD_BINANCE`, `EUR_BCV`, `COP_OFICIAL`, `COP_FRONTERA`,
 `VES`. Los errores siempre responden `{ "error": "...", "detail": "..." }`.
 
 ## Fuentes de datos
@@ -68,8 +79,9 @@ Bases válidas en `from`: `USD_BCV`, `USD_BINANCE`, `EUR_BCV`, `COP_BCV`, `COP_B
 | --- | --- | --- |
 | Dólar y euro BCV | `https://www.bcv.org.ve/` | Se lee el HTML de la portada. Su certificado TLS está vencido, así que la petición usa `node:https` sin validarlo, acotado a ese host |
 | Dólar BCV (respaldo) | `https://ve.dolarapi.com/v1/dolares/oficial` | Solo publica el dólar; cuando entra en juego, el euro queda sin dato |
-| Dólar Binance P2P | `POST https://p2p.binance.com/bapi/c2c/v2/friendly/c2c/adv/search` | Endpoint público de la web de Binance. Se toma la mediana recortada de 20 anuncios por lado |
-| Pesos por dólar | `https://open.er-api.com/v6/latest/USD` | Plan abierto de ExchangeRate-API, sin clave |
+| Mercado P2P (VES y COP) | `POST https://p2p.binance.com/bapi/c2c/v2/friendly/c2c/adv/search` | Endpoint público de la web de Binance. Se consulta con `fiat: VES` y `fiat: COP`, tomando la mediana recortada de 20 anuncios por lado |
+| TRM oficial | `https://www.datos.gov.co/resource/32sa-8pi3.json` | Datos abiertos de Colombia, sin clave. Es la TRM certificada por la Superintendencia Financiera |
+| TRM (respaldo) | `https://open.er-api.com/v6/latest/USD` | Cotización internacional del peso. No es la TRM, así que cuando entra en juego la tarjeta lo indica y `/api/health` lo explica |
 
 Si el entorno define `HTTPS_PROXY`, la petición al BCV abre el túnel `CONNECT` a mano:
 Node no aplica esa variable por su cuenta.

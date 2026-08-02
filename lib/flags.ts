@@ -14,7 +14,7 @@ export const FLAGS: Record<RateKey, string> = {
   USD_BCV: "🇺🇸",
   USD_BINANCE: "🇺🇸",
   EUR_BCV: "🇪🇺",
-  COP_BCV: "🇨🇴",
-  COP_BINANCE: "🇨🇴",
+  COP_OFICIAL: "🇨🇴",
+  COP_FRONTERA: "🇨🇴",
   VES: "🇻🇪",
 };

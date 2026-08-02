@@ -33,9 +33,7 @@ export default async function Home({
           <h1 className="text-3xl font-bold leading-none tracking-tight">
             Tas<span className="text-[color:var(--accent)]">app</span>
           </h1>
-          <p className="text-sm text-[color:var(--muted)]">
-            Cuánto vale tu dinero hoy en la frontera, en bolívares.
-          </p>
+          <p className="text-sm text-[color:var(--muted)]">Cuánto vale tu dinero hoy</p>
         </div>
       </header>
 

@@ -1,57 +1,43 @@
 import { RateCard } from "@/components/RateCard";
 import { FLAGS } from "@/lib/flags";
+import { RATE_ORDER } from "@/lib/rates";
 import type { RatesSnapshot } from "@/lib/types";
 
 /**
- * Las cuatro referencias del día. El peso va en una sola tarjeta con sus dos
- * cruces, porque en la práctica es una misma moneda vista con dos dólares
- * distintos.
+ * Las cinco referencias del día.
+ *
+ * El peso ocupa dos tarjetas —oficial y frontera— en vez de amontonar ambas
+ * cifras en una: son dos precios distintos del mismo billete y conviene
+ * compararlos de un vistazo.
  */
 export function RatePanel({ snapshot }: { snapshot: RatesSnapshot }) {
-  const { USD_BCV, USD_BINANCE, EUR_BCV, COP_BCV, COP_BINANCE } = snapshot.rates;
+  const keys = RATE_ORDER.filter((key) => key !== "VES");
 
   return (
     <section aria-labelledby="tasas-titulo" className="flex flex-col gap-3">
-      <h2 id="tasas-titulo" className="text-sm font-semibold uppercase tracking-wide text-[color:var(--muted)]">
+      <h2
+        id="tasas-titulo"
+        className="text-sm font-semibold uppercase tracking-wide text-[color:var(--muted)]"
+      >
         Tasas de hoy
       </h2>
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <RateCard
-          label="Dólar BCV"
-          symbol="$"
-          flag={FLAGS.USD_BCV}
-          value={USD_BCV.bsPerUnit}
-          source={USD_BCV.source}
-          updatedAt={USD_BCV.updatedAt}
-        />
-        <RateCard
-          label="Dólar Binance P2P"
-          symbol="$"
-          flag={FLAGS.USD_BINANCE}
-          value={USD_BINANCE.bsPerUnit}
-          source={USD_BINANCE.source}
-          updatedAt={USD_BINANCE.updatedAt}
-          note={USD_BINANCE.note}
-        />
-        <RateCard
-          label="Euro BCV"
-          symbol="€"
-          flag={FLAGS.EUR_BCV}
-          value={EUR_BCV.bsPerUnit}
-          source={EUR_BCV.source}
-          updatedAt={EUR_BCV.updatedAt}
-        />
-        <RateCard
-          label="Peso colombiano"
-          symbol="COL$"
-          flag={FLAGS.COP_BCV}
-          value={COP_BCV.bsPerUnit}
-          secondary={{ label: "Cruce Binance", value: COP_BINANCE.bsPerUnit }}
-          source={COP_BCV.source}
-          updatedAt={COP_BCV.updatedAt}
-          note={COP_BCV.note ? `Cruce BCV arriba · ${COP_BCV.note}` : "Cruce BCV arriba"}
-        />
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 sm:gap-3 lg:grid-cols-3">
+        {keys.map((key) => {
+          const rate = snapshot.rates[key];
+
+          return (
+            <RateCard
+              key={key}
+              label={rate.label}
+              flag={FLAGS[key]}
+              value={rate.bsPerUnit}
+              source={rate.source}
+              updatedAt={rate.updatedAt}
+              note={rate.note}
+            />
+          );
+        })}
       </div>
     </section>
   );

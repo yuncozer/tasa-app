@@ -1,17 +1,23 @@
 import type { BinanceDetail } from "@/lib/types";
 
 /**
- * Mercado P2P de Binance para USDT/VES.
+ * Mercado P2P de Binance.
  *
  * Es el endpoint público que usa la propia web de Binance, así que no hace falta
  * API key ni el SDK. Devuelve los anuncios ordenados por mejor precio; para que
  * un anuncio suelto no distorsione la tasa se recorta el 20 % extremo de la
  * lista y se toma la mediana de lo que queda.
+ *
+ * Se consulta con dos monedas: USDT/VES da el dólar paralelo venezolano y
+ * USDT/COP el precio real del peso. Cruzando ambas sale la tasa de frontera.
  */
 
 const P2P_URL = "https://p2p.binance.com/bapi/c2c/v2/friendly/c2c/adv/search";
 const ROWS = 20;
 const TIMEOUT_MS = 12_000;
+
+/** Monedas locales que consulta Tasapp. */
+export type P2PFiat = "VES" | "COP";
 
 interface P2PResponse {
   data?: { adv?: { price?: string } }[];
@@ -19,9 +25,9 @@ interface P2PResponse {
 
 /**
  * `BUY` devuelve los anuncios en los que el usuario compra USDT pagando en
- * bolívares; `SELL`, aquellos en los que vende USDT y recibe bolívares.
+ * moneda local; `SELL`, aquellos en los que vende USDT y recibe moneda local.
  */
-async function fetchSide(tradeType: "BUY" | "SELL"): Promise<number[]> {
+async function fetchSide(fiat: P2PFiat, tradeType: "BUY" | "SELL"): Promise<number[]> {
   const response = await fetch(P2P_URL, {
     method: "POST",
     cache: "no-store",
@@ -36,7 +42,7 @@ async function fetchSide(tradeType: "BUY" | "SELL"): Promise<number[]> {
       page: 1,
       rows: ROWS,
       asset: "USDT",
-      fiat: "VES",
+      fiat,
       tradeType,
       payTypes: [],
       publisherType: null,
@@ -50,7 +56,7 @@ async function fetchSide(tradeType: "BUY" | "SELL"): Promise<number[]> {
     .map((entry) => Number(entry.adv?.price))
     .filter((price) => Number.isFinite(price) && price > 0);
 
-  if (prices.length === 0) throw new Error(`Binance P2P: sin anuncios ${tradeType}`);
+  if (prices.length === 0) throw new Error(`Binance P2P: sin anuncios ${tradeType}/${fiat}`);
   return prices;
 }
 
@@ -64,8 +70,11 @@ function trimmedMedian(prices: number[]): number {
   return core.length % 2 === 0 ? (core[middle - 1] + core[middle]) / 2 : core[middle];
 }
 
-export async function fetchBinanceRate(): Promise<BinanceDetail> {
-  const [buyPrices, sellPrices] = await Promise.all([fetchSide("BUY"), fetchSide("SELL")]);
+export async function fetchBinanceRate(fiat: P2PFiat): Promise<BinanceDetail> {
+  const [buyPrices, sellPrices] = await Promise.all([
+    fetchSide(fiat, "BUY"),
+    fetchSide(fiat, "SELL"),
+  ]);
 
   const buy = trimmedMedian(buyPrices);
   const sell = trimmedMedian(sellPrices);

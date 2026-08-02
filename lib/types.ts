@@ -11,8 +11,8 @@ export type RateKey =
   | "USD_BCV"
   | "USD_BINANCE"
   | "EUR_BCV"
-  | "COP_BCV"
-  | "COP_BINANCE"
+  | "COP_OFICIAL"
+  | "COP_FRONTERA"
   | "VES";
 
 /** Una cotización lista para mostrar o para calcular. */
@@ -34,11 +34,11 @@ export interface Rate {
   note?: string;
 }
 
-/** Detalle del mercado P2P de Binance para USDT/VES. */
+/** Detalle del mercado P2P de Binance para una moneda local. */
 export interface BinanceDetail {
-  /** Precio al que el usuario compra USDT pagando en bolívares. */
+  /** Precio al que el usuario compra USDT pagando en moneda local. */
   buy: number;
-  /** Precio al que el usuario vende USDT y recibe bolívares. */
+  /** Precio al que el usuario vende USDT y recibe moneda local. */
   sell: number;
   /** Punto medio entre `buy` y `sell`: la tasa que usa la calculadora. */
   mid: number;
@@ -61,10 +61,12 @@ export interface RatesSnapshot {
   /** Momento en que se armó esta fotografía (ISO 8601). */
   fetchedAt: string;
   rates: Record<RateKey, Rate>;
-  /** Compra/venta del P2P, `null` si Binance falló. */
-  binance: BinanceDetail | null;
-  /** Pesos colombianos por dólar, según el mercado internacional. */
-  usdCop: number | null;
+  /** Compra/venta del P2P en cada moneda; `null` la que haya fallado. */
+  binance: { ves: BinanceDetail | null; cop: BinanceDetail | null };
+  /** Pesos por dólar según la TRM oficial de Colombia. */
+  trm: number | null;
+  /** Pesos por dólar en el mercado P2P. */
+  copMercado: number | null;
   providers: ProviderStatus[];
 }
 

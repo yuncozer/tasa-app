@@ -1,11 +1,11 @@
 import { withCache } from "@/lib/cache";
 import { fetchBcvRates } from "@/lib/providers/bcv";
 import { fetchBinanceRate } from "@/lib/providers/binance";
-import { fetchCopRate } from "@/lib/providers/cop";
+import { fetchTrmRate } from "@/lib/providers/trm";
 import type { ProviderStatus, Rate, RateKey, RatesSnapshot } from "@/lib/types";
 
 /**
- * Arma la fotografía de tasas consultando los tres proveedores en paralelo.
+ * Arma la fotografía de tasas consultando los cuatro proveedores en paralelo.
  *
  * Se usa `allSettled` a propósito: que Binance esté caído no debe impedir ver la
  * tasa del BCV. Cada tasa que no se pudo obtener queda con `bsPerUnit: null` y
@@ -17,14 +17,10 @@ const TTL_MS = 5 * 60 * 1000;
 
 const RATE_META: Record<RateKey, Pick<Rate, "label" | "shortLabel" | "symbol">> = {
   USD_BCV: { label: "Dólar BCV", shortLabel: "$ BCV", symbol: "$" },
-  USD_BINANCE: { label: "Dólar Binance P2P", shortLabel: "$ Binance", symbol: "$" },
+  USD_BINANCE: { label: "Dólar Binance", shortLabel: "$ Binance", symbol: "$" },
   EUR_BCV: { label: "Euro BCV", shortLabel: "€ BCV", symbol: "€" },
-  COP_BCV: { label: "Peso colombiano (cruce BCV)", shortLabel: "COP · BCV", symbol: "COL$" },
-  COP_BINANCE: {
-    label: "Peso colombiano (cruce Binance)",
-    shortLabel: "COP · Binance",
-    symbol: "COL$",
-  },
+  COP_OFICIAL: { label: "Peso oficial", shortLabel: "COP oficial", symbol: "COL$" },
+  COP_FRONTERA: { label: "Peso frontera", shortLabel: "COP frontera", symbol: "COL$" },
   VES: { label: "Bolívar", shortLabel: "Bs", symbol: "Bs" },
 };
 
@@ -33,8 +29,8 @@ export const RATE_ORDER: RateKey[] = [
   "USD_BCV",
   "USD_BINANCE",
   "EUR_BCV",
-  "COP_BCV",
-  "COP_BINANCE",
+  "COP_OFICIAL",
+  "COP_FRONTERA",
   "VES",
 ];
 
@@ -56,16 +52,22 @@ function describeError(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+function formatCop(value: number): string {
+  return new Intl.NumberFormat("es-CO", { maximumFractionDigits: 2 }).format(value);
+}
+
 async function buildSnapshot(): Promise<RatesSnapshot> {
-  const [bcv, binance, cop] = await Promise.allSettled([
+  const [bcv, binanceVes, binanceCop, trm] = await Promise.allSettled([
     fetchBcvRates(),
-    fetchBinanceRate(),
-    fetchCopRate(),
+    fetchBinanceRate("VES"),
+    fetchBinanceRate("COP"),
+    fetchTrmRate(),
   ]);
 
   const bcvData = bcv.status === "fulfilled" ? bcv.value : null;
-  const binanceData = binance.status === "fulfilled" ? binance.value : null;
-  const copData = cop.status === "fulfilled" ? cop.value : null;
+  const vesData = binanceVes.status === "fulfilled" ? binanceVes.value : null;
+  const copData = binanceCop.status === "fulfilled" ? binanceCop.value : null;
+  const trmData = trm.status === "fulfilled" ? trm.value : null;
 
   const providers: ProviderStatus[] = [
     {
@@ -76,26 +78,36 @@ async function buildSnapshot(): Promise<RatesSnapshot> {
       warning: bcvData?.warning,
     },
     {
-      name: "binance",
-      ok: binance.status === "fulfilled",
-      source: binanceData ? "Binance P2P (USDT/VES)" : null,
-      error: binance.status === "rejected" ? describeError(binance.reason) : null,
+      name: "binance-ves",
+      ok: binanceVes.status === "fulfilled",
+      source: vesData ? "Binance P2P (USDT/VES)" : null,
+      error: binanceVes.status === "rejected" ? describeError(binanceVes.reason) : null,
     },
     {
-      name: "cop",
-      ok: cop.status === "fulfilled",
-      source: copData?.source ?? null,
-      error: cop.status === "rejected" ? describeError(cop.reason) : null,
+      name: "binance-cop",
+      ok: binanceCop.status === "fulfilled",
+      source: copData ? "Binance P2P (USDT/COP)" : null,
+      error: binanceCop.status === "rejected" ? describeError(binanceCop.reason) : null,
+    },
+    {
+      name: "trm",
+      ok: trm.status === "fulfilled",
+      source: trmData?.source ?? null,
+      error: trm.status === "rejected" ? describeError(trm.reason) : null,
+      warning: trmData?.warning,
     },
   ];
 
-  // El peso no cotiza contra el bolívar: su precio en Bs es un cruce vía dólar.
-  // Se calculan las dos versiones porque en la frontera conviven ambas lógicas.
-  const usdCop = copData?.usdCop ?? null;
-  const bsPerCop = (bsPerUsd: number | null | undefined): number | null =>
-    usdCop && bsPerUsd ? bsPerUsd / usdCop : null;
+  // El peso no cotiza contra el bolívar: su precio en Bs sale de cruzar dos
+  // dólares. Con los oficiales (BCV y TRM) da la relación de papel; con los dos
+  // mercados P2P, lo que de verdad se paga en la frontera.
+  const trmValue = trmData?.copPerUsd ?? null;
+  const copMercado = copData?.mid ?? null;
 
-  const copNote = usdCop ? `1 USD = ${usdCop.toFixed(2)} COP` : undefined;
+  const bsPorPesoOficial = trmValue && bcvData?.usd ? bcvData.usd / trmValue : null;
+  const bsPorPesoFrontera = vesData && copMercado ? vesData.mid / copMercado : null;
+
+  const now = new Date().toISOString();
 
   const rates: Record<RateKey, Rate> = {
     USD_BCV: buildRate(
@@ -106,11 +118,11 @@ async function buildSnapshot(): Promise<RatesSnapshot> {
     ),
     USD_BINANCE: buildRate(
       "USD_BINANCE",
-      binanceData?.mid ?? null,
-      "Binance P2P (USDT/VES)",
-      binanceData ? new Date().toISOString() : null,
-      binanceData
-        ? `Compra ${binanceData.buy.toFixed(2)} · Venta ${binanceData.sell.toFixed(2)}`
+      vesData?.mid ?? null,
+      "Binance P2P",
+      vesData ? now : null,
+      vesData
+        ? `Compra ${vesData.buy.toFixed(2)} · venta ${vesData.sell.toFixed(2)}`
         : undefined,
     ),
     EUR_BCV: buildRate(
@@ -119,28 +131,29 @@ async function buildSnapshot(): Promise<RatesSnapshot> {
       bcvData?.source ?? "BCV",
       bcvData?.updatedAt ?? null,
     ),
-    COP_BCV: buildRate(
-      "COP_BCV",
-      bsPerCop(bcvData?.usd),
-      copData?.source ?? "ExchangeRate-API",
-      copData?.updatedAt ?? null,
-      copNote,
+    COP_OFICIAL: buildRate(
+      "COP_OFICIAL",
+      bsPorPesoOficial,
+      trmData?.source ?? "TRM",
+      trmData?.updatedAt ?? null,
+      trmValue ? `${formatCop(trmValue)} por dólar` : undefined,
     ),
-    COP_BINANCE: buildRate(
-      "COP_BINANCE",
-      bsPerCop(binanceData?.mid),
-      copData?.source ?? "ExchangeRate-API",
-      copData?.updatedAt ?? null,
-      copNote,
+    COP_FRONTERA: buildRate(
+      "COP_FRONTERA",
+      bsPorPesoFrontera,
+      "Binance P2P",
+      copMercado ? now : null,
+      copMercado ? `${formatCop(copMercado)} por dólar` : undefined,
     ),
     VES: buildRate("VES", 1, "Moneda base", null),
   };
 
   return {
-    fetchedAt: new Date().toISOString(),
+    fetchedAt: now,
     rates,
-    binance: binanceData,
-    usdCop,
+    binance: { ves: vesData, cop: copData },
+    trm: trmValue,
+    copMercado,
     providers,
   };
 }

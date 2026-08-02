@@ -138,7 +138,7 @@ async function fetchFromSite(): Promise<BcvRates> {
 
   if (usd === null) throw new Error("BCV: no se encontró la tasa del dólar en el HTML");
 
-  return { usd, eur, updatedAt: parseValueDate(html), source: "BCV (bcv.org.ve)" };
+  return { usd, eur, updatedAt: parseValueDate(html), source: "BCV" };
 }
 
 async function fetchFromDolarApi(): Promise<BcvRates> {
@@ -160,7 +160,7 @@ async function fetchFromDolarApi(): Promise<BcvRates> {
     usd: data.promedio,
     eur: null,
     updatedAt: data.fechaActualizacion ?? null,
-    source: "BCV vía ve.dolarapi.com",
+    source: "BCV · vía DolarAPI",
   };
 }
 
