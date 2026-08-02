@@ -1,4 +1,5 @@
 import { RateCard } from "@/components/RateCard";
+import { FLAGS } from "@/lib/flags";
 import type { RatesSnapshot } from "@/lib/types";
 
 /**
@@ -19,6 +20,7 @@ export function RatePanel({ snapshot }: { snapshot: RatesSnapshot }) {
         <RateCard
           label="Dólar BCV"
           symbol="$"
+          flag={FLAGS.USD_BCV}
           value={USD_BCV.bsPerUnit}
           source={USD_BCV.source}
           updatedAt={USD_BCV.updatedAt}
@@ -26,6 +28,7 @@ export function RatePanel({ snapshot }: { snapshot: RatesSnapshot }) {
         <RateCard
           label="Dólar Binance P2P"
           symbol="$"
+          flag={FLAGS.USD_BINANCE}
           value={USD_BINANCE.bsPerUnit}
           source={USD_BINANCE.source}
           updatedAt={USD_BINANCE.updatedAt}
@@ -34,6 +37,7 @@ export function RatePanel({ snapshot }: { snapshot: RatesSnapshot }) {
         <RateCard
           label="Euro BCV"
           symbol="€"
+          flag={FLAGS.EUR_BCV}
           value={EUR_BCV.bsPerUnit}
           source={EUR_BCV.source}
           updatedAt={EUR_BCV.updatedAt}
@@ -41,6 +45,7 @@ export function RatePanel({ snapshot }: { snapshot: RatesSnapshot }) {
         <RateCard
           label="Peso colombiano"
           symbol="COL$"
+          flag={FLAGS.COP_BCV}
           value={COP_BCV.bsPerUnit}
           secondary={{ label: "Cruce Binance", value: COP_BINANCE.bsPerUnit }}
           source={COP_BCV.source}

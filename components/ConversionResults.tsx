@@ -1,3 +1,4 @@
+import { FLAGS } from "@/lib/flags";
 import { formatAmount, formatRate } from "@/lib/format";
 import { RATE_ORDER } from "@/lib/rates";
 import type { ConversionResult, RatesSnapshot } from "@/lib/types";
@@ -42,7 +43,12 @@ export function ConversionResults({
           return (
             <li key={key} className="flex items-center justify-between gap-3 px-4 py-3">
               <div className="min-w-0">
-                <p className="truncate text-sm font-medium">{rate.label}</p>
+                <p className="truncate text-sm font-medium">
+                  <span aria-hidden="true" className="mr-1.5">
+                    {FLAGS[key]}
+                  </span>
+                  {rate.label}
+                </p>
                 <p className="tabular text-xs text-[color:var(--muted)]">
                   {rate.bsPerUnit === null
                     ? "Tasa no disponible"

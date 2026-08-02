@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { ConversionResults } from "@/components/ConversionResults";
 import { Keypad, type KeypadKey } from "@/components/Keypad";
 import { convert } from "@/lib/convert";
-import { formatDate, parseInput } from "@/lib/format";
+import { parseInput } from "@/lib/format";
 import { RATE_ORDER } from "@/lib/rates";
 import type { RateKey, RatesSnapshot } from "@/lib/types";
 
@@ -116,10 +116,6 @@ export function Calculator({ snapshot }: { snapshot: RatesSnapshot }) {
         <Keypad onKey={(key) => setRaw((current) => applyKey(current, key))} onClear={() => setRaw("")} />
         <ConversionResults conversion={conversion} snapshot={snapshot} />
       </div>
-
-      <p className="text-center text-xs text-[color:var(--muted)]">
-        Tasas consultadas el {formatDate(snapshot.fetchedAt)} · se actualizan cada 5 minutos
-      </p>
     </div>
   );
 }

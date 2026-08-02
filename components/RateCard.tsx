@@ -3,6 +3,8 @@ import { formatDate, formatRate } from "@/lib/format";
 interface RateCardProps {
   label: string;
   symbol: string;
+  /** Bandera del país de la moneda (decorativa). */
+  flag: string;
   /** Bolívares por unidad. `null` cuando la fuente no respondió. */
   value: number | null;
   /** Segunda línea de valor, usada por el peso para mostrar sus dos cruces. */
@@ -16,6 +18,7 @@ interface RateCardProps {
 export function RateCard({
   label,
   symbol,
+  flag,
   value,
   secondary,
   source,
@@ -33,7 +36,13 @@ export function RateCard({
       }`}
     >
       <header className="flex items-baseline justify-between gap-2">
-        <h3 className="text-sm font-medium text-[color:var(--muted)]">{label}</h3>
+        <h3 className="flex items-baseline gap-1.5 text-sm font-medium text-[color:var(--muted)]">
+          {/* La bandera acompaña al nombre; el lector de pantalla ya lee la moneda. */}
+          <span aria-hidden="true" className="text-base leading-none">
+            {flag}
+          </span>
+          {label}
+        </h3>
         <span className="text-sm font-semibold text-[color:var(--accent)]">{symbol}</span>
       </header>
 
