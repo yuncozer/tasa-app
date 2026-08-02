@@ -41,9 +41,11 @@ export default async function Home({
         </div>
       </header>
 
+      {/* Debajo de la cabecera: al final de la página nadie llegaba a verlo. */}
+      <InstallPrompt />
+
       <RatePanel snapshot={snapshot} />
       <Calculator snapshot={snapshot} />
-      <InstallPrompt />
       <Footer fetchedAt={snapshot.fetchedAt} />
     </main>
   );

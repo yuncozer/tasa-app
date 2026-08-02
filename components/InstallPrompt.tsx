@@ -39,7 +39,30 @@ function yaInstalada(): boolean {
 }
 
 function esIOS(): boolean {
-  return /iphone|ipad|ipod/i.test(navigator.userAgent);
+  if (/iphone|ipad|ipod/i.test(navigator.userAgent)) return true;
+  // Desde iPadOS 13 el iPad se anuncia como un Mac de escritorio; lo delata que
+  // sea táctil.
+  return /macintosh/i.test(navigator.userAgent) && navigator.maxTouchPoints > 1;
+}
+
+/**
+ * Safari en navegación privada puede lanzar al tocar `localStorage`, y esto se
+ * lee desde `getSnapshot`: una excepción ahí tumbaría el render de la página.
+ */
+function leerDescartado(): boolean {
+  try {
+    return localStorage.getItem(DESCARTADO) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function guardarDescartado(): void {
+  try {
+    localStorage.setItem(DESCARTADO, "1");
+  } catch {
+    // Sin almacenamiento no se recuerda entre visitas; se oculta igualmente.
+  }
 }
 
 function suscribir(alCambiar: () => void) {
@@ -61,7 +84,7 @@ function suscribir(alCambiar: () => void) {
 }
 
 function estadoActual(): Estado {
-  if (descartado === null) descartado = localStorage.getItem(DESCARTADO) === "1";
+  if (descartado === null) descartado = leerDescartado();
   if (descartado || yaInstalada()) return "oculto";
   if (evento) return "instalar";
   return esIOS() ? "ios" : "oculto";
@@ -75,7 +98,7 @@ export function InstallPrompt() {
   if (estado === "oculto") return null;
 
   const descartar = () => {
-    localStorage.setItem(DESCARTADO, "1");
+    guardarDescartado();
     descartado = true;
     avisar();
   };
