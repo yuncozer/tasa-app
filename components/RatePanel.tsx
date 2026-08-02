@@ -9,9 +9,13 @@ import type { RatesSnapshot } from "@/lib/types";
  * El peso ocupa dos tarjetas —oficial y frontera— en vez de amontonar ambas
  * cifras en una: son dos precios distintos del mismo billete y conviene
  * compararlos de un vistazo.
+ *
+ * Binance es al revés: compra y venta comparten bandera, fuente y nota (salen
+ * del mismo fetch), así que van en una sola tarjeta con los dos montos
+ * apilados en vez de duplicar toda esa información en dos tarjetas.
  */
 export function RatePanel({ snapshot }: { snapshot: RatesSnapshot }) {
-  const keys = RATE_ORDER.filter((key) => key !== "VES");
+  const keys = RATE_ORDER.filter((key) => key !== "VES" && key !== "USD_BINANCE_SELL");
 
   return (
     <section aria-labelledby="tasas-titulo" className="flex flex-col gap-3">
@@ -24,6 +28,26 @@ export function RatePanel({ snapshot }: { snapshot: RatesSnapshot }) {
 
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 sm:gap-3 lg:grid-cols-3">
         {keys.map((key) => {
+          if (key === "USD_BINANCE_BUY") {
+            const buy = snapshot.rates.USD_BINANCE_BUY;
+            const sell = snapshot.rates.USD_BINANCE_SELL;
+
+            return (
+              <RateCard
+                key="binance"
+                label="Dólar Binance"
+                flag={FLAGS.USD_BINANCE_BUY}
+                amounts={[
+                  { label: "Compra", value: buy.bsPerUnit },
+                  { label: "Venta", value: sell.bsPerUnit },
+                ]}
+                source={buy.source}
+                updatedAt={buy.updatedAt}
+                note={buy.note}
+              />
+            );
+          }
+
           const rate = snapshot.rates[key];
 
           return (
@@ -31,7 +55,7 @@ export function RatePanel({ snapshot }: { snapshot: RatesSnapshot }) {
               key={key}
               label={rate.label}
               flag={FLAGS[key]}
-              value={rate.bsPerUnit}
+              amounts={[{ value: rate.bsPerUnit }]}
               source={rate.source}
               updatedAt={rate.updatedAt}
               note={rate.note}
