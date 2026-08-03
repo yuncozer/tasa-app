@@ -39,6 +39,7 @@ export function RatePanel({ snapshot }: { snapshot: RatesSnapshot }) {
                 key="binance"
                 label="Dólar Binance"
                 flag={FLAGS.USD_BINANCE_BUY}
+                platformLogo="/SVG/binance.svg"
                 amounts={[
                   { label: "Compra", value: buy.bsPerUnit },
                   { label: "Venta", value: sell.bsPerUnit },

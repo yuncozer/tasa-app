@@ -1,4 +1,5 @@
 import { Info } from "lucide-react";
+import { Flag, type Pais } from "@/components/Flag";
 import { Tooltip } from "@/components/Tooltip";
 import { formatDate, formatRate, formatRelative } from "@/lib/format";
 
@@ -10,8 +11,10 @@ interface RateAmount {
 
 interface RateCardProps {
   label: string;
-  /** Bandera del país de la moneda (decorativa). */
-  flag: string;
+  /** País de la moneda, para dibujar su bandera (decorativa). */
+  flag: Pais;
+  /** Ruta a un logo adicional junto a la bandera, p. ej. el de Binance en el P2P. */
+  platformLogo?: string;
   /**
    * Bolívares por unidad. Casi siempre un solo monto; Binance trae dos
    * (compra y venta) porque a partir de cierto monto la diferencia entre
@@ -40,6 +43,7 @@ interface RateCardProps {
 export function RateCard({
   label,
   flag,
+  platformLogo,
   amounts,
   source,
   updatedAt,
@@ -62,7 +66,13 @@ export function RateCard({
       <div className="min-w-0 flex-1">
         <h3 className="flex items-center gap-1.5 text-sm font-medium text-[color:var(--muted)]">
           {/* La bandera acompaña al nombre; el lector de pantalla ya lee la moneda. */}
-          <span aria-hidden="true">{flag}</span>
+          <Flag pais={flag} className="shrink-0" />
+          {/* El logo de la plataforma (p. ej. Binance) va aparte de la bandera:
+              el P2P no es una tasa de ningún país, es de quien opera el mercado. */}
+          {platformLogo && (
+            // eslint-disable-next-line @next/next/no-img-element -- SVG estático y decorativo.
+            <img src={platformLogo} alt="" width={14} height={14} className="shrink-0" />
+          )}
           {/* El truncado va en el texto, no en el contenedor flex: ahí solo
               recortaría, sin puntos suspensivos y empujando al ícono fuera. */}
           <span className="truncate">{label}</span>
