@@ -1,3 +1,4 @@
+import { Tooltip } from "@/components/Tooltip";
 import { FLAGS } from "@/lib/flags";
 import { formatAmount, formatRate } from "@/lib/format";
 import { RATE_ORDER } from "@/lib/rates";
@@ -55,12 +56,16 @@ export function ConversionResults({
                     : `a ${formatRate(rate.bsPerUnit)} Bs`}
                 </p>
               </div>
-              <p className="tabular shrink-0 text-lg font-semibold">
-                <span className="mr-1 text-xs font-normal text-[color:var(--muted)]">
-                  {rate.symbol}
-                </span>
-                {formatAmount(value, key)}
-              </p>
+              <Tooltip
+                content={`Equivalente en ${rate.label} a la tasa actual`}
+              >
+                <p className="tabular shrink-0 text-lg font-semibold">
+                  <span className="mr-1 text-xs font-normal text-[color:var(--muted)]">
+                    {rate.symbol}
+                  </span>
+                  {formatAmount(value, key)}
+                </p>
+              </Tooltip>
             </li>
           );
         })}

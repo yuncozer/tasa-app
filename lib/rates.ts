@@ -25,6 +25,31 @@ const RATE_META: Record<RateKey, Pick<Rate, "label" | "shortLabel" | "symbol">> 
   VES: { label: "Bolívar", shortLabel: "Bs", symbol: "Bs" },
 };
 
+interface RateHelp {
+  cardDescription?: string;
+  amountHelp?: string | string[];
+}
+
+const RATE_HELP: Record<RateKey, RateHelp> = {
+  USD_BCV: { cardDescription: "Tasa oficial del Banco Central de Venezuela" },
+  USD_BINANCE_BUY: {
+    cardDescription: "Precio en el mercado P2P de Binance",
+    amountHelp: ["Lo que pagas en bs por cada dólar que compres"],
+  },
+  USD_BINANCE_SELL: {
+    cardDescription: "Precio en el mercado P2P de Binance",
+    amountHelp: ["Lo que recibes en bs por cada dólar que vendas"],
+  },
+  EUR_BCV: { cardDescription: "Euro oficial del Banco Central de Venezuela" },
+  COP_OFICIAL: { cardDescription: "Peso colombiano oficial (TRM de Banco de la República)" },
+  COP_FRONTERA: { cardDescription: "Precio del peso en el mercado P2P de Binance" },
+  VES: { cardDescription: "Moneda base para conversiones" },
+};
+
+export function rateHelp(key: RateKey): RateHelp {
+  return RATE_HELP[key];
+}
+
 /** Orden en que se muestran las tasas y los resultados. */
 export const RATE_ORDER: RateKey[] = [
   "USD_BCV",

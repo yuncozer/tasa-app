@@ -1,3 +1,4 @@
+import { Tooltip } from "@/components/Tooltip";
 import { formatDate, formatRate, formatRelative } from "@/lib/format";
 
 interface RateAmount {
@@ -20,6 +21,10 @@ interface RateCardProps {
   updatedAt: string | null;
   /** Detalle propio de la tasa, p. ej. la operación de referencia del P2P. */
   note?: string;
+  /** Descripción breve de la tasa (para tooltip). */
+  description?: string;
+  /** Texto de ayuda para cada monto (string único o array para múltiples montos). */
+  amountHelp?: string | string[];
 }
 
 /**
@@ -31,9 +36,19 @@ interface RateCardProps {
  * fila por cada monto; Binance trae dos (compra y venta) porque a partir de
  * cierto monto la diferencia entre ambas es real y no un detalle menor.
  */
-export function RateCard({ label, flag, amounts, source, updatedAt, note }: RateCardProps) {
+export function RateCard({
+  label,
+  flag,
+  amounts,
+  source,
+  updatedAt,
+  note,
+  description,
+  amountHelp,
+}: RateCardProps) {
   const unavailable = amounts.every((amount) => amount.value === null);
   const stacked = amounts.length > 1;
+  const amountHelpArray = Array.isArray(amountHelp) ? amountHelp : amountHelp ? [amountHelp] : [];
 
   return (
     <article
@@ -48,6 +63,11 @@ export function RateCard({ label, flag, amounts, source, updatedAt, note }: Rate
           {/* La bandera acompaña al nombre; el lector de pantalla ya lee la moneda. */}
           <span aria-hidden="true">{flag}</span>
           {label}
+          {description && (
+            <Tooltip content={description}>
+              <span className="text-xs opacity-60">(?)</span>
+            </Tooltip>
+          )}
         </h3>
 
         <div className="mt-1 text-xs text-[color:var(--muted)]">
@@ -66,23 +86,39 @@ export function RateCard({ label, flag, amounts, source, updatedAt, note }: Rate
       </div>
 
       <div className="flex shrink-0 flex-col items-end gap-1">
-        {amounts.map((amount, index) => (
-          <div key={amount.label ?? index} className="text-right">
-            {/* El prefijo va arriba del monto, no delante: así no le quita
-                ancho horizontal a la columna de info. */}
-            {amount.label && (
-              <p className="text-xs leading-none text-[color:var(--muted)]">{amount.label}</p>
-            )}
-            <p
-              className={`tabular leading-none ${
-                stacked ? "text-lg font-semibold sm:text-xl" : "text-2xl font-semibold sm:text-3xl"
-              }`}
-            >
-              {formatRate(amount.value)}
-              <span className="ml-1 text-sm font-normal text-[color:var(--muted)]">Bs</span>
-            </p>
-          </div>
-        ))}
+        {amounts.map((amount, index) => {
+          const help = amountHelpArray[index];
+          return (
+            <div key={amount.label ?? index} className="text-right">
+              {/* El prefijo va arriba del monto, no delante: así no le quita
+                  ancho horizontal a la columna de info. */}
+              {amount.label && (
+                <p className="text-xs leading-none text-[color:var(--muted)]">{amount.label}</p>
+              )}
+              {help ? (
+                <Tooltip content={help}>
+                  <p
+                    className={`tabular leading-none ${
+                      stacked ? "text-lg font-semibold sm:text-xl" : "text-2xl font-semibold sm:text-3xl"
+                    }`}
+                  >
+                    {formatRate(amount.value)}
+                    <span className="ml-1 text-sm font-normal text-[color:var(--muted)]">Bs</span>
+                  </p>
+                </Tooltip>
+              ) : (
+                <p
+                  className={`tabular leading-none ${
+                    stacked ? "text-lg font-semibold sm:text-xl" : "text-2xl font-semibold sm:text-3xl"
+                  }`}
+                >
+                  {formatRate(amount.value)}
+                  <span className="ml-1 text-sm font-normal text-[color:var(--muted)]">Bs</span>
+                </p>
+              )}
+            </div>
+          );
+        })}
       </div>
     </article>
   );
