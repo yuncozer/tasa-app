@@ -37,7 +37,7 @@ const REFERENCE_USD_AMOUNT =
  */
 const REFERENCE_PAY_TYPE = process.env.BINANCE_REFERENCE_PAY_TYPE ?? "PagoMovil";
 
-/** Monedas locales que consulta Tasapp. */
+/** Monedas locales que consulta La Tasa. */
 export type P2PFiat = "VES" | "COP";
 
 interface P2PResponse {

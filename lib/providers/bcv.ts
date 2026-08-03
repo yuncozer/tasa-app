@@ -79,7 +79,7 @@ async function fetchBcvHtml(): Promise<string> {
         timeout: TIMEOUT_MS,
         ...(socket ? { socket, agent: false } : {}),
         headers: {
-          "User-Agent": "Mozilla/5.0 (compatible; Tasapp/1.0)",
+          "User-Agent": "Mozilla/5.0 (compatible; LaTasa/1.0)",
           Accept: "text/html",
         },
       },

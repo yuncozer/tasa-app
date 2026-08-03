@@ -14,7 +14,7 @@ export function Logo({ className }: { className?: string }) {
       strokeLinecap="round"
       strokeLinejoin="round"
       className={className}
-      // Decorativa: el <h1> de al lado ya dice "Tasapp".
+      // Decorativa: el <h1> de al lado ya dice "La Tasa".
       aria-hidden="true"
       focusable="false"
     >

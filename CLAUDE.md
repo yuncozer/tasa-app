@@ -4,7 +4,7 @@
 This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` before writing any code. Heed deprecation notices.
 <!-- END:nextjs-agent-rules -->
 
-# Tasapp
+# La Tasa
 
 Tasas del día y calculadora de conversiones cruzadas para la frontera
 colombo-venezolana. Se usa de pie, en un negocio, en un teléfono y con señal
@@ -142,7 +142,7 @@ se conserva porque `COP_FRONTERA` lo sigue usando para el cruce VES↔COP.
 
 ### El aviso legal se queda
 
-El pie declara que los datos son de terceros, que Tasapp no fija ni certifica
+El pie declara que los datos son de terceros, que La Tasa no fija ni certifica
 ninguna tasa y que nada de lo mostrado es asesoría financiera. No lo quites ni lo
 suavices.
 

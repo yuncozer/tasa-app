@@ -14,14 +14,14 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Tasapp — Tasas y calculadora de la frontera",
+  title: "La Tasa — Tasas y calculadora de la frontera",
   description:
     "Dólar BCV, dólar Binance P2P, euro BCV y peso colombiano en bolívares, con calculadora de conversiones cruzadas.",
-  applicationName: "Tasapp",
+  applicationName: "La Tasa",
   // Sin esto, en iPhone la app instalada seguiría abriendo con barra de navegador.
   appleWebApp: {
     capable: true,
-    title: "Tasapp",
+    title: "La Tasa",
     statusBarStyle: "black-translucent",
   },
 };

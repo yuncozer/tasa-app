@@ -6,7 +6,7 @@
  * que basta con conocer ese número por moneda para poder cruzar cualquier par.
  */
 
-/** Bases de cotización que maneja Tasapp. */
+/** Bases de cotización que maneja La Tasa. */
 export type RateKey =
   | "USD_BCV"
   | "USD_BINANCE_BUY"

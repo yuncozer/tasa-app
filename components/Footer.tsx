@@ -3,7 +3,7 @@ import { formatDate, formatRelative } from "@/lib/format";
 /**
  * Letra pequeña de la app: cuándo se consultaron las tasas y el aviso legal.
  *
- * El descargo deja constancia de tres cosas: los datos son de terceros, Tasapp no
+ * El descargo deja constancia de tres cosas: los datos son de terceros, La Tasa no
  * fija ni certifica ninguna tasa, y verificar antes de operar es del usuario.
  */
 export function Footer({ fetchedAt }: { fetchedAt: string }) {
@@ -14,7 +14,7 @@ export function Footer({ fetchedAt }: { fetchedAt: string }) {
       </p>
 
       <p>
-        <strong className="font-semibold text-[color:var(--foreground)]">Aviso:</strong> Tasapp
+        <strong className="font-semibold text-[color:var(--foreground)]">Aviso:</strong> La Tasa
         muestra tasas obtenidas de fuentes públicas de terceros (BCV, Binance P2P y
         ExchangeRate-API) con fines exclusivamente informativos. No fijamos, certificamos ni
         garantizamos ninguna tasa de cambio, no intervenimos en operaciones de compra o venta

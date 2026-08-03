@@ -1,5 +1,5 @@
 /**
- * Service worker de Tasapp.
+ * Service worker de La Tasa.
  *
  * Escrito a mano y sin librería: la app es una sola página con sus estáticos, y
  * la alternativa que recomienda Next (Serwist) exige configuración de webpack,
@@ -10,10 +10,12 @@
  * respuesta de `/api/` desde la caché, porque ahí sí pasaría por fresca.
  */
 
-const VERSION = "v2";
-const CACHE_PAGINA = `tasapp-pagina-${VERSION}`;
-const CACHE_ESTATICOS = `tasapp-estaticos-${VERSION}`;
+const VERSION = "v3";
+const CACHE_PAGINA = `latasa-pagina-${VERSION}`;
+const CACHE_ESTATICOS = `latasa-estaticos-${VERSION}`;
 const VIGENTES = [CACHE_PAGINA, CACHE_ESTATICOS];
+/** Prefijos de cachés de versiones previas (incluida la de "Tasapp"), para poder limpiarlas. */
+const PREFIJOS_VIEJOS = ["tasapp-", "latasa-"];
 
 /** Clave única para la portada: así `?actualizar=…` no llena la caché. */
 const CLAVE_PORTADA = "/";
@@ -70,7 +72,11 @@ self.addEventListener("activate", (event) => {
       const nombres = await caches.keys();
       await Promise.all(
         nombres
-          .filter((nombre) => nombre.startsWith("tasapp-") && !VIGENTES.includes(nombre))
+          .filter(
+            (nombre) =>
+              PREFIJOS_VIEJOS.some((prefijo) => nombre.startsWith(prefijo)) &&
+              !VIGENTES.includes(nombre),
+          )
           .map((nombre) => caches.delete(nombre)),
       );
       await self.clients.claim();
@@ -83,11 +89,11 @@ function paginaDeCortesia() {
   return new Response(
     `<!doctype html><html lang="es-VE"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Tasapp · sin conexión</title>
+<title>La Tasa · sin conexión</title>
 <style>body{margin:0;display:grid;place-items:center;min-height:100vh;background:#0b1120;color:#f1f5f9;font-family:system-ui,sans-serif;text-align:center;padding:2rem}
 p{color:#94a3b8;line-height:1.5;max-width:22rem}</style></head>
 <body><div><h1>Sin conexión</h1>
-<p>Todavía no hay tasas guardadas en este dispositivo. Abre Tasapp una vez con datos
+<p>Todavía no hay tasas guardadas en este dispositivo. Abre La Tasa una vez con datos
 y a partir de entonces funcionará también sin señal.</p></div></body></html>`,
     { status: 503, headers: { "Content-Type": "text/html; charset=utf-8" } },
   );

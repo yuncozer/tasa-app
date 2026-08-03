@@ -9,8 +9,8 @@ import type { MetadataRoute } from "next";
  */
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Tasapp — Tasas y calculadora de la frontera",
-    short_name: "Tasapp",
+    name: "La Tasa — Tasas y calculadora de la frontera",
+    short_name: "La Tasa",
     description:
       "Dólar BCV, dólar Binance P2P, euro BCV y peso colombiano en bolívares, con calculadora de conversiones cruzadas.",
     lang: "es-VE",

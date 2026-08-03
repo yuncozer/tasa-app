@@ -1,10 +1,10 @@
-# Tasapp
+# La Tasa
 
 Tasas del día y calculadora de conversiones cruzadas para la frontera colombo-venezolana.
 
 En la frontera se comercia con cuatro referencias a la vez y la pregunta habitual no es
 "¿cuántos bolívares son 100 $?" sino **"si cambio 100 $ a tasa BCV, ¿cuántos dólares
-Binance, euros o pesos me quedan?"**. Tasapp responde eso: muestra las tasas del día y
+Binance, euros o pesos me quedan?"**. La Tasa responde eso: muestra las tasas del día y
 convierte cualquier monto usando el bolívar como pivote.
 
 Hecho con Next.js 16 (App Router), TypeScript y Tailwind CSS v4. Sin base de datos y sin
@@ -143,7 +143,7 @@ explicado en `/api/health`.
 
 ## PWA
 
-Tasapp se instala en la pantalla de inicio y abre a pantalla completa. El manifiesto lo
+La Tasa se instala en la pantalla de inicio y abre a pantalla completa. El manifiesto lo
 genera `app/manifest.ts` y los iconos salen del propio logo con `npm run iconos`
 (`scripts/generar-iconos.mjs`), que rasteriza el SVG con sharp; los PNG se versionan, así
 que solo hay que regenerarlos si cambia el logo.

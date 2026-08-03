@@ -38,7 +38,7 @@ export default async function Home({
         <Logo className="h-10 w-10 shrink-0 text-[color:var(--accent)]" />
         <div className="flex flex-col gap-1">
           <h1 className="text-3xl font-bold leading-none tracking-tight">
-            Tas<span className="text-[color:var(--accent)]">app</span>
+            La <span className="text-[color:var(--accent)]">Tasa</span>
           </h1>
           <p className="text-sm text-[color:var(--muted)]">Cuánto vale tu dinero hoy</p>
         </div>
