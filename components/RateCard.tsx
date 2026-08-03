@@ -60,13 +60,15 @@ export function RateCard({
       }`}
     >
       <div className="min-w-0 flex-1">
-        <h3 className="flex items-center gap-1.5 truncate text-sm font-medium text-[color:var(--muted)]">
+        <h3 className="flex items-center gap-1.5 text-sm font-medium text-[color:var(--muted)]">
           {/* La bandera acompaña al nombre; el lector de pantalla ya lee la moneda. */}
           <span aria-hidden="true">{flag}</span>
-          {label}
+          {/* El truncado va en el texto, no en el contenedor flex: ahí solo
+              recortaría, sin puntos suspensivos y empujando al ícono fuera. */}
+          <span className="truncate">{label}</span>
           {description && (
-            <Tooltip content={description}>
-              <Info aria-hidden="true" className="size-3.5 shrink-0 opacity-60" />
+            <Tooltip className="shrink-0" content={description}>
+              <Info aria-hidden="true" className="size-3.5 opacity-60" />
             </Tooltip>
           )}
         </h3>
@@ -92,31 +94,26 @@ export function RateCard({
           return (
             <div key={amount.label ?? index} className="text-right">
               {/* El prefijo va arriba del monto, no delante: así no le quita
-                  ancho horizontal a la columna de info. */}
-              {amount.label && (
-                <p className="text-xs leading-none text-[color:var(--muted)]">{amount.label}</p>
-              )}
-              {help ? (
-                <Tooltip content={help}>
-                  <p
-                    className={`tabular leading-none ${
-                      stacked ? "text-lg font-semibold sm:text-xl" : "text-2xl font-semibold sm:text-3xl"
-                    }`}
-                  >
-                    {formatRate(amount.value)}
-                    <span className="ml-1 text-sm font-normal text-[color:var(--muted)]">Bs</span>
-                  </p>
-                </Tooltip>
-              ) : (
-                <p
-                  className={`tabular leading-none ${
-                    stacked ? "text-lg font-semibold sm:text-xl" : "text-2xl font-semibold sm:text-3xl"
-                  }`}
-                >
-                  {formatRate(amount.value)}
-                  <span className="ml-1 text-sm font-normal text-[color:var(--muted)]">Bs</span>
+                  ancho horizontal a la columna de info. La ayuda cuelga de un
+                  ícono visible: nadie adivina que un texto suelto se toca. */}
+              {(amount.label || help) && (
+                <p className="mb-0.5 flex items-center justify-end gap-1 text-xs leading-none text-[color:var(--muted)]">
+                  {amount.label}
+                  {help && (
+                    <Tooltip content={help}>
+                      <Info aria-hidden="true" className="size-3 opacity-60" />
+                    </Tooltip>
+                  )}
                 </p>
               )}
+              <p
+                className={`tabular leading-none ${
+                  stacked ? "text-lg font-semibold sm:text-xl" : "text-2xl font-semibold sm:text-3xl"
+                }`}
+              >
+                {formatRate(amount.value)}
+                <span className="ml-1 text-sm font-normal text-[color:var(--muted)]">Bs</span>
+              </p>
             </div>
           );
         })}

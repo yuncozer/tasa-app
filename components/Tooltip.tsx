@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 interface TooltipProps {
   children: React.ReactNode;
@@ -90,30 +91,40 @@ export function Tooltip({ children, content, className }: TooltipProps) {
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
         aria-describedby={isVisible ? tooltipId : undefined}
-        className={`block w-full cursor-help appearance-none border-0 bg-transparent p-0 text-inherit ${className ?? ""}`}
+        // `inline-flex` para que el botón se ajuste a su contenido: con
+        // `block w-full` reclamaba toda la fila y aplastaba a sus hermanos.
+        // El `after` invisible agranda el área de toque de un ícono de 12 px
+        // sin ocupar espacio, cosa que un padding sí haría.
+        className={`relative inline-flex cursor-help appearance-none items-center border-0 bg-transparent p-0 text-inherit after:absolute after:-inset-2 after:content-[''] ${className ?? ""}`}
       >
         {children}
       </button>
 
-      {isVisible && (
-        <div
-          ref={tooltipRef}
-          id={tooltipId}
-          role="tooltip"
-          style={{
-            position: "fixed",
-            top: `${position?.top ?? 0}px`,
-            left: `${position?.left ?? 0}px`,
-            // Oculto hasta tener coordenadas reales: se monta igual para
-            // poder medirlo, pero no debe verse saltar desde (0,0).
-            visibility: position ? "visible" : "hidden",
-            zIndex: 50,
-          }}
-          className="max-w-xs rounded-lg border border-[color:var(--border)] bg-[color:var(--surface)] px-3 py-2 text-xs text-[color:var(--muted)] shadow-lg"
-        >
-          {content}
-        </div>
-      )}
+      {/* El panel va a <body> por portal: las anclas viven dentro de <p> y
+          <h3>, que no admiten un <div> descendiente. Sin el portal el HTML es
+          inválido y React rompe la hidratación. Como ya está posicionado con
+          `fixed`, sacarlo del árbol no cambia nada visualmente. */}
+      {isVisible &&
+        createPortal(
+          <div
+            ref={tooltipRef}
+            id={tooltipId}
+            role="tooltip"
+            style={{
+              position: "fixed",
+              top: `${position?.top ?? 0}px`,
+              left: `${position?.left ?? 0}px`,
+              // Oculto hasta tener coordenadas reales: se monta igual para
+              // poder medirlo, pero no debe verse saltar desde (0,0).
+              visibility: position ? "visible" : "hidden",
+              zIndex: 50,
+            }}
+            className="max-w-xs rounded-lg border border-[color:var(--border)] bg-[color:var(--surface)] px-3 py-2 text-xs text-[color:var(--muted)] shadow-lg"
+          >
+            {content}
+          </div>,
+          document.body,
+        )}
     </>
   );
 }

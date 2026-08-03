@@ -1,7 +1,8 @@
+import { Info } from "lucide-react";
 import { Tooltip } from "@/components/Tooltip";
 import { FLAGS } from "@/lib/flags";
 import { formatAmount, formatRate } from "@/lib/format";
-import { RATE_ORDER } from "@/lib/rates";
+import { RATE_ORDER, rateHelp } from "@/lib/rates";
 import type { ConversionResult, RatesSnapshot } from "@/lib/types";
 
 /**
@@ -40,15 +41,21 @@ export function ConversionResults({
         {others.map((key) => {
           const rate = snapshot.rates[key];
           const value = conversion.results[key];
+          const help = rateHelp(key);
 
           return (
             <li key={key} className="flex items-center justify-between gap-3 px-4 py-3">
               <div className="min-w-0">
-                <p className="truncate text-sm font-medium">
-                  <span aria-hidden="true" className="mr-1.5">
-                    {FLAGS[key]}
-                  </span>
-                  {rate.label}
+                {/* La ayuda cuelga del nombre, no del monto: el nombre es lo
+                    que el usuario no entiende, y así el número queda intacto. */}
+                <p className="flex items-center gap-1.5 text-sm font-medium">
+                  <span aria-hidden="true">{FLAGS[key]}</span>
+                  <span className="truncate">{rate.label}</span>
+                  {help.cardDescription && (
+                    <Tooltip className="shrink-0" content={help.cardDescription}>
+                      <Info aria-hidden="true" className="size-3.5 opacity-60" />
+                    </Tooltip>
+                  )}
                 </p>
                 <p className="tabular text-xs text-[color:var(--muted)]">
                   {rate.bsPerUnit === null
@@ -56,17 +63,12 @@ export function ConversionResults({
                     : `a ${formatRate(rate.bsPerUnit)} Bs`}
                 </p>
               </div>
-              <Tooltip
-                className="shrink-0"
-                content={`Equivalente en ${rate.label} a la tasa actual`}
-              >
-                <p className="tabular text-lg font-semibold">
-                  <span className="mr-1 text-xs font-normal text-[color:var(--muted)]">
-                    {rate.symbol}
-                  </span>
-                  {formatAmount(value, key)}
-                </p>
-              </Tooltip>
+              <p className="tabular shrink-0 text-lg font-semibold">
+                <span className="mr-1 text-xs font-normal text-[color:var(--muted)]">
+                  {rate.symbol}
+                </span>
+                {formatAmount(value, key)}
+              </p>
             </li>
           );
         })}
