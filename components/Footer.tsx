@@ -22,6 +22,18 @@ export function Footer({ fetchedAt }: { fetchedAt: string }) {
         estar desactualizados o contener errores: confirma siempre con la fuente oficial antes
         de cerrar cualquier operación.
       </p>
+
+      <p className="text-center">
+        Hecho por{" "}
+        <a
+          href="https://www.instagram.com/nova.solutionsdev"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="font-medium text-[color:var(--foreground)] underline underline-offset-2"
+        >
+          Nova Solutions
+        </a>
+      </p>
     </footer>
   );
 }
