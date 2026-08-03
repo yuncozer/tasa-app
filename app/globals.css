@@ -42,3 +42,24 @@ body {
 .tabular {
   font-variant-numeric: tabular-nums;
 }
+
+/* Barra indeterminada de SplashOverlay: se desliza en bucle mientras carga. */
+@keyframes barra-splash {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(300%);
+  }
+}
+
+.barra-splash {
+  animation: barra-splash 1.1s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .barra-splash {
+    animation: none;
+    transform: translateX(50%);
+  }
+}

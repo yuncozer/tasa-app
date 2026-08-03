@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { AppleSplashLinks } from "@/components/AppleSplashLinks";
 import { ServiceWorkerRegistration } from "@/components/ServiceWorkerRegistration";
+import { SplashOverlay } from "@/components/SplashOverlay";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -43,7 +45,9 @@ export default function RootLayout({
       lang="es-VE"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
+      <AppleSplashLinks />
       <body className="min-h-full flex flex-col">
+        <SplashOverlay />
         {children}
         <ServiceWorkerRegistration />
       </body>
