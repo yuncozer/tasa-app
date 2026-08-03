@@ -1,4 +1,5 @@
 import { Info } from "lucide-react";
+import { Flag } from "@/components/Flag";
 import { Tooltip } from "@/components/Tooltip";
 import { FLAGS } from "@/lib/flags";
 import { formatAmount, formatRate } from "@/lib/format";
@@ -49,7 +50,7 @@ export function ConversionResults({
                 {/* La ayuda cuelga del nombre, no del monto: el nombre es lo
                     que el usuario no entiende, y así el número queda intacto. */}
                 <p className="flex items-center gap-1.5 text-sm font-medium">
-                  <span aria-hidden="true">{FLAGS[key]}</span>
+                  <Flag pais={FLAGS[key]} className="shrink-0" />
                   <span className="truncate">{rate.label}</span>
                   {help.cardDescription && (
                     <Tooltip className="shrink-0" content={help.cardDescription}>
