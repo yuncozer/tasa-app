@@ -1,20 +1,29 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 
 interface TooltipProps {
   children: React.ReactNode;
   content: React.ReactNode;
+  /** Clases para el <button> ancla, p. ej. "shrink-0" cuando vive en un flex. */
+  className?: string;
 }
 
-export function Tooltip({ children, content }: TooltipProps) {
+export function Tooltip({ children, content, className }: TooltipProps) {
   const [isVisible, setIsVisible] = useState(false);
   const [position, setPosition] = useState<{ top: number; left: number } | null>(null);
-  const anchorRef = useRef<HTMLDivElement>(null);
+  const anchorRef = useRef<HTMLButtonElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
   const tooltipId = useId();
 
-  useEffect(() => {
+  // El tooltip se renderiza (oculto) en cuanto `isVisible` es true, no cuando
+  // ya hay `position`: si esperáramos a tener coordenadas para montarlo,
+  // `tooltipRef.current` nunca existiría y la posición jamás se calcularía
+  // (dependencia circular que dejaba el tooltip invisible siempre).
+  useLayoutEffect(() => {
+    // Al cerrar no hace falta limpiar `position`: la próxima vez que se abra,
+    // este mismo efecto recalcula las coordenadas antes de que el navegador
+    // pinte, así que un valor viejo nunca llega a mostrarse.
     if (!isVisible || !anchorRef.current || !tooltipRef.current) return;
 
     const rect = anchorRef.current.getBoundingClientRect();
@@ -55,7 +64,10 @@ export function Tooltip({ children, content }: TooltipProps) {
 
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    setIsVisible(!isVisible);
+    // Siempre abre (no alterna): en desktop el mouse ya entra en hover antes
+    // del click, así que alternar cerraba el tooltip en el mismo click que
+    // lo abría. Cerrar queda a cargo de mouseleave, tap fuera o ESC.
+    setIsVisible(true);
   };
 
   const handleMouseEnter = () => {
@@ -68,26 +80,33 @@ export function Tooltip({ children, content }: TooltipProps) {
 
   return (
     <>
-      <div
+      {/* Un <button> registra el tap en un solo toque en iOS Safari; un <div>
+          con onClick necesita dos toques la primera vez (el primero solo
+          simula :hover). */}
+      <button
         ref={anchorRef}
+        type="button"
         onClick={handleClick}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
         aria-describedby={isVisible ? tooltipId : undefined}
-        className="cursor-help"
+        className={`block w-full cursor-help appearance-none border-0 bg-transparent p-0 text-inherit ${className ?? ""}`}
       >
         {children}
-      </div>
+      </button>
 
-      {isVisible && position && (
+      {isVisible && (
         <div
           ref={tooltipRef}
           id={tooltipId}
           role="tooltip"
           style={{
             position: "fixed",
-            top: `${position.top}px`,
-            left: `${position.left}px`,
+            top: `${position?.top ?? 0}px`,
+            left: `${position?.left ?? 0}px`,
+            // Oculto hasta tener coordenadas reales: se monta igual para
+            // poder medirlo, pero no debe verse saltar desde (0,0).
+            visibility: position ? "visible" : "hidden",
             zIndex: 50,
           }}
           className="max-w-xs rounded-lg border border-[color:var(--border)] bg-[color:var(--surface)] px-3 py-2 text-xs text-[color:var(--muted)] shadow-lg"

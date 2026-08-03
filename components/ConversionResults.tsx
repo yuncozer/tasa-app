@@ -57,9 +57,10 @@ export function ConversionResults({
                 </p>
               </div>
               <Tooltip
+                className="shrink-0"
                 content={`Equivalente en ${rate.label} a la tasa actual`}
               >
-                <p className="tabular shrink-0 text-lg font-semibold">
+                <p className="tabular text-lg font-semibold">
                   <span className="mr-1 text-xs font-normal text-[color:var(--muted)]">
                     {rate.symbol}
                   </span>

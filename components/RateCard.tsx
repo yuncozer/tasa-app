@@ -1,3 +1,4 @@
+import { Info } from "lucide-react";
 import { Tooltip } from "@/components/Tooltip";
 import { formatDate, formatRate, formatRelative } from "@/lib/format";
 
@@ -65,7 +66,7 @@ export function RateCard({
           {label}
           {description && (
             <Tooltip content={description}>
-              <span className="text-xs opacity-60">(?)</span>
+              <Info aria-hidden="true" className="size-3.5 shrink-0 opacity-60" />
             </Tooltip>
           )}
         </h3>
