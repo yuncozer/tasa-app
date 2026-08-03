@@ -148,6 +148,13 @@ suavices.
 
 ## Cómo trabajar en este proyecto
 
+### Estilos
+
+Antes de escribir interfaz, lee `ESTILOS.md`: tokens de color, escala tipográfica
+por rol, radios, recetas de componente y las reglas duras (ningún color crudo de
+Tailwind, nada de `md:`, `.tabular` en todo número). Su última sección lista las
+desviaciones que ya existen, para no copiarlas por error.
+
 ### Commits
 
 Van a nombre de **Yuncozer \<daniel.krdns@gmail.com\>**, sin pie de coautoría y sin
