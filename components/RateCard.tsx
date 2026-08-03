@@ -13,6 +13,8 @@ interface RateCardProps {
   label: string;
   /** País de la moneda, para dibujar su bandera (decorativa). */
   flag: Pais;
+  /** Símbolo de la moneda, p. ej. "$" o "€". */
+  symbol: string;
   /** Ruta a un logo adicional junto a la bandera, p. ej. el de Binance en el P2P. */
   platformLogo?: string;
   /**
@@ -29,6 +31,11 @@ interface RateCardProps {
   description?: string;
   /** Texto de ayuda para cada monto (string único o array para múltiples montos). */
   amountHelp?: string | string[];
+  /**
+   * Valor inverso (p. ej. pesos por bolívar), se muestra más chico debajo del
+   * monto principal. Solo lo usan las tarjetas de peso.
+   */
+  inverse?: { value: number | null; prefix: string; help?: string; symbol: string };
 }
 
 /**
@@ -43,6 +50,7 @@ interface RateCardProps {
 export function RateCard({
   label,
   flag,
+  symbol,
   platformLogo,
   amounts,
   source,
@@ -50,6 +58,7 @@ export function RateCard({
   note,
   description,
   amountHelp,
+  inverse,
 }: RateCardProps) {
   const unavailable = amounts.every((amount) => amount.value === null);
   const stacked = amounts.length > 1;
@@ -57,11 +66,10 @@ export function RateCard({
 
   return (
     <article
-      className={`flex items-center gap-3 rounded-2xl border px-4 py-3 sm:py-4 ${
-        unavailable
-          ? "border-[color:var(--warning)]/40 bg-[color:var(--warning)]/5"
-          : "border-[color:var(--border)] bg-[color:var(--surface)]"
-      }`}
+      className={`flex items-center gap-3 rounded-2xl border px-4 py-3 sm:py-4 ${unavailable
+        ? "border-[color:var(--warning)]/40 bg-[color:var(--warning)]/5"
+        : "border-[color:var(--border)] bg-[color:var(--surface)]"
+        }`}
     >
       <div className="min-w-0 flex-1">
         <h3 className="flex items-center gap-1.5 text-sm font-medium text-[color:var(--muted)]">
@@ -117,13 +125,23 @@ export function RateCard({
                 </p>
               )}
               <p
-                className={`tabular leading-none ${
-                  stacked ? "text-lg font-semibold sm:text-xl" : "text-2xl font-semibold sm:text-3xl"
-                }`}
+                className={`tabular leading-none ${stacked ? "text-lg font-semibold sm:text-xl" : "text-2xl font-semibold sm:text-3xl"
+                  }`}
               >
+                <span className="text-[10px] leading-none text-[color:var(--muted)]/50">{`1${symbol}`} =  </span>
                 {formatRate(amount.value)}
                 <span className="ml-1 text-sm font-normal text-[color:var(--muted)]">Bs</span>
               </p>
+              {inverse && inverse.value !== null && (
+                <div className="mt-1 flex items-center justify-end gap-1 text-xs leading-none text-[color:var(--muted)]">
+                  {inverse.prefix} {formatRate(inverse.value)} {inverse.symbol}
+                  {inverse.help && (
+                    <Tooltip content={inverse.help}>
+                      <Info aria-hidden="true" className="size-3 opacity-60" />
+                    </Tooltip>
+                  )}
+                </div>
+              )}
             </div>
           );
         })}

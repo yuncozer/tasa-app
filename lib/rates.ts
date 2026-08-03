@@ -60,6 +60,23 @@ export function equivalenceHelp(key: RateKey): RateHelp {
   return EQUIVALENCE_HELP[key];
 }
 
+/**
+ * Explica el valor inverso (pesos por bolívar) que se muestra bajo el monto
+ * principal en las tarjetas de peso. Solo aplica a COP: es la forma en que
+ * cotizan la tasa muchos comercios de la frontera, al revés del modelo mental
+ * del resto de la app (bolívares por unidad).
+ */
+const INVERSE_HELP: Partial<Record<RateKey, string>> = {
+  COP_OFICIAL:
+    "Así cotizan la tasa muchos comercios: cuántos pesos vale 1 bolívar, al revés del valor de arriba (que muestra cuántos bolívares vale 1 peso).",
+  COP_FRONTERA:
+    "Así cotizan la tasa muchos comercios: cuántos pesos vale 1 bolívar, al revés del valor de arriba (que muestra cuántos bolívares vale 1 peso).",
+};
+
+export function inverseHelp(key: RateKey): string | undefined {
+  return INVERSE_HELP[key];
+}
+
 export function rateHelp(key: RateKey): RateHelp {
   return RATE_HELP[key];
 }

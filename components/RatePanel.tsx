@@ -1,6 +1,6 @@
 import { RateCard } from "@/components/RateCard";
 import { FLAGS } from "@/lib/flags";
-import { RATE_ORDER, rateHelp } from "@/lib/rates";
+import { RATE_ORDER, rateHelp, inverseHelp } from "@/lib/rates";
 import type { RatesSnapshot } from "@/lib/types";
 
 /**
@@ -38,6 +38,7 @@ export function RatePanel({ snapshot }: { snapshot: RatesSnapshot }) {
               <RateCard
                 key="binance"
                 label="Dólar Binance"
+                symbol={"$"}
                 flag={FLAGS.USD_BINANCE_BUY}
                 platformLogo="/SVG/binance.svg"
                 amounts={[
@@ -58,11 +59,21 @@ export function RatePanel({ snapshot }: { snapshot: RatesSnapshot }) {
 
           const rate = snapshot.rates[key];
           const help = rateHelp(key);
+          const inverse =
+            key === "COP_OFICIAL" || key === "COP_FRONTERA"
+              ? {
+                value: rate.bsPerUnit ? 1 / rate.bsPerUnit : null,
+                prefix: `1Bs = `,
+                help: inverseHelp(key),
+                symbol: rate.symbol,
+              }
+              : undefined;
 
           return (
             <RateCard
               key={key}
               label={rate.label}
+              symbol={rate.symbol}
               flag={FLAGS[key]}
               amounts={[{ value: rate.bsPerUnit }]}
               source={rate.source}
@@ -70,6 +81,7 @@ export function RatePanel({ snapshot }: { snapshot: RatesSnapshot }) {
               note={rate.note}
               description={help.cardDescription}
               amountHelp={typeof help.amountHelp === "string" ? help.amountHelp : undefined}
+              inverse={inverse}
             />
           );
         })}
