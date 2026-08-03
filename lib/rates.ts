@@ -199,14 +199,14 @@ async function buildSnapshot(): Promise<RatesSnapshot> {
       bsPorPesoOficial,
       trmData?.source ?? "TRM",
       trmData?.updatedAt ?? null,
-      trmValue ? `${formatCop(trmValue)} por dólar` : undefined,
+      trmValue ? `${formatCop(trmValue)} COP por dólar` : undefined,
     ),
     COP_FRONTERA: buildRate(
       "COP_FRONTERA",
       bsPorPesoFrontera,
       "Binance P2P",
       copMercado ? now : null,
-      copMercado ? `${formatCop(copMercado)} por dólar` : undefined,
+      copMercado ? `${formatCop(copMercado)} COP por dólar` : undefined,
     ),
     VES: buildRate("VES", 1, "Moneda base", null),
   };

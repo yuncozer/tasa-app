@@ -1,24 +1,7 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!-- Generator: Adobe Illustrator 22.1.0, SVG Export Plug-In . SVG Version: 6.00 Build 0)  -->
-<svg version="1.2" baseProfile="tiny" id="Binance_Logo"
-	 xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px" viewBox="0 0 5000 5000"
-	 xml:space="preserve">
-<g id="Logo">
-	<circle id="Ellipse" fill="#F3BA2C" cx="2500" cy="2500" r="1444.3"/>
-	<g>
-		<g id="Triangles_1_">
-			<polygon fill="#FFFFFF" points="3119.7,2888.4 3119.5,2888.5 2500,3508.1 1880.6,2888.7 1880.3,2888.4 2108.4,2660.9 
-				2108.4,2660.9 2500,3052.4 2891.7,2660.7 			"/>
-			<polygon fill="#FFFFFF" points="3119.5,2111.5 2891.7,2339.3 2500,1947.6 2108.4,2339.1 1880.6,2111.3 2500,1491.9 			"/>
-		</g>
-		<g id="Rectangles_1_">
-			
-				<rect x="3119.2" y="2339" transform="matrix(0.7071 -0.7071 0.7071 0.7071 -807.0563 3051.8191)" fill="#FFFFFF" width="322.2" height="322.2"/>
-			
-				<rect x="1558.6" y="2338.9" transform="matrix(0.7071 -0.7071 0.7071 0.7071 -1264.0356 1948.2675)" fill="#FFFFFF" width="322.2" height="322.2"/>
-			<path fill="#FFFFFF" d="M2731.1,2499.9h0.1L2500,2268.7l-170.8,170.8h0l-19.6,19.6l-40.5,40.5l-0.3,0.3l0.3,0.3l231,231
-				l231.2-231.2l0.1-0.1L2731.1,2499.9"/>
-		</g>
-	</g>
-</g>
-</svg>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<!-- Uploaded to: SVG Repo, www.svgrepo.com, Transformed by: SVG Repo Mixer Tools -->
+<svg fill="#e9b30c" width="800px" height="800px" viewBox="0 0 32 32" version="1.1" xmlns="http://www.w3.org/2000/svg" stroke="#e9b30c">
+<g id="SVGRepo_bgCarrier" stroke-width="0"/>
+<g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"/>
+<g id="SVGRepo_iconCarrier"> <title>binance</title> <path d="M15.986 1.019l9.189 9.159-3.396 3.393-5.793-5.793-5.793 5.823-3.396-3.393 9.189-9.189zM4.399 12.605l3.365 3.395-3.363 3.365-3.396-3.365zM15.986 12.607l3.394 3.363-3.395 3.395-3.395-3.365 3.395-3.393zM27.572 12.605l3.423 3.395-3.393 3.395-3.395-3.395zM21.778 18.399l3.396 3.393-9.189 9.189-9.189-9.187 3.396-3.395 5.793 5.823 5.793-5.823z"/> </g>
+</svg>

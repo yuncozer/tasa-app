@@ -26,7 +26,7 @@ export function RatePanel({ snapshot }: { snapshot: RatesSnapshot }) {
         Tasas de hoy
       </h2>
 
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 sm:gap-3 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 sm:gap-2 lg:grid-cols-2">
         {keys.map((key) => {
           if (key === "USD_BINANCE_BUY") {
             const buy = snapshot.rates.USD_BINANCE_BUY;

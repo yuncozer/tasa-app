@@ -79,7 +79,7 @@ export function RateCard({
               el P2P no es una tasa de ningún país, es de quien opera el mercado. */}
           {platformLogo && (
             // eslint-disable-next-line @next/next/no-img-element -- SVG estático y decorativo.
-            <img src={platformLogo} alt="" width={14} height={14} className="shrink-0" />
+            <img src={platformLogo} alt="" width={16} height={16} className="shrink-0" />
           )}
           {/* El truncado va en el texto, no en el contenedor flex: ahí solo
               recortaría, sin puntos suspensivos y empujando al ícono fuera. */}
@@ -115,25 +115,25 @@ export function RateCard({
                   ancho horizontal a la columna de info. La ayuda cuelga de un
                   ícono visible: nadie adivina que un texto suelto se toca. */}
               {(amount.label || help) && (
-                <p className="mb-0.5 flex items-center justify-end gap-1 text-xs leading-none text-[color:var(--muted)]">
+                <div className="mb-0.5 flex items-center justify-end gap-1 text-xs leading-none text-[color:var(--muted)]">
                   {amount.label}
                   {help && (
                     <Tooltip content={help}>
                       <Info aria-hidden="true" className="size-3 opacity-60" />
                     </Tooltip>
                   )}
-                </p>
+                </div>
               )}
               <p
                 className={`tabular leading-none ${stacked ? "text-lg font-semibold sm:text-xl" : "text-2xl font-semibold sm:text-3xl"
                   }`}
               >
-                <span className="text-[10px] leading-none text-[color:var(--muted)]/50">{`1${symbol}`} =  </span>
+                <span className="text-[10px] lg:text-sm leading-none text-[color:var(--muted)]/50">{`1${symbol}`} =  </span>
                 {formatRate(amount.value)}
                 <span className="ml-1 text-sm font-normal text-[color:var(--muted)]">Bs</span>
               </p>
               {inverse && inverse.value !== null && (
-                <div className="mt-1 flex items-center justify-end gap-1 text-xs leading-none text-[color:var(--muted)]">
+                <div className="mt-2 flex items-center justify-end gap-1 text-xs lg:text-sm leading-none text-[color:var(--muted)]">
                   {inverse.prefix} {formatRate(inverse.value)} {inverse.symbol}
                   {inverse.help && (
                     <Tooltip content={inverse.help}>
