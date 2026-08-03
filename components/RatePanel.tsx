@@ -1,6 +1,6 @@
 import { RateCard } from "@/components/RateCard";
 import { FLAGS } from "@/lib/flags";
-import { RATE_ORDER } from "@/lib/rates";
+import { RATE_ORDER, rateHelp } from "@/lib/rates";
 import type { RatesSnapshot } from "@/lib/types";
 
 /**
@@ -31,6 +31,8 @@ export function RatePanel({ snapshot }: { snapshot: RatesSnapshot }) {
           if (key === "USD_BINANCE_BUY") {
             const buy = snapshot.rates.USD_BINANCE_BUY;
             const sell = snapshot.rates.USD_BINANCE_SELL;
+            const buyHelp = rateHelp("USD_BINANCE_BUY");
+            const sellHelp = rateHelp("USD_BINANCE_SELL");
 
             return (
               <RateCard
@@ -44,11 +46,17 @@ export function RatePanel({ snapshot }: { snapshot: RatesSnapshot }) {
                 source={buy.source}
                 updatedAt={buy.updatedAt}
                 note={buy.note}
+                description={buyHelp.cardDescription}
+                amountHelp={[
+                  buyHelp.amountHelp?.[0] || "",
+                  sellHelp.amountHelp?.[0] || "",
+                ]}
               />
             );
           }
 
           const rate = snapshot.rates[key];
+          const help = rateHelp(key);
 
           return (
             <RateCard
@@ -59,6 +67,8 @@ export function RatePanel({ snapshot }: { snapshot: RatesSnapshot }) {
               source={rate.source}
               updatedAt={rate.updatedAt}
               note={rate.note}
+              description={help.cardDescription}
+              amountHelp={typeof help.amountHelp === "string" ? help.amountHelp : undefined}
             />
           );
         })}
