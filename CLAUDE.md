@@ -188,3 +188,7 @@ Chromium ya está instalado en `/opt/pw-browsers`; no ejecutes `playwright insta
 
 Los de la PWA se generan del propio logo con `npm run iconos`. Los PNG se
 versionan, así que solo hay que regenerarlos si cambia el logo.
+
+### Tooltips
+
+Para los tooltips de ayuda se maneja un componente standar ubicado /components/Tooltip.tsx, el cual maneja la libreria react-tooltip

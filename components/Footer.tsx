@@ -24,14 +24,14 @@ export function Footer({ fetchedAt }: { fetchedAt: string }) {
       </p>
 
       <p className="text-center">
-        Hecho por{" "}
+        by{" "}
         <a
           href="https://www.instagram.com/nova.solutionsdev"
           target="_blank"
           rel="noopener noreferrer"
           className="font-medium text-[color:var(--foreground)] underline underline-offset-2"
         >
-          Nova Solutions
+          Nova Solutions - 2026
         </a>
       </p>
     </footer>

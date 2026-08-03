@@ -3,7 +3,7 @@ import { Flag } from "@/components/Flag";
 import { Tooltip } from "@/components/Tooltip";
 import { FLAGS } from "@/lib/flags";
 import { formatAmount, formatRate } from "@/lib/format";
-import { RATE_ORDER, rateHelp } from "@/lib/rates";
+import { RATE_ORDER, rateHelp, equivalenceHelp } from "@/lib/rates";
 import type { ConversionResult, RatesSnapshot } from "@/lib/types";
 
 /**
@@ -42,14 +42,13 @@ export function ConversionResults({
         {others.map((key) => {
           const rate = snapshot.rates[key];
           const value = conversion.results[key];
-          const help = rateHelp(key);
-
+          const help = equivalenceHelp(key);
           return (
             <li key={key} className="flex items-center justify-between gap-3 px-4 py-3">
               <div className="min-w-0">
                 {/* La ayuda cuelga del nombre, no del monto: el nombre es lo
                     que el usuario no entiende, y así el número queda intacto. */}
-                <p className="flex items-center gap-1.5 text-sm font-medium">
+                <div className="flex items-center gap-1.5 text-sm font-medium">
                   <Flag pais={FLAGS[key]} className="shrink-0" />
                   {/* El P2P no es una tasa de ningún país: el logo de Binance
                       va aparte de la bandera, igual que en RateCard. */}
@@ -63,7 +62,7 @@ export function ConversionResults({
                       <Info aria-hidden="true" className="size-3.5 opacity-60" />
                     </Tooltip>
                   )}
-                </p>
+                </div>
                 <p className="tabular text-xs text-[color:var(--muted)]">
                   {rate.bsPerUnit === null
                     ? "Tasa no disponible"

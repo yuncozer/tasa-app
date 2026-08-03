@@ -46,6 +46,20 @@ const RATE_HELP: Record<RateKey, RateHelp> = {
   VES: { cardDescription: "Moneda base para conversiones" },
 };
 
+const EQUIVALENCE_HELP: Record<RateKey, RateHelp> = {
+  USD_BCV: { cardDescription: "El monto que ve a la derecha seria el total en Dolares oficial del BCV" },
+  USD_BINANCE_BUY: { cardDescription: "El monto que ve a la derecha seria el total en Dolares tasa P2P de Binance (compra)" },
+  USD_BINANCE_SELL: { cardDescription: "El monto que ve a la derecha seria el total en Dolares tasa P2P de Binance (venta)" },
+  EUR_BCV: { cardDescription: "El monto que ve a la derecha seria el total en  Euros oficial del BCV" },
+  COP_OFICIAL: { cardDescription: "El monto que ve a la derecha seria el total en Pesos Colombianos a tasa oficial (TRM)" },
+  COP_FRONTERA: { cardDescription: "El monto que ve a la derecha seria el total en Pesos Colombianos a tasa P2P de Binance" },
+  VES: { cardDescription: "El monto que ve a la derecha seria el total en Bolívares BCV (moneda base para conversiones)" },
+};
+
+export function equivalenceHelp(key: RateKey): RateHelp {
+  return EQUIVALENCE_HELP[key];
+}
+
 export function rateHelp(key: RateKey): RateHelp {
   return RATE_HELP[key];
 }
