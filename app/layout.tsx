@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { AppleSplashLinks } from "@/components/AppleSplashLinks";
 import { ServiceWorkerRegistration } from "@/components/ServiceWorkerRegistration";
 import { SplashOverlay } from "@/components/SplashOverlay";
+import { Analytics } from "@vercel/analytics/next"
 import "./globals.css";
 
 const geistSans = Geist({
@@ -51,6 +52,7 @@ export default function RootLayout({
         {children}
         <ServiceWorkerRegistration />
       </body>
+      <Analytics />
     </html>
   );
 }
