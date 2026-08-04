@@ -31,14 +31,29 @@ export function formatAmount(value: number | null, key: RateKey): string {
  * fracciones de bolívar y con dos decimales se perdería la diferencia entre el
  * cruce BCV y el de Binance.
  */
+function rateDecimals(value: number): number {
+  return value < 1 ? 4 : 2;
+}
+
 export function formatRate(value: number | null): string {
   if (value === null || !Number.isFinite(value)) return "—";
 
-  const decimals = value < 1 ? 4 : 2;
+  const decimals = rateDecimals(value);
   return new Intl.NumberFormat("es-VE", {
     minimumFractionDigits: decimals,
     maximumFractionDigits: decimals,
   }).format(value);
+}
+
+/**
+ * Redondea una tasa a los mismos decimales con que se le muestra al usuario.
+ *
+ * Sin esto, `convert()` calcula con la precisión completa del proveedor
+ * mientras el usuario solo puede verificar la cuenta con los decimales que ve
+ * en pantalla, y los dos resultados no coinciden.
+ */
+export function roundToDisplayPrecision(value: number): number {
+  return Number(value.toFixed(rateDecimals(value)));
 }
 
 const MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];

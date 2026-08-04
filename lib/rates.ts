@@ -1,4 +1,5 @@
 import { withCache } from "@/lib/cache";
+import { roundToDisplayPrecision } from "@/lib/format";
 import { fetchBcvRates } from "@/lib/providers/bcv";
 import { fetchBinanceRate } from "@/lib/providers/binance";
 import { fetchTrmRate } from "@/lib/providers/trm";
@@ -103,7 +104,8 @@ function buildRate(
   updatedAt: string | null,
   note?: string,
 ): Rate {
-  return { key, ...RATE_META[key], bsPerUnit, source, updatedAt, note };
+  const rounded = bsPerUnit === null ? null : roundToDisplayPrecision(bsPerUnit);
+  return { key, ...RATE_META[key], bsPerUnit: rounded, source, updatedAt, note };
 }
 
 function describeError(error: unknown): string {
