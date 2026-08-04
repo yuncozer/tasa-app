@@ -66,6 +66,36 @@ terceros que lo ofrecían cerraron o pasaron a exigir registro. Tres detalles de
 Si el HTML del BCV cambia, se cae al respaldo de `ve.dolarapi.com`, que solo trae
 el dólar. El euro queda sin dato y `/api/health` dice por qué.
 
+### Lo que se muestra es lo que se calcula
+
+`bsPerUnit` llegaba al snapshot con la precisión completa del proveedor (BCV,
+TRM del Banco de la República, Binance), pero al usuario se le muestra
+redondeado (`formatRate` en `lib/format.ts`: 4 decimales si la tasa vale menos
+de 1 Bs, 2 en el resto). `convert()` calculaba con el valor sin redondear, así
+que alguien que reproducía la cuenta a mano con el número que veía en pantalla
+—p. ej. 100 $ ÷ 0,2328 Bs por peso— obtenía un resultado distinto al de la
+app: verificado en vivo, 323.063 COP en la calculadora frente a 323.065
+calculado a mano con la tasa de 4 decimales.
+
+La corrección no vive dentro de `convert()`: redondear ahí solo arreglaría esa
+función y dejaría inconsistentes el inverso de `RatePanel` y los valores
+crudos de `/api/rates/*`, que son otros sitios donde alguien puede reproducir
+la cuenta. En cambio, `bsPerUnit` se redondea una sola vez, en `buildRate()`
+(`lib/rates.ts`), su único punto de entrada al snapshot, con
+`roundToDisplayPrecision()` (`lib/format.ts`). Así todo lo que lee `bsPerUnit`
+después parte del mismo número que ve el usuario.
+
+La tarjeta del peso además muestra el inverso ("1 Bs = X pesos"). Con los 2
+decimales de `formatRate` esa cifra no es la inversa matemática real de una
+tasa de 4 decimales (0,2328 Bs/peso ⇄ 4,30 pesos/Bs difieren ~0,1 %), así que
+multiplicar por la inversa mostrada no daba el mismo resultado que dividir por
+la tasa mostrada. Por eso existe `formatInverseRate()`, con 6 decimales: no es
+una precisión arbitraria, es la mínima para que ambos caminos coincidan en los
+montos con los que de verdad se usa la app. Ninguna cantidad finita de
+decimales lo garantiza para montos arbitrariamente grandes —es una limitación
+matemática de mostrar dos números redondeados por separado, no algo que haya
+que seguir afinando.
+
 ### Las fechas se arman a mano, no con `Intl.DateTimeFormat`
 
 Servidor y navegador pueden traer versiones distintas de ICU y devolver textos que
