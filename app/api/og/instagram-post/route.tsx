@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { ImageResponse } from "next/og";
-import { formatDate, formatRate } from "@/lib/format";
+import { formatClock, formatDate, formatRate } from "@/lib/format";
 import { getRates } from "@/lib/rates";
 import type { Rate, RateKey, RatesSnapshot } from "@/lib/types";
 
@@ -48,8 +48,8 @@ async function leerSvgComoDataUri(nombre: string): Promise<string> {
 function LogoTaza() {
   return (
     <svg
-      width={56}
-      height={56}
+      width={120}
+      height={120}
       viewBox="0 0 24 24"
       fill="none"
       stroke={COLOR.accent}
@@ -99,14 +99,14 @@ function FilaTasa({ rate, banderaSrc }: { rate: Rate; banderaSrc: string }) {
         </div>
         <span style={{ fontSize: 32, color: COLOR.foreground }}>{rate.label}</span>
       </div>
-      <span style={{ fontSize: 46, fontWeight: 700, color: colorTexto }}>
+      <span style={{ fontSize: 50, fontWeight: 700, color: colorTexto }}>
         {noDisponible ? "No disponible" : `${formatRate(rate.bsPerUnit)} Bs`}
       </span>
     </div>
   );
 }
 
-function PostImage({ snapshot, banderas }: { snapshot: RatesSnapshot; banderas: Record<string, string> }) {
+function PostImage({ snapshot, banderas, icons }: { snapshot: RatesSnapshot; banderas: Record<string, string>; icons: { instagram: string; browser: string } }) {
   return (
     <div
       style={{
@@ -124,14 +124,21 @@ function PostImage({ snapshot, banderas }: { snapshot: RatesSnapshot; banderas: 
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
           <LogoTaza />
           <div style={{ display: "flex", flexDirection: "column" }}>
-            <div style={{ display: "flex", fontSize: 46, fontWeight: 700 }}>
+            <div style={{ display: "flex", fontSize: 64, fontWeight: 700 }}>
               <span style={{ color: COLOR.foreground }}>La&nbsp;</span>
               <span style={{ color: COLOR.accent }}>Tasa</span>
             </div>
-            <span style={{ fontSize: 22, color: COLOR.muted }}>Cuánto vale tu dinero hoy</span>
+            <span style={{ fontSize: 28, color: COLOR.muted }}>Cuánto vale tu dinero hoy</span>
           </div>
         </div>
-        <span style={{ fontSize: 24, color: COLOR.muted }}>{formatDate(snapshot.fetchedAt)}</span>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
+          <span style={{ fontSize: 32, color: COLOR.foreground, fontWeight: 700 }}>
+            {formatDate(snapshot.fetchedAt)}
+          </span>
+          <span style={{ fontSize: 32, color: COLOR.foreground, fontWeight: 700 }}>
+            {formatClock(snapshot.fetchedAt)}
+          </span>
+        </div>
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
@@ -149,8 +156,9 @@ function PostImage({ snapshot, banderas }: { snapshot: RatesSnapshot; banderas: 
           paddingTop: 24,
         }}
       >
-        <span style={{ fontSize: 26, color: COLOR.accent, fontWeight: 700 }}>
-          latasa.online · @latasa.online
+        
+        <span style={{ fontSize: 32, color: COLOR.foreground, fontWeight: 700, display: "flex", alignItems: "center", gap: 8 }}>
+        <img src={icons.browser} width={28} height={28} alt="" />  www.latasa.online  <img src={icons.instagram} width={28} height={28} alt="" /> @latasa.online
         </span>
         <span style={{ fontSize: 16, color: COLOR.muted, lineHeight: 1.5 }}>
           La Tasa muestra tasas obtenidas de fuentes públicas de terceros con fines
@@ -166,16 +174,18 @@ function PostImage({ snapshot, banderas }: { snapshot: RatesSnapshot; banderas: 
 }
 
 export async function GET() {
-  const [snapshot, geistRegular, geistBold, ...banderasSvg] = await Promise.all([
+  const [snapshot, geistRegular, geistBold, instagramIcon, browserIcon, ...banderasSvg] = await Promise.all([
     getRates(),
     leerFontBuffer("Geist-Regular.ttf"),
     leerFontBuffer("Geist-Bold.ttf"),
+    leerSvgComoDataUri("instagram-icon.svg"),
+    leerSvgComoDataUri("browser-icon.svg"),
     ...FILAS.map((key) => leerSvgComoDataUri(BANDERA_POR_TASA[key]!)),
   ]);
 
   const banderas = Object.fromEntries(FILAS.map((key, i) => [key, banderasSvg[i]]));
 
-  return new ImageResponse(<PostImage snapshot={snapshot} banderas={banderas} />, {
+  return new ImageResponse(<PostImage snapshot={snapshot} banderas={banderas} icons={{ instagram: instagramIcon, browser: browserIcon }}/>, {
     ...SIZE,
     fonts: [
       { name: "Geist", data: geistRegular, weight: 400, style: "normal" },

@@ -87,13 +87,34 @@ export function formatDate(iso: string | null): string {
   if (!iso) return "—";
 
   const date = new Date(iso);
+
   if (Number.isNaN(date.getTime())) return "—";
 
   const caracas = new Date(date.getTime() - CARACAS_OFFSET_MS);
-  const hora = String(caracas.getUTCHours()).padStart(2, "0");
+
+  return `${String(caracas.getUTCDate()).padStart(2, "0")}/${MESES[caracas.getUTCMonth()].toUpperCase()}/${caracas.getUTCFullYear()}`;
+}
+
+export function formatClock(iso: string | null): string {
+  if (!iso) return "—";
+
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "—";
+
+  const caracas = new Date(date.getTime() - CARACAS_OFFSET_MS);
+  // 1. Obtener la hora en base 24h
+  const utcHours = caracas.getUTCHours();
+
+  // 2. Determinar si es AM o PM
+  const ampm = utcHours >= 12 ? 'PM' : 'AM';
+
+  // 3. Convertir a formato 12 horas (0 se convierte en 12)
+  const hour12 = utcHours % 12 || 12;
+
+  const hora = String(hour12).padStart(2, "0");
   const minuto = String(caracas.getUTCMinutes()).padStart(2, "0");
 
-  return `${caracas.getUTCDate()} ${MESES[caracas.getUTCMonth()]}, ${hora}:${minuto}`;
+  return `${hora}:${minuto} ${ampm}`;
 }
 
 const MINUTO = 60_000;
