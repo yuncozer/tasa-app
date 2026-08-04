@@ -1,7 +1,7 @@
 import { Info } from "lucide-react";
 import { Flag, type Pais } from "@/components/Flag";
 import { Tooltip } from "@/components/Tooltip";
-import { formatDate, formatRate, formatRelative } from "@/lib/format";
+import { formatDate, formatInverseRate, formatRate, formatRelative } from "@/lib/format";
 
 interface RateAmount {
   /** Prefijo antes del valor, p. ej. "Compra". Solo se ve cuando hay más de un monto. */
@@ -134,7 +134,7 @@ export function RateCard({
               </p>
               {inverse && inverse.value !== null && (
                 <div className="mt-2 flex items-center justify-end gap-1 text-xs lg:text-sm leading-none text-[color:var(--muted)]">
-                  {inverse.prefix} {formatRate(inverse.value)} {inverse.symbol}
+                  {inverse.prefix} {formatInverseRate(inverse.value)} {inverse.symbol}
                   {inverse.help && (
                     <Tooltip content={inverse.help}>
                       <Info aria-hidden="true" className="size-3 opacity-60" />

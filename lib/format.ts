@@ -56,6 +56,21 @@ export function roundToDisplayPrecision(value: number): number {
   return Number(value.toFixed(rateDecimals(value)));
 }
 
+/**
+ * La inversa (pesos por bolívar) necesita más decimales que la tasa directa:
+ * con solo 2 no vuelve a dar 1 al multiplicarla por la tasa que se muestra
+ * (0,2328 Bs/peso ⇄ 4,30 pesos/Bs difieren ~0,1 %), y esa discrepancia se
+ * nota al reproducir la cuenta a mano en sentido inverso.
+ */
+export function formatInverseRate(value: number | null): string {
+  if (value === null || !Number.isFinite(value)) return "—";
+
+  return new Intl.NumberFormat("es-VE", {
+    minimumFractionDigits: 6,
+    maximumFractionDigits: 6,
+  }).format(value);
+}
+
 const MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
 
 /** Venezuela usa UTC−4 todo el año, sin horario de verano desde 2016. */
