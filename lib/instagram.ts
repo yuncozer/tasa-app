@@ -1,5 +1,13 @@
 /**
- * Publicación en Instagram vía Graph API de Meta.
+ * Publicación en Instagram vía "Instagram API with Instagram Login" (login
+ * directo por instagram.com, sin pasar por una Página de Facebook — es el
+ * flujo que se configuró para esta cuenta, con testers en el App Dashboard).
+ *
+ * Esta variante usa `graph.instagram.com`, no `graph.facebook.com`: son
+ * bases distintas y un token de este flujo (empieza con "IGAA") no lo
+ * reconoce la Graph API clásica de Facebook. Si en el futuro se cambia a
+ * login por Página de Facebook, el token empezaría con "EAA" y esta base
+ * habría que volver a `graph.facebook.com`.
  *
  * El flujo son dos pasos: crear un contenedor de media con la URL de la
  * imagen y el caption, y publicarlo. Meta procesa el contenedor de forma
@@ -10,7 +18,7 @@
  */
 
 const GRAPH_VERSION = "v21.0";
-const GRAPH_BASE = `https://graph.facebook.com/${GRAPH_VERSION}`;
+const GRAPH_BASE = `https://graph.instagram.com/${GRAPH_VERSION}`;
 const MEDIA_NOT_READY_CODE = 9007;
 const REINTENTOS = 3;
 const ESPERA_MS = 4000;

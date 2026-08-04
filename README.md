@@ -159,31 +159,43 @@ con las tasas del momento y lo publica en `@latasa.online` vía la Graph API de 
   porque Instagram necesita poder buscarla como cualquier imagen.
 - `lib/caption.ts` arma el texto del post con una plantilla fija, sin ningún API de
   IA de por medio.
-- `lib/instagram.ts` habla con la Graph API: crea el contenedor de media y lo
-  publica, con reintentos cortos si Meta todavía lo está procesando.
+- `lib/instagram.ts` habla con **"Instagram API with Instagram Login"** (login
+  directo por instagram.com, sin pasar por una Página de Facebook): crea el
+  contenedor de media y lo publica, con reintentos cortos si Meta todavía lo
+  está procesando. Ojo con esto si algún día se cambia de flujo: esta variante
+  usa `graph.instagram.com` y tokens que empiezan con `IGAA`; el otro flujo
+  posible (login por Página de Facebook) usa `graph.facebook.com` y tokens
+  `EAA` — son bases distintas y un token de un flujo no sirve en el otro
+  ("Cannot parse access token" si se mezclan).
 
 ### Cómo obtener las credenciales de Meta
 
 1. Convierte la cuenta de Instagram a **Business o Creator** (Configuración → Tipo
    de cuenta y herramientas).
-2. Vincula una **Página de Facebook** a esa cuenta (créala si no existe).
-3. Crea una **app de Meta** en developers.facebook.com/apps, tipo "Business", y
-   agrégale el producto **Instagram Graph API**.
-4. En `business.facebook.com` → Configuración del negocio, asegúrate de que la
-   Página, la cuenta de Instagram y la app estén **las tres** dentro del mismo
-   Business Manager (Cuentas → Páginas / Cuentas de Instagram / Apps → Agregar).
-   Sin esto la vinculación falla con "Rol de desarrollador insuficiente".
-5. Si tu app usa el login directo de Instagram ("API setup with Instagram login"),
-   agrega la cuenta como **Instagram tester** ahí y acéptalo desde la cuenta misma
-   en `instagram.com/accounts/manage_access/`.
-6. Genera un token de usuario con `instagram_basic`, `instagram_content_publish`,
-   `pages_show_list`, `pages_read_engagement`, cámbialo por uno de larga duración
-   (`GET /oauth/access_token?grant_type=fb_exchange_token&...`), y con él pide el
-   token de página vía `GET /me/accounts`.
-7. `GET /{page-id}?fields=instagram_business_account` da el
-   `instagram_business_account.id` → ese es `IG_BUSINESS_ACCOUNT_ID`.
+2. Crea una **app de Meta** en developers.facebook.com/apps, tipo "Business", y
+   agrégale el producto **Instagram** → **"API setup with Instagram login"**.
+3. Ahí mismo, en **Roles → Instagram testers**, agrega la cuenta de Instagram que
+   va a publicar. Acepta la invitación desde la cuenta misma, en
+   `instagram.com/accounts/manage_access/` — sin esto la vinculación falla con
+   "Rol de desarrollador insuficiente".
+4. En `business.facebook.com` → Configuración del negocio, conviene tener la
+   cuenta de Instagram y la app dentro del mismo Business Manager (Cuentas →
+   Cuentas de Instagram / Apps → Agregar); ayuda a que Meta reconozca la
+   relación entre ambas.
+5. Autoriza la app con los scopes `instagram_business_basic` e
+   `instagram_business_content_publish` (flujo OAuth de "API setup with
+   Instagram login" en el propio dashboard, o un link de autorización manual)
+   — de ahí sale un token de usuario de Instagram (empieza con `IGAA`).
+6. Cámbialo por uno de **larga duración** (60 días) vía
+   `GET https://graph.instagram.com/access_token?grant_type=ig_exchange_token&client_secret=<app-secret>&access_token=<token-corto>`.
+   Ese es el valor de `IG_ACCESS_TOKEN`.
+7. `IG_BUSINESS_ACCOUNT_ID` es el ID de la cuenta de Instagram para ese token:
+   confírmalo con `GET https://graph.instagram.com/me?fields=id,username&access_token=<IG_ACCESS_TOKEN>`
+   (el `id` que devuelve tiene que ser ese, no un ID sacado de una Página de
+   Facebook — pueden no coincidir entre los dos flujos).
 8. Carga `IG_ACCESS_TOKEN`, `IG_BUSINESS_ACCOUNT_ID`, `CRON_SECRET` y `SITE_URL` en
-   las variables de entorno de Vercel (producción).
+   las variables de entorno de Vercel (producción) y en `.env.local` para probar
+   en local.
 
 ## PWA
 
