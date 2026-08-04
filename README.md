@@ -101,14 +101,20 @@ El documento de partida proponía otros endpoints que, al verificarlos, ya no se
 
 ## Variables de entorno
 
-Ambas son opcionales; sin definirlas, la app usa $100 vía Pago Móvil como operación de
-referencia para la tasa Binance P2P en VES (en COP se filtra solo por monto). Ver
-`.env.example`.
+Las dos primeras son opcionales; sin definirlas, la app usa $100 vía Pago Móvil como
+operación de referencia para la tasa Binance P2P en VES (en COP se filtra solo por
+monto). Las cuatro últimas solo hacen falta para el post diario en Instagram (ver
+[Publicación automática en Instagram](#publicación-automática-en-instagram)); sin
+ellas, el resto de la app funciona igual. Ver `.env.example`.
 
 | Variable | Default | Qué controla |
 | --- | --- | --- |
 | `BINANCE_REFERENCE_USD_AMOUNT` | `100` | Monto (en USD) de la operación de referencia usada para filtrar anuncios por `transAmount`, en VES y en COP |
 | `BINANCE_REFERENCE_PAY_TYPE` | `PagoMovil` | Identificador de Binance para el método de pago usado en el filtro `payTypes`, solo en VES |
+| `CRON_SECRET` | — | Autentica la llamada de Vercel Cron a `/api/cron/publish-instagram` |
+| `SITE_URL` | — | Dominio público de producción; Instagram lo usa para buscar la imagen del post |
+| `IG_BUSINESS_ACCOUNT_ID` | — | ID de la cuenta de Instagram Business que publica |
+| `IG_ACCESS_TOKEN` | — | Token de acceso de larga duración con permiso `instagram_content_publish` |
 
 ## Caché y actualización
 
@@ -141,6 +147,44 @@ Los proveedores se consultan con `Promise.allSettled`: que Binance esté caído 
 la tasa del BCV. Lo que falte se marca en la interfaz como "dato no disponible" y queda
 explicado en `/api/health`.
 
+## Publicación automática en Instagram
+
+Cada día a las 9:00 am hora de Caracas, Vercel Cron dispara
+`GET /api/cron/publish-instagram` (protegido con `CRON_SECRET`), que arma el post
+con las tasas del momento y lo publica en `@latasa.online` vía la Graph API de Meta:
+
+- `app/api/og/instagram-post/route.tsx` genera la imagen del post con `next/og`
+  (1080×1080, sin capturas ni assets estáticos con parches: se renderiza de nuevo
+  cada vez con los montos del momento). Es una ruta pública sin autenticación
+  porque Instagram necesita poder buscarla como cualquier imagen.
+- `lib/caption.ts` arma el texto del post con una plantilla fija, sin ningún API de
+  IA de por medio.
+- `lib/instagram.ts` habla con la Graph API: crea el contenedor de media y lo
+  publica, con reintentos cortos si Meta todavía lo está procesando.
+
+### Cómo obtener las credenciales de Meta
+
+1. Convierte la cuenta de Instagram a **Business o Creator** (Configuración → Tipo
+   de cuenta y herramientas).
+2. Vincula una **Página de Facebook** a esa cuenta (créala si no existe).
+3. Crea una **app de Meta** en developers.facebook.com/apps, tipo "Business", y
+   agrégale el producto **Instagram Graph API**.
+4. En `business.facebook.com` → Configuración del negocio, asegúrate de que la
+   Página, la cuenta de Instagram y la app estén **las tres** dentro del mismo
+   Business Manager (Cuentas → Páginas / Cuentas de Instagram / Apps → Agregar).
+   Sin esto la vinculación falla con "Rol de desarrollador insuficiente".
+5. Si tu app usa el login directo de Instagram ("API setup with Instagram login"),
+   agrega la cuenta como **Instagram tester** ahí y acéptalo desde la cuenta misma
+   en `instagram.com/accounts/manage_access/`.
+6. Genera un token de usuario con `instagram_basic`, `instagram_content_publish`,
+   `pages_show_list`, `pages_read_engagement`, cámbialo por uno de larga duración
+   (`GET /oauth/access_token?grant_type=fb_exchange_token&...`), y con él pide el
+   token de página vía `GET /me/accounts`.
+7. `GET /{page-id}?fields=instagram_business_account` da el
+   `instagram_business_account.id` → ese es `IG_BUSINESS_ACCOUNT_ID`.
+8. Carga `IG_ACCESS_TOKEN`, `IG_BUSINESS_ACCOUNT_ID`, `CRON_SECRET` y `SITE_URL` en
+   las variables de entorno de Vercel (producción).
+
 ## PWA
 
 La Tasa se instala en la pantalla de inicio y abre a pantalla completa. El manifiesto lo
@@ -170,7 +214,7 @@ suscripciones y un proceso que vigile las tasas.
 ```
 app/            páginas, rutas API y manifiesto (App Router, sin carpeta src/)
 components/     panel de tasas, calculadora, teclado numérico y piezas de la PWA
-lib/            proveedores, agregación, conversión y formato
+lib/            proveedores, agregación, conversión, formato e Instagram
 public/         service worker e iconos generados
 scripts/        generación de iconos a partir del logo
 ```

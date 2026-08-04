@@ -1,0 +1,84 @@
+/**
+ * Publicación en Instagram vía Graph API de Meta.
+ *
+ * El flujo son dos pasos: crear un contenedor de media con la URL de la
+ * imagen y el caption, y publicarlo. Meta procesa el contenedor de forma
+ * asíncrona antes de poder publicarlo, así que `media_publish` puede
+ * responder que todavía no está listo (código 9007) justo después de
+ * crearlo; por eso se reintenta unas pocas veces con una espera corta antes
+ * de darlo por fallido.
+ */
+
+const GRAPH_VERSION = "v21.0";
+const GRAPH_BASE = `https://graph.facebook.com/${GRAPH_VERSION}`;
+const MEDIA_NOT_READY_CODE = 9007;
+const REINTENTOS = 3;
+const ESPERA_MS = 4000;
+
+interface GraphErrorBody {
+  error?: { message: string; type: string; code: number; fbtrace_id: string };
+}
+
+export class InstagramApiError extends Error {
+  constructor(message: string, graphError: GraphErrorBody) {
+    super(`${message}: ${graphError.error?.message ?? "error desconocido"}`);
+  }
+}
+
+function credenciales(): { accountId: string; accessToken: string } {
+  const accountId = process.env.IG_BUSINESS_ACCOUNT_ID;
+  const accessToken = process.env.IG_ACCESS_TOKEN;
+  if (!accountId || !accessToken) {
+    throw new Error("Faltan IG_BUSINESS_ACCOUNT_ID o IG_ACCESS_TOKEN");
+  }
+  return { accountId, accessToken };
+}
+
+async function crearContenedor(imageUrl: string, caption: string): Promise<string> {
+  const { accountId, accessToken } = credenciales();
+  const url = new URL(`${GRAPH_BASE}/${accountId}/media`);
+  url.searchParams.set("image_url", imageUrl);
+  url.searchParams.set("caption", caption);
+  url.searchParams.set("access_token", accessToken);
+
+  const res = await fetch(url, { method: "POST" });
+  const body = await res.json();
+  if (!res.ok) throw new InstagramApiError("No se pudo crear el contenedor de media", body);
+  return body.id as string;
+}
+
+function esMediaNoLista(body: GraphErrorBody): boolean {
+  return body.error?.code === MEDIA_NOT_READY_CODE;
+}
+
+async function publicarContenedor(containerId: string): Promise<string> {
+  const { accountId, accessToken } = credenciales();
+  const url = new URL(`${GRAPH_BASE}/${accountId}/media_publish`);
+  url.searchParams.set("creation_id", containerId);
+  url.searchParams.set("access_token", accessToken);
+
+  for (let intento = 1; intento <= REINTENTOS; intento++) {
+    const res = await fetch(url, { method: "POST" });
+    const body = await res.json();
+    if (res.ok) return body.id as string;
+
+    if (esMediaNoLista(body) && intento < REINTENTOS) {
+      await new Promise((resolve) => setTimeout(resolve, ESPERA_MS));
+      continue;
+    }
+
+    throw new InstagramApiError("No se pudo publicar el contenedor", body);
+  }
+
+  throw new Error("No se pudo publicar el contenedor tras varios reintentos");
+}
+
+/** Publica el post del día: crea el contenedor y lo publica. */
+export async function publishDailyPost(
+  imageUrl: string,
+  caption: string,
+): Promise<{ mediaId: string }> {
+  const containerId = await crearContenedor(imageUrl, caption);
+  const mediaId = await publicarContenedor(containerId);
+  return { mediaId };
+}
