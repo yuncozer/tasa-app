@@ -149,9 +149,15 @@ explicado en `/api/health`.
 
 ## Publicación automática en Instagram
 
-Cada día a las 9:00 am hora de Caracas, Vercel Cron dispara
+Cada día a las 9:00 am y a las 6:00 pm hora de Caracas, Vercel Cron dispara
 `GET /api/cron/publish-instagram` (protegido con `CRON_SECRET`), que arma el post
-con las tasas del momento y lo publica en `@latasa.online` vía la Graph API de Meta:
+con las tasas del momento y lo publica en `@latasa.online` vía la Graph API de Meta.
+Los dos horarios son dos entradas separadas en `vercel.json`, cada una con
+`?momento=manana` o `?momento=tarde` en la ruta — ese query param es lo único que
+decide el título del caption ("Tasas de hoy por la mañana/tarde"); no se puede sacar
+de una variable de entorno porque Vercel lee `vercel.json` en tiempo de deploy, no de
+ejecución. Para cambiar los horarios hay que editar `vercel.json` directamente
+(recordar que sus `schedule` van siempre en UTC) y volver a desplegar.
 
 - `app/api/og/instagram-post/route.tsx` genera la imagen del post con `next/og`
   (1080×1080, sin capturas ni assets estáticos con parches: se renderiza de nuevo

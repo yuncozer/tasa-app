@@ -21,15 +21,22 @@ const FILAS: Array<{ key: RateKey; emoji: string }> = [
 const HASHTAGS =
   "#Venezuela #Colombia #DolarBCV #DolarParalelo #TasaDeCambio #Cucuta #Binance #EuroVenezuela";
 
-export function buildCaption(snapshot: RatesSnapshot): string {
+const TITULO_POR_MOMENTO: Record<"manana" | "tarde", string> = {
+  manana: "Tasas de hoy por la mañana",
+  tarde: "Tasas de hoy por la tarde",
+};
+
+export function buildCaption(snapshot: RatesSnapshot, momento?: "manana" | "tarde"): string {
   const lineas = FILAS.map(({ key, emoji }) => {
     const rate = snapshot.rates[key];
     const valor = rate.bsPerUnit === null ? "no disponible" : `${formatRate(rate.bsPerUnit)} Bs`;
     return `${emoji} ${rate.label}: ${valor}`;
   });
 
+  const titulo = momento ? TITULO_POR_MOMENTO[momento] : "Tasas de hoy";
+
   return [
-    `📊 Tasas de hoy — ${formatDate(snapshot.fetchedAt)}`,
+    `📊 ${titulo} — ${formatDate(snapshot.fetchedAt)}`,
     "",
     ...lineas,
     "",
