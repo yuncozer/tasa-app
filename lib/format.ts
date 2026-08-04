@@ -1,3 +1,4 @@
+import { proximoDiaHabilBcv } from "@/lib/feriados-ve";
 import type { RateKey } from "@/lib/types";
 
 /**
@@ -169,6 +170,40 @@ export function formatRelative(iso: string | null): string {
 
   const meses = Math.floor(dias / 30);
   return `hace ${meses} ${meses === 1 ? "mes" : "meses"}`;
+}
+
+const DIAS_SEMANA = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
+
+/** Día calendario en Caracas (medianoche UTC), para operar con fechas sin hora. */
+function fechaCaracas(ms: number): Date {
+  const caracas = new Date(ms - CARACAS_OFFSET_MS);
+  return new Date(Date.UTC(caracas.getUTCFullYear(), caracas.getUTCMonth(), caracas.getUTCDate()));
+}
+
+/**
+ * Cuándo entra en vigencia una tasa del BCV, en lenguaje llano, solo cuando
+ * no es ya hoy: "vigente mañana", o si el BCV publica en viernes, "vigente el
+ * lunes" (o "vigente el martes" si el lunes es feriado).
+ *
+ * No usa la fecha valor tal cual la publica el BCV porque a veces cae en fin
+ * de semana o feriado (el BCV no opera esos días); se resuelve primero al
+ * próximo día hábil real con `proximoDiaHabilBcv` antes de describirla, así
+ * "vigente mañana" nunca apunta a un sábado.
+ */
+export function vigenciaBcv(iso: string | null): string | undefined {
+  if (!iso) return undefined;
+
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return undefined;
+
+  const objetivo = proximoDiaHabilBcv(fechaCaracas(date.getTime()));
+  const hoy = fechaCaracas(Date.now());
+  const diasDiferencia = Math.round((objetivo.getTime() - hoy.getTime()) / DIA);
+
+  if (diasDiferencia <= 0) return undefined;
+  if (diasDiferencia === 1) return "vigente mañana";
+
+  return `vigente el ${DIAS_SEMANA[objetivo.getUTCDay()]}`;
 }
 
 /** Convierte lo tecleado en la calculadora ("1.234,56") a número. */

@@ -1,4 +1,4 @@
-import { formatDate, formatRate } from "@/lib/format";
+import { formatDate, formatRate, vigenciaBcv } from "@/lib/format";
 import type { RateKey, RatesSnapshot } from "@/lib/types";
 
 /**
@@ -30,7 +30,9 @@ export function buildCaption(snapshot: RatesSnapshot, momento?: "manana" | "tard
   const lineas = FILAS.map(({ key, emoji }) => {
     const rate = snapshot.rates[key];
     const valor = rate.bsPerUnit === null ? "no disponible" : `${formatRate(rate.bsPerUnit)} Bs`;
-    return `${emoji} ${rate.label}: ${valor}`;
+    const esBcv = key === "USD_BCV" || key === "EUR_BCV";
+    const vigencia = esBcv ? vigenciaBcv(rate.updatedAt) : undefined;
+    return `${emoji} ${rate.label}: ${valor}${vigencia ? ` (${vigencia})` : ""}`;
   });
 
   const titulo = momento ? TITULO_POR_MOMENTO[momento] : "Tasas de hoy";

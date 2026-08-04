@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { ImageResponse } from "next/og";
-import { formatClock, formatDate, formatRate } from "@/lib/format";
+import { formatClock, formatDate, formatRate, vigenciaBcv } from "@/lib/format";
 import { getRates } from "@/lib/rates";
 import type { Rate, RateKey, RatesSnapshot } from "@/lib/types";
 
@@ -70,6 +70,8 @@ function LogoTaza() {
 function FilaTasa({ rate, banderaSrc }: { rate: Rate; banderaSrc: string }) {
   const noDisponible = rate.bsPerUnit === null;
   const colorTexto = noDisponible ? COLOR.warning : COLOR.accent;
+  const esBcv = rate.key === "USD_BCV" || rate.key === "EUR_BCV";
+  const vigencia = esBcv ? vigenciaBcv(rate.updatedAt) : undefined;
 
   return (
     <div
@@ -97,7 +99,10 @@ function FilaTasa({ rate, banderaSrc }: { rate: Rate; banderaSrc: string }) {
           {/* eslint-disable-next-line @next/next/no-img-element -- Satori rasteriza, no es una <img> de navegador. */}
           <img src={banderaSrc} width={56} height={56} style={{ objectFit: "cover" }} alt="" />
         </div>
-        <span style={{ fontSize: 32, color: COLOR.foreground }}>{rate.label}</span>
+        <div style={{ display: "flex", flexDirection: "column" }}>
+          <span style={{ fontSize: 32, color: COLOR.foreground }}>{rate.label}</span>
+          {vigencia && <span style={{ fontSize: 18, color: COLOR.muted }}>{vigencia}</span>}
+        </div>
       </div>
       <span style={{ fontSize: 50, fontWeight: 700, color: colorTexto }}>
         {noDisponible ? "No disponible" : `${formatRate(rate.bsPerUnit)} Bs`}
