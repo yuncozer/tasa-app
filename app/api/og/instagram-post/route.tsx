@@ -1,7 +1,6 @@
-import { readFile } from "node:fs/promises";
-import path from "node:path";
 import { ImageResponse } from "next/og";
 import { formatClock, formatDate, formatRate, vigenciaBcv } from "@/lib/format";
+import { AVISO_TASAS, COLOR, Encabezado, Pie, leerFontBuffer, leerSvgComoDataUri } from "@/lib/og-shared";
 import { getRates } from "@/lib/rates";
 import type { Rate, RateKey, RatesSnapshot } from "@/lib/types";
 
@@ -16,16 +15,6 @@ export const runtime = "nodejs";
 
 const SIZE = { width: 1080, height: 1080 };
 
-const COLOR = {
-  background: "#0b1120",
-  surface: "#131c2f",
-  border: "#26324c",
-  foreground: "#f1f5f9",
-  muted: "#94a3b8",
-  accent: "#34d399",
-  warning: "#fbbf24",
-};
-
 const FILAS: RateKey[] = ["USD_BCV", "USD_BINANCE_BUY", "USD_BINANCE_SELL", "EUR_BCV", "COP_FRONTERA"];
 
 const BANDERA_POR_TASA: Partial<Record<RateKey, string>> = {
@@ -35,37 +24,6 @@ const BANDERA_POR_TASA: Partial<Record<RateKey, string>> = {
   EUR_BCV: "Flag-of-European-Union.svg",
   COP_FRONTERA: "Flag-of-Colombia.svg",
 };
-
-async function leerFontBuffer(nombre: string): Promise<Buffer> {
-  return readFile(path.join(process.cwd(), "app/api/og/instagram-post/assets", nombre));
-}
-
-async function leerSvgComoDataUri(nombre: string): Promise<string> {
-  const buffer = await readFile(path.join(process.cwd(), "public/SVG", nombre));
-  return `data:image/svg+xml;base64,${buffer.toString("base64")}`;
-}
-
-function LogoTaza() {
-  return (
-    <svg
-      width={120}
-      height={120}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke={COLOR.accent}
-      strokeWidth={1.8}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M7.5 2.2c-.7.9-.7 1.8 0 2.7" />
-      <path d="M11 2.2c-.7.9-.7 1.8 0 2.7" />
-      <path d="M14.5 2.2c-.7.9-.7 1.8 0 2.7" />
-      <path d="M3.5 8h13.5v5.6a5.2 5.2 0 0 1-5.2 5.2H8.7A5.2 5.2 0 0 1 3.5 13.6V8Z" />
-      <path d="M17 9.6h1.3a2.6 2.6 0 0 1 0 5.2H17" />
-      <path d="M2.5 21.3h16" />
-    </svg>
-  );
-}
 
 function FilaTasa({ rate, banderaSrc }: { rate: Rate; banderaSrc: string }) {
   const noDisponible = rate.bsPerUnit === null;
@@ -126,16 +84,7 @@ function PostImage({ snapshot, banderas, icons }: { snapshot: RatesSnapshot; ban
       }}
     >
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-          <LogoTaza />
-          <div style={{ display: "flex", flexDirection: "column" }}>
-            <div style={{ display: "flex", fontSize: 64, fontWeight: 700 }}>
-              <span style={{ color: COLOR.foreground }}>La&nbsp;</span>
-              <span style={{ color: COLOR.accent }}>Tasa</span>
-            </div>
-            <span style={{ fontSize: 28, color: COLOR.muted }}>Cuánto vale tu dinero hoy</span>
-          </div>
-        </div>
+        <Encabezado subtitulo="Cuánto vale tu dinero hoy" />
         <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
           <span style={{ fontSize: 32, color: COLOR.foreground, fontWeight: 700 }}>
             {formatDate(snapshot.fetchedAt)}
@@ -152,28 +101,7 @@ function PostImage({ snapshot, banderas, icons }: { snapshot: RatesSnapshot; ban
         ))}
       </div>
 
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          gap: 10,
-          borderTop: `1px solid ${COLOR.border}`,
-          paddingTop: 24,
-        }}
-      >
-
-        <span style={{ fontSize: 32, color: COLOR.foreground, fontWeight: 700, display: "flex", alignItems: "center", gap: 8 }}>
-          <img src={icons.browser} width={50} height={50} alt="" />  www.latasa.online  <img src={icons.instagram} width={50} height={50} alt="" /> @latasa.online
-        </span>
-        <span style={{ fontSize: 16, color: COLOR.muted, lineHeight: 1.5 }}>
-          La Tasa muestra tasas obtenidas de fuentes públicas de terceros con fines
-          exclusivamente informativos. No fijamos, certificamos ni garantizamos ninguna
-          tasa de cambio, no intervenimos en operaciones de compra o venta de divisas y
-          nada de lo aquí mostrado constituye asesoría financiera. Los datos pueden estar
-          desactualizados o contener errores: confirma siempre con la fuente oficial antes
-          de cerrar cualquier operación.
-        </span>
-      </div>
+      <Pie icons={icons} aviso={AVISO_TASAS} />
     </div>
   );
 }

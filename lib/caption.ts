@@ -1,4 +1,5 @@
 import { formatDate, formatRate, vigenciaBcv } from "@/lib/format";
+import type { ArticleData } from "@/lib/providers/news";
 import type { RateKey, RatesSnapshot } from "@/lib/types";
 
 /**
@@ -19,7 +20,7 @@ const FILAS: Array<{ key: RateKey; emoji: string }> = [
 ];
 
 const HASHTAGS =
-  "#Venezuela #Colombia #DolarBCV #DolarParalelo #TasaDeCambio #Cucuta #Binance #EuroVenezuela";
+  "#Venezuela #Colombia #DolarBCV #DolarParalelo #TasaDeCambio #Cucuta #Binance #EuroVenezuela #LaTasaOnline";
 
 const TITULO_POR_MOMENTO: Record<"manana" | "tarde", string> = {
   manana: "Tasas de hoy por la mañana",
@@ -45,5 +46,24 @@ export function buildCaption(snapshot: RatesSnapshot, momento?: "manana" | "tard
     "Convierte cualquier monto en la calculadora completa: link en la bio.",
     "",
     HASHTAGS,
+  ].join("\n");
+}
+
+const HASHTAGS_NOTICIA = "#Venezuela #Colombia #Economía #Noticias #DolarBCV #LaTasaOnline";
+
+/**
+ * Caption del post ocasional de noticia: plantilla fija, sin IA — igual que
+ * `buildCaption`. El aviso legal tampoco se repite aquí por la misma razón:
+ * ya vive completo en la imagen.
+ */
+export function buildNewsCaption(article: ArticleData): string {
+  return [
+    `📰 ${article.title}`,
+    "",
+    article.description,
+    "",
+    `Fuente: ${article.sourceHost}`,
+    "",
+    HASHTAGS_NOTICIA,
   ].join("\n");
 }
