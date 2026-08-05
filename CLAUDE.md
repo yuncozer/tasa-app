@@ -176,6 +176,54 @@ El pie declara que los datos son de terceros, que La Tasa no fija ni certifica
 ninguna tasa y que nada de lo mostrado es asesoría financiera. No lo quites ni lo
 suavices.
 
+### El post de noticias es manual, con scraping por portal y firma HMAC
+
+Además de los dos posts diarios de tasas, existe un post ocasional armado a
+mano a partir de un artículo externo: imagen "estilo noticiero" con la marca
+de La Tasa + caption por plantilla, sin IA. Se dispara desde dos sitios que
+comparten la misma lógica en `lib/publish-news.ts` — `app/api/publish-instagram-news`
+(con `CRON_SECRET`, para curl) y `/admin/noticia` (con contraseña propia, para
+el teléfono, ver más abajo) — nunca por cron.
+
+- `lib/providers/news.ts` (`fetchArticle`): título, imagen y fecha se leen con
+  un extractor **genérico** de meta tags (`og:title`, `og:image`,
+  `article:published_time`), porque son estándar en cualquier portal WordPress
+  observado hasta ahora. El **cuerpo** del artículo no es genérico — cada
+  portal estructura su contenedor distinto (`entry-content` en lapatilla,
+  `content-inner` en bitlyanews, `textnota` en lanacionweb, que ni siquiera es
+  la primera clase de la lista por usar el theme Bricks Builder) — así que vive
+  en `CONTENEDOR_POR_HOST`, una entrada por portal que se agrega a mano cuando
+  se suma uno nuevo. Si el portal no está en el mapa, se degrada a la
+  descripción corta del `<meta name="description">` en vez de romper.
+- El crédito de fuente (`sourceHost`) sale siempre del hostname de la URL que
+  se pidió publicar, **nunca** de `og:site_name`: se encontró un caso real
+  (bitlyanews.com) donde el propio HTML se identifica como otro dominio —
+  confiar en ese campo le atribuiría la noticia al sitio equivocado.
+- La imagen del artículo se descarga y se normaliza a PNG con `sharp`
+  (dependencia de producción, no solo del script de iconos) antes de
+  embeberla: Satori no garantiza soportar todos los formatos que traen los
+  portales (AVIF, por ejemplo).
+- `app/api/og/instagram-post-news` recibe título/imagen/fuente por query
+  string para poder generar la imagen on-demand, como exige la Graph API de
+  Instagram, y por eso queda sin autenticación (Instagram debe poder
+  descargarla). Pero eso vuelve ese texto controlable por quien arme la URL,
+  así que los parámetros van firmados con HMAC (`lib/news-signature.ts`,
+  mismo `CRON_SECRET`) — sin eso, cualquiera que encontrara la ruta podría
+  generar una imagen con la marca de La Tasa y contenido arbitrario.
+- El caption se puede editar a mano en `/admin/noticia` antes de publicar
+  (`publishNewsPost` acepta un `captionOverride`): el scraper no siempre trae
+  exactamente los párrafos que se quieren usar.
+
+### `/admin` usa su propia contraseña, no `CRON_SECRET`
+
+`ADMIN_PASSWORD` es un secreto aparte a propósito: son dos superficies de
+ataque distintas — una vive en un formulario que se teclea desde el teléfono,
+la otra protege los endpoints de publicación/cron. La sesión es una cookie
+`httpOnly` firmada con el mismo patrón HMAC que `lib/news-signature.ts`
+(`lib/admin-session.ts`), sin ninguna librería de sesiones nueva.
+`CRON_SECRET` nunca llega al navegador: `/admin/noticia` lo usa solo del lado
+servidor, a través de `publishNewsPost`.
+
 ## Cómo trabajar en este proyecto
 
 ### Estilos
@@ -210,11 +258,42 @@ desplegar a mano.
   probar también el camino de degradación, apuntando el proveedor a una URL
   inválida y confirmando que cae al respaldo.
 
+### Probar el post de noticias en local
+
+Para ver la imagen y el caption de una noticia **sin publicar de verdad**,
+con `npm run dev` corriendo en otra terminal:
+
+```bash
+npx tsx scripts/preview-noticia.ts "https://url-del-articulo"
+```
+
+Hace `fetchArticle()` sobre esa URL real, arma el caption con
+`buildNewsCaption` y firma los parámetros de la imagen — imprime el caption
+completo y una URL local ya firmada de `/api/og/instagram-post-news` para
+pegar en el navegador y ver la imagen generada. Lee `CRON_SECRET` de
+`.env.local` para firmar (no publica nada; solo `POST /api/publish-instagram-news`
+o el botón "Publicar" de `/admin/noticia` publican de verdad).
+
+Para probar `/admin/noticia` en sí hace falta además `ADMIN_PASSWORD` en
+`.env.local`.
+
 ### El entorno de desarrollo
 
 Este contenedor obliga a salir por `HTTPS_PROXY`, cosa que en producción no ocurre.
 Afecta a dos sitios: el raspado del BCV necesita el túnel `CONNECT`, y Chromium hay
 que lanzarlo con el proxy para alcanzar direcciones externas.
+
+Además, en algunas máquinas de desarrollo un antivirus con inspección TLS
+(AVG, visible como `SSLKEYLOGFILE=...avgMonFltProxy...` en el entorno)
+intercepta las peticiones HTTPS salientes con su propio certificado, que el
+proceso de `next dev` no confía por defecto — la descarga de la imagen del
+artículo en `app/api/og/instagram-post-news` falla con
+`UNABLE_TO_VERIFY_LEAF_SIGNATURE`. Es un problema puramente local (no ocurre
+en producción ni con `curl`); si aparece, arranca así en su lugar:
+
+```bash
+NODE_OPTIONS="--use-system-ca" npm run dev
+```
 
 El service worker solo se registra en producción, así que para probarlo hace falta
 `npm run build && npm start`, no `npm run dev`.
