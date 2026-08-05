@@ -82,7 +82,7 @@ function FilaTasa({ rate, banderaSrc }: { rate: Rate; banderaSrc: string }) {
         border: `2px solid ${noDisponible ? COLOR.warning : COLOR.accent}`,
         backgroundColor: COLOR.surface,
         borderRadius: 9999,
-        padding: "22px 34px",
+        padding: "16px 34px",
       }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
@@ -97,11 +97,11 @@ function FilaTasa({ rate, banderaSrc }: { rate: Rate; banderaSrc: string }) {
           }}
         >
           {/* eslint-disable-next-line @next/next/no-img-element -- Satori rasteriza, no es una <img> de navegador. */}
-          <img src={banderaSrc} width={56} height={56} style={{ objectFit: "cover" }} alt="" />
+          <img src={banderaSrc} width={56} height={56} style={{ objectFit: "cover", borderRadius: 9999 }} alt="" />
         </div>
         <div style={{ display: "flex", flexDirection: "column" }}>
           <span style={{ fontSize: 32, color: COLOR.foreground }}>{rate.label}</span>
-          {vigencia && <span style={{ fontSize: 18, color: COLOR.muted }}>{vigencia}</span>}
+          {vigencia && <span style={{ fontSize: 24, color: COLOR.foreground, fontWeight: 500, textTransform: "capitalize" }}>{`(${vigencia})`}</span>}
         </div>
       </div>
       <span style={{ fontSize: 50, fontWeight: 700, color: colorTexto }}>
@@ -161,9 +161,9 @@ function PostImage({ snapshot, banderas, icons }: { snapshot: RatesSnapshot; ban
           paddingTop: 24,
         }}
       >
-        
+
         <span style={{ fontSize: 32, color: COLOR.foreground, fontWeight: 700, display: "flex", alignItems: "center", gap: 8 }}>
-        <img src={icons.browser} width={28} height={28} alt="" />  www.latasa.online  <img src={icons.instagram} width={28} height={28} alt="" /> @latasa.online
+          <img src={icons.browser} width={50} height={50} alt="" />  www.latasa.online  <img src={icons.instagram} width={50} height={50} alt="" /> @latasa.online
         </span>
         <span style={{ fontSize: 16, color: COLOR.muted, lineHeight: 1.5 }}>
           La Tasa muestra tasas obtenidas de fuentes públicas de terceros con fines
@@ -190,7 +190,7 @@ export async function GET() {
 
   const banderas = Object.fromEntries(FILAS.map((key, i) => [key, banderasSvg[i]]));
 
-  return new ImageResponse(<PostImage snapshot={snapshot} banderas={banderas} icons={{ instagram: instagramIcon, browser: browserIcon }}/>, {
+  return new ImageResponse(<PostImage snapshot={snapshot} banderas={banderas} icons={{ instagram: instagramIcon, browser: browserIcon }} />, {
     ...SIZE,
     fonts: [
       { name: "Geist", data: geistRegular, weight: 400, style: "normal" },

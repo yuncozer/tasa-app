@@ -23,15 +23,16 @@ export function Footer({ fetchedAt }: { fetchedAt: string }) {
         de cerrar cualquier operación.
       </p>
 
-      <p className="text-center">
-        by{" "}
+      <p className="flex gap-4 text-center items-end justify-center">
+        Síguenos en Instagram:
         <a
-          href="https://www.instagram.com/nova.solutionsdev"
+          href="https://www.instagram.com/latasa.online"
           target="_blank"
           rel="noopener noreferrer"
-          className="font-medium text-[color:var(--foreground)] underline underline-offset-2"
+          className="flex gap-2 items-center justify-center font-medium text-[color:var(--foreground)] underline underline-offset-2"
         >
-          Nova Solutions - 2026
+          <img src="/SVG/Instagram-Icon.svg" width={24} height={2} alt="" />
+          @latasa.online
         </a>
       </p>
     </footer>
