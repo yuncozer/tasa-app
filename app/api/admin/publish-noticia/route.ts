@@ -22,8 +22,10 @@ export async function POST(request: NextRequest) {
     return apiError("Falta un url válido (http o https)", undefined, 400);
   }
 
+  const caption = typeof body?.caption === "string" && body.caption.trim() ? body.caption : undefined;
+
   try {
-    const { mediaId } = await publishNewsPost(url);
+    const { mediaId } = await publishNewsPost(url, caption);
     return apiJson({ ok: true, mediaId }, { cachear: false });
   } catch (error) {
     return apiError("No se pudo publicar el post de la noticia", error);

@@ -25,15 +25,22 @@ async function leerError(response: Response): Promise<string> {
 
 /**
  * Formulario de `/admin/noticia`: pegar la URL del artículo, ver la vista
- * previa real (imagen + caption) y publicar solo tras un segundo paso de
- * confirmación — es una acción externa e irreversible.
+ * previa real (imagen + caption editable) y publicar solo tras un segundo
+ * paso de confirmación — es una acción externa e irreversible.
  */
 export function PublicarNoticiaForm() {
   const [url, setUrl] = useState("");
+  const [caption, setCaption] = useState("");
   const [estado, setEstado] = useState<Estado>({ paso: "inicial" });
 
   const cargandoPreview = estado.paso === "cargando-preview";
   const publicando = estado.paso === "publicando";
+
+  function limpiar() {
+    setUrl("");
+    setCaption("");
+    setEstado({ paso: "inicial" });
+  }
 
   async function verVistaPrevia() {
     setEstado({ paso: "cargando-preview" });
@@ -48,6 +55,7 @@ export function PublicarNoticiaForm() {
         return;
       }
       const preview = (await response.json()) as Preview;
+      setCaption(preview.caption);
       setEstado({ paso: "preview", preview });
     } catch {
       setEstado({ paso: "error", mensaje: "No se pudo conectar con el servidor" });
@@ -60,7 +68,7 @@ export function PublicarNoticiaForm() {
       const response = await fetch("/api/admin/publish-noticia", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url }),
+        body: JSON.stringify({ url, caption }),
       });
       if (!response.ok) {
         setEstado({ paso: "error", mensaje: await leerError(response) });
@@ -81,18 +89,30 @@ export function PublicarNoticiaForm() {
         <label htmlFor="url-articulo" className="text-sm font-semibold uppercase tracking-wide text-muted">
           URL del artículo
         </label>
-        <input
-          id="url-articulo"
-          type="url"
-          inputMode="url"
-          placeholder="https://..."
-          value={url}
-          onChange={(e) => {
-            setUrl(e.target.value);
-            setEstado({ paso: "inicial" });
-          }}
-          className="rounded-xl border border-border-soft bg-surface-strong px-4 py-3 text-base text-foreground outline-none"
-        />
+        <div className="flex gap-2">
+          <input
+            id="url-articulo"
+            type="url"
+            inputMode="url"
+            placeholder="https://..."
+            value={url}
+            onChange={(e) => {
+              setUrl(e.target.value);
+              setEstado({ paso: "inicial" });
+            }}
+            className="flex-1 rounded-xl border border-border-soft bg-surface-strong px-4 py-3 text-base text-foreground outline-none"
+          />
+          {url && (
+            <button
+              type="button"
+              onClick={limpiar}
+              aria-label="Limpiar URL"
+              className="rounded-xl border border-border-soft bg-surface-strong px-4 py-3 text-base font-semibold text-muted transition active:scale-95"
+            >
+              ✕
+            </button>
+          )}
+        </div>
       </div>
 
       <button
@@ -121,7 +141,18 @@ export function PublicarNoticiaForm() {
           {/* eslint-disable-next-line @next/next/no-img-element -- imagen generada dinámicamente, no un asset estático. */}
           <img src={preview.imageUrl} alt="" className="w-full rounded-2xl border border-border-soft" />
 
-          <pre className="whitespace-pre-wrap break-words text-sm text-foreground">{preview.caption}</pre>
+          <div className="flex flex-col gap-1">
+            <label htmlFor="caption" className="text-sm font-semibold uppercase tracking-wide text-muted">
+              Caption
+            </label>
+            <textarea
+              id="caption"
+              value={caption}
+              onChange={(e) => setCaption(e.target.value)}
+              rows={8}
+              className="whitespace-pre-wrap rounded-xl border border-border-soft bg-surface-strong px-4 py-3 text-sm text-foreground outline-none"
+            />
+          </div>
 
           <p className="text-xs text-muted">Fuente: {preview.sourceHost}</p>
 

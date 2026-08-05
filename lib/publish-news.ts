@@ -37,8 +37,12 @@ export async function previewNewsPost(url: string): Promise<{ article: ArticleDa
  * disparo manual por curl) como `app/api/admin/publish-noticia` (protegida
  * por la cookie de sesión de `/admin`) — misma lógica, dos formas distintas
  * de autorizar quién puede dispararla.
+ *
+ * `captionOverride` existe para `/admin/noticia`: ahí se puede editar el
+ * caption a mano (agregar párrafos que el scraper no trajo, por ejemplo)
+ * antes de publicar. Sin ella, se usa el caption armado por plantilla.
  */
-export async function publishNewsPost(url: string): Promise<{ mediaId: string }> {
+export async function publishNewsPost(url: string, captionOverride?: string): Promise<{ mediaId: string }> {
   const { imageUrl, caption } = await buildNewsPost(url);
-  return publishDailyPost(imageUrl, caption);
+  return publishDailyPost(imageUrl, captionOverride ?? caption);
 }
