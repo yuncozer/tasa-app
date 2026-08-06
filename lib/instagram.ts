@@ -15,6 +15,10 @@
  * responder que todavía no está listo (código 9007) justo después de
  * crearlo; por eso se reintenta unas pocas veces con una espera corta antes
  * de darlo por fallido.
+ *
+ * El carrusel añade un nivel: cada imagen es un contenedor "hijo"
+ * (`is_carousel_item`), y sobre ellos se crea un contenedor "padre"
+ * (`media_type=CAROUSEL`) que es el que lleva el caption y el que se publica.
  */
 
 const GRAPH_VERSION = "v21.0";
@@ -42,16 +46,15 @@ function credenciales(): { accountId: string; accessToken: string } {
   return { accountId, accessToken };
 }
 
-async function crearContenedor(imageUrl: string, caption: string): Promise<string> {
+async function crearContenedor(params: Record<string, string>, queHace: string): Promise<string> {
   const { accountId, accessToken } = credenciales();
   const url = new URL(`${GRAPH_BASE}/${accountId}/media`);
-  url.searchParams.set("image_url", imageUrl);
-  url.searchParams.set("caption", caption);
+  for (const [clave, valor] of Object.entries(params)) url.searchParams.set(clave, valor);
   url.searchParams.set("access_token", accessToken);
 
   const res = await fetch(url, { method: "POST" });
   const body = await res.json();
-  if (!res.ok) throw new InstagramApiError("No se pudo crear el contenedor de media", body);
+  if (!res.ok) throw new InstagramApiError(`No se pudo crear ${queHace}`, body);
   return body.id as string;
 }
 
@@ -81,12 +84,51 @@ async function publicarContenedor(containerId: string): Promise<string> {
   throw new Error("No se pudo publicar el contenedor tras varios reintentos");
 }
 
-/** Publica el post del día: crea el contenedor y lo publica. */
+/** Publica un post de una sola imagen: crea el contenedor y lo publica. */
 export async function publishDailyPost(
   imageUrl: string,
   caption: string,
 ): Promise<{ mediaId: string }> {
-  const containerId = await crearContenedor(imageUrl, caption);
+  const containerId = await crearContenedor(
+    { image_url: imageUrl, caption },
+    "el contenedor de media",
+  );
   const mediaId = await publicarContenedor(containerId);
+  return { mediaId };
+}
+
+/**
+ * Publica un carrusel: un contenedor hijo por imagen, un padre que los agrupa
+ * con el caption, y a publicar el padre.
+ *
+ * Los hijos se crean en paralelo a propósito. Crear un contenedor es lo que
+ * hace que Meta se descargue la imagen, y las nuestras se renderizan al
+ * vuelo; en serie se sumarían los dos tiempos de render y descarga dentro de
+ * una función que tiene tope de ejecución. `Promise.all` además conserva el
+ * orden del arreglo, que es el orden en que se deslizan las diapositivas.
+ */
+export async function publishCarouselPost(
+  imageUrls: string[],
+  caption: string,
+): Promise<{ mediaId: string }> {
+  if (imageUrls.length < 2 || imageUrls.length > 10) {
+    throw new Error("Un carrusel de Instagram lleva entre 2 y 10 imágenes");
+  }
+
+  const hijos = await Promise.all(
+    imageUrls.map((imageUrl) =>
+      crearContenedor(
+        { image_url: imageUrl, is_carousel_item: "true" },
+        "una diapositiva del carrusel",
+      ),
+    ),
+  );
+
+  const padre = await crearContenedor(
+    { media_type: "CAROUSEL", children: hijos.join(","), caption },
+    "el contenedor del carrusel",
+  );
+
+  const mediaId = await publicarContenedor(padre);
   return { mediaId };
 }

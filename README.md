@@ -159,27 +159,36 @@ de una variable de entorno porque Vercel lee `vercel.json` en tiempo de deploy, 
 ejecución. Para cambiar los horarios hay que editar `vercel.json` directamente
 (recordar que sus `schedule` van siempre en UTC) y volver a desplegar.
 
-Cada disparo publica **dos** posts, así que salen cuatro al día: las tasas en
-bolívares y las mismas tasas en pesos colombianos. Van en la misma invocación —y no
-en dos entradas de cron aparte— porque comparten un único `getRates()`, de modo que
-los dos posts de la mañana no pueden mostrar cifras distintas; además el plan Hobby
-de Vercel solo admite dos entradas de cron. Se publican uno tras otro, no en
-paralelo, y cada uno con su propio manejo de error: si el segundo falla, el primero
-ya salió de verdad y la respuesta lo dice en `posts[]` en vez de devolver un error
-seco que llevaría a redisparar el cron y duplicar el post que sí funcionó.
+Cada disparo publica **un carrusel de dos diapositivas**: las tasas en bolívares y
+las mismas tasas en pesos colombianos. Son un solo post y no dos porque cuatro
+publicaciones casi idénticas al día saturan el feed y la cuadrícula del perfil, y
+porque el post en pesos es el complemento del de bolívares, no una noticia aparte.
+De paso desaparece el estado a medias: un carrusel sale entero o no sale, mientras
+que dos publicaciones seguidas pueden dejar la primera publicada y la segunda no.
+Ambas diapositivas salen del mismo `getRates()`, así que no pueden mostrar cifras
+distintas.
 
-- `app/api/og/instagram-post/route.tsx` genera la imagen del post en bolívares con
-  `next/og` (1080×1080, sin capturas ni assets estáticos con parches: se renderiza de
-  nuevo cada vez con los montos del momento). Es una ruta pública sin autenticación
-  porque Instagram necesita poder buscarla como cualquier imagen.
-- `app/api/og/instagram-post-pesos/route.tsx` hace lo mismo con las tasas en pesos:
-  misma plantilla, mismas piezas de `lib/og-shared.tsx`, otra moneda al lado del
-  número.
-- `lib/pesos.ts` calcula las filas de ese post (dólar TRM, dólar frontera de compra y
-  de venta, bolívar promedio) con `convert()`, la misma función pura de la
-  calculadora, y las comparten imagen y caption para que no puedan divergir.
-- `lib/caption.ts` arma el texto de ambos posts con plantillas fijas, sin ningún API
-  de IA de por medio.
+- `app/api/og/instagram-post/route.tsx` genera la primera diapositiva con `next/og`
+  (1080×1080, sin capturas ni assets estáticos con parches: se renderiza de nuevo
+  cada vez con los montos del momento). Es una ruta pública sin autenticación porque
+  Instagram necesita poder buscarla como cualquier imagen.
+- `app/api/og/instagram-post-pesos/route.tsx` genera la segunda con las tasas en
+  pesos: misma plantilla, mismas piezas de `lib/og-shared.tsx`, otra moneda al lado
+  del número.
+- `lib/pesos.ts` calcula las filas de esa segunda diapositiva (dólar TRM, dólar
+  frontera de compra y de venta, bolívar promedio) con `convert()`, la misma función
+  pura de la calculadora, y las comparten imagen y caption para que no puedan
+  divergir.
+- `lib/caption.ts` arma el texto con una plantilla fija, sin ningún API de IA de por
+  medio. El caption es uno solo —el del contenedor padre— y lleva los **dos** bloques
+  de cifras: la segunda diapositiva solo se ve si el lector desliza, así que los
+  números en pesos tienen que estar también ahí.
+- `publishCarouselPost` en `lib/instagram.ts` crea un contenedor hijo por imagen
+  (`is_carousel_item`), un padre que los agrupa (`media_type=CAROUSEL`) con el
+  caption, y publica el padre. Los hijos se crean en paralelo porque es al crearlos
+  cuando Meta se descarga cada imagen, y las nuestras se renderizan al vuelo. El
+  route exporta `maxDuration = 60` por eso mismo: son cuatro viajes a Meta más los
+  reintentos del código 9007.
 - `lib/instagram.ts` habla con **"Instagram API with Instagram Login"** (login
   directo por instagram.com, sin pasar por una Página de Facebook): crea el
   contenedor de media y lo publica, con reintentos cortos si Meta todavía lo

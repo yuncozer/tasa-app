@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 import { apiError, apiJson } from "@/lib/api";
-import { buildCaption, buildPesosCaption } from "@/lib/caption";
-import { publishDailyPost } from "@/lib/instagram";
+import { buildCaption } from "@/lib/caption";
+import { publishCarouselPost } from "@/lib/instagram";
 import { getRates } from "@/lib/rates";
 
 /**
@@ -11,11 +11,13 @@ import { getRates } from "@/lib/rates";
  * del caption — explícito en vez de inferirlo de la hora del reloj, así no
  * se rompe si algún día se cambian los horarios.
  *
- * Cada disparo publica **dos** posts: las tasas en bolívares y las mismas
- * tasas en pesos. Van juntos en la misma invocación, y no en dos entradas de
- * cron aparte, por dos razones: comparten un único `getRates()`, de modo que
- * los dos posts de la mañana no pueden mostrar cifras distintas; y el plan
- * Hobby de Vercel solo admite dos entradas de cron en total.
+ * Cada disparo publica **un carrusel de dos diapositivas**: las tasas en
+ * bolívares y las mismas tasas en pesos. Son un solo post y no dos porque
+ * cuatro publicaciones casi idénticas al día saturan el feed y el perfil, y
+ * porque el post en pesos es el complemento del de bolívares, no una noticia
+ * aparte. De paso desaparece el estado a medias: un carrusel sale entero o no
+ * sale, mientras que dos publicaciones seguidas pueden dejar la primera
+ * publicada y la segunda no.
  *
  * A diferencia del resto de las rutas de la API, esta sí exige autenticación:
  * publica en una cuenta real y no debe poder dispararla cualquiera que
@@ -23,12 +25,14 @@ import { getRates } from "@/lib/rates";
  */
 export const runtime = "nodejs";
 
-interface ResultadoPost {
-  tipo: "bolivares" | "pesos";
-  ok: boolean;
-  mediaId?: string;
-  error?: string;
-}
+/**
+ * Publicar un carrusel son cuatro viajes a Meta —dos contenedores hijos, el
+ * padre y la publicación—, y crear cada hijo obliga a Meta a descargarse una
+ * imagen que se renderiza al vuelo. Con el tope por defecto de la plataforma
+ * eso va justo, y encima `publicarContenedor()` puede esperar hasta 8 s
+ * reintentando si Meta todavía está procesando.
+ */
+export const maxDuration = 60;
 
 function momentoDesdeQuery(request: NextRequest): "manana" | "tarde" | undefined {
   const valor = request.nextUrl.searchParams.get("momento");
@@ -46,41 +50,18 @@ export async function GET(request: NextRequest) {
     return apiError("Falta configurar SITE_URL", undefined, 500);
   }
 
-  let snapshot;
   try {
-    snapshot = await getRates();
+    const snapshot = await getRates();
+    const caption = buildCaption(snapshot, momentoDesdeQuery(request));
+
+    // El orden es el orden en que se deslizan: bolívares primero.
+    const { mediaId } = await publishCarouselPost(
+      [`${siteUrl}/api/og/instagram-post`, `${siteUrl}/api/og/instagram-post-pesos`],
+      caption,
+    );
+
+    return apiJson({ ok: true, mediaId }, { cachear: false });
   } catch (error) {
-    return apiError("No se pudieron obtener las tasas para publicar", error);
+    return apiError("No se pudo publicar el post de Instagram", error);
   }
-
-  const momento = momentoDesdeQuery(request);
-
-  /**
-   * Uno tras otro, no en paralelo: son dos publicaciones seguidas en la misma
-   * cuenta y `publicarContenedor()` ya reintenta con esperas; lanzarlas a la
-   * vez solo acerca el límite de peticiones de la Graph API.
-   *
-   * Y cada una con su propio try: si falla la segunda, la primera ya salió de
-   * verdad. Responder con un error seco haría creer que no se publicó nada y
-   * llevaría a redisparar el cron, duplicando el post que sí funcionó.
-   */
-  const posts: ResultadoPost[] = [];
-
-  for (const { tipo, imageUrl, caption } of [
-    { tipo: "bolivares" as const, imageUrl: `${siteUrl}/api/og/instagram-post`, caption: buildCaption(snapshot, momento) },
-    { tipo: "pesos" as const, imageUrl: `${siteUrl}/api/og/instagram-post-pesos`, caption: buildPesosCaption(snapshot, momento) },
-  ]) {
-    try {
-      const { mediaId } = await publishDailyPost(imageUrl, caption);
-      posts.push({ tipo, ok: true, mediaId });
-    } catch (error) {
-      posts.push({ tipo, ok: false, error: error instanceof Error ? error.message : String(error) });
-    }
-  }
-
-  if (posts.every((post) => !post.ok)) {
-    return apiError("No se pudo publicar ningún post de Instagram", new Error(posts.map((p) => p.error).join(" | ")));
-  }
-
-  return apiJson({ ok: posts.every((post) => post.ok), posts }, { cachear: false });
 }
