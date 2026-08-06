@@ -1,4 +1,4 @@
-import { formatCopRate, formatDate, formatRate, vigenciaBcv } from "@/lib/format";
+import { formatDate, formatRate, vigenciaBcv } from "@/lib/format";
 import { buildFilasPesos, type FilaPesosId } from "@/lib/pesos";
 import type { ArticleData } from "@/lib/providers/news";
 import type { RateKey, RatesSnapshot } from "@/lib/types";
@@ -50,7 +50,10 @@ function lineasEnBolivares(snapshot: RatesSnapshot): string[] {
     const valor = rate.bsPerUnit === null ? "no disponible" : `${formatRate(rate.bsPerUnit)} Bs`;
     const esBcv = key === "USD_BCV" || key === "EUR_BCV";
     const vigencia = esBcv ? vigenciaBcv(rate.updatedAt) : undefined;
-    return `${emoji} ${rate.label}: ${valor}${vigencia ? ` (${vigencia})` : ""}`;
+    // Igual que en la imagen: el peso frontera declara su fuente, porque su
+    // nombre no la nombra y se leería como una tasa de las casas de cambio.
+    const fuente = key === "COP_FRONTERA" ? rate.source : undefined;
+    return `${emoji} ${rate.label}: ${valor}${vigencia ? ` (${vigencia})` : ""}${fuente ? ` (${fuente})` : ""}`;
   });
 }
 
@@ -61,8 +64,8 @@ function lineasEnBolivares(snapshot: RatesSnapshot): string[] {
  */
 function lineasEnPesos(snapshot: RatesSnapshot): string[] {
   return buildFilasPesos(snapshot).map((fila) => {
-    const valor = fila.copPerUnit === null ? "no disponible" : `${formatCopRate(fila.copPerUnit)} COP`;
-    return `${EMOJI_POR_FILA_PESOS[fila.id]} ${fila.label}: ${valor}`;
+    const valor = fila.copPerUnit === null ? "no disponible" : `${formatRate(fila.copPerUnit)} COP`;
+    return `${EMOJI_POR_FILA_PESOS[fila.id]} ${fila.label}: ${valor}${fila.fuente ? ` (${fila.fuente})` : ""}`;
   });
 }
 
