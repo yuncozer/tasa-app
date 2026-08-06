@@ -88,6 +88,68 @@ export function Encabezado({ subtitulo }: { subtitulo: string }) {
   );
 }
 
+/**
+ * Fila de una tasa: bandera, nombre y monto, dentro de una píldora.
+ *
+ * La comparten el post en bolívares y el post en pesos, que son la misma
+ * plantilla con otra moneda al lado del número. `sublabel` es opcional porque
+ * solo el post en bolívares tiene algo que decir ahí (la vigencia del BCV).
+ */
+export function FilaMoneda({
+  banderaSrc,
+  label,
+  sublabel,
+  valor,
+  noDisponible,
+}: {
+  banderaSrc: string;
+  label: string;
+  sublabel?: string;
+  valor: string;
+  noDisponible: boolean;
+}) {
+  const color = noDisponible ? COLOR.warning : COLOR.accent;
+
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        border: `2px solid ${color}`,
+        backgroundColor: COLOR.surface,
+        borderRadius: 9999,
+        padding: "16px 34px",
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
+        <div
+          style={{
+            display: "flex",
+            width: 56,
+            height: 56,
+            borderRadius: 9999,
+            overflow: "hidden",
+            border: `2px solid ${COLOR.border}`,
+          }}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element -- Satori rasteriza, no es una <img> de navegador. */}
+          <img src={banderaSrc} width={56} height={56} style={{ objectFit: "cover", borderRadius: 9999 }} alt="" />
+        </div>
+        <div style={{ display: "flex", flexDirection: "column" }}>
+          <span style={{ fontSize: 32, color: COLOR.foreground }}>{label}</span>
+          {sublabel && (
+            <span style={{ fontSize: 24, color: COLOR.foreground, fontWeight: 500, textTransform: "capitalize" }}>
+              {`(${sublabel})`}
+            </span>
+          )}
+        </div>
+      </div>
+      <span style={{ fontSize: 50, fontWeight: 700, color }}>{valor}</span>
+    </div>
+  );
+}
+
 /** Línea de contacto + párrafo legal del pie de página, común a ambas plantillas. */
 export function Pie({ icons, aviso }: { icons: { instagram: string; browser: string }; aviso: string }) {
   return (

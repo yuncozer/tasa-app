@@ -170,6 +170,37 @@ ambas es real (verificado en vivo: ~847 vs ~838, más de un 1 %) y esconderla en
 promedio daba una imagen falsa de lo que se paga o se recibe. `BinanceDetail.mid`
 se conserva porque `COP_FRONTERA` lo sigue usando para el cruce VES↔COP.
 
+### El post en pesos es el mismo post visto desde el otro lado de la frontera
+
+El post diario en bolívares responde "cuánto vale un dólar en bolívares", que es
+la pregunta del lado venezolano. Del lado colombiano la pregunta es la contraria,
+así que cada disparo del cron publica **dos** posts —bolívares y pesos— y salen
+cuatro al día.
+
+- Los dos van en **la misma invocación del cron**, no en dos entradas de
+  `vercel.json` aparte. Comparten un único `getRates()`, así que los dos posts de
+  la mañana no pueden mostrar cifras distintas; y el plan Hobby de Vercel solo
+  admite dos entradas de cron. Se publican uno tras otro, con su propio `try` cada
+  uno: si el segundo falla, el primero **ya salió**, y responder con un error seco
+  llevaría a redisparar el cron y duplicar el post que sí funcionó.
+- Las filas viven en `lib/pesos.ts` y las leen tanto la imagen como el caption. No
+  las dupliques en cada sitio: son el mismo post y tienen que decir lo mismo.
+- Todo se calcula con `convert()`, no a mano, para que el número publicado sea el
+  mismo que da la calculadora. La única excepción es el **dólar TRM**, que se toma
+  de `snapshot.trm` tal cual: derivarlo de `USD_BCV ÷ COP_OFICIAL` daría lo mismo
+  por construcción, pero con dos redondeos encima sobre una cifra oficial que el
+  lector puede contrastar con el Banco de la República.
+- El **bolívar promedio** es el promedio del dólar frontera de compra y venta
+  expresado por bolívar, y eso se simplifica a `1 ÷ COP_FRONTERA`: ambas filas de
+  frontera dividen entre la misma tasa, así que el promedio se cancela. No lo
+  "corrijas" a un promedio explícito — daría el mismo número con más redondeos por
+  el camino.
+- `formatCopRate()` (`lib/format.ts`) corre de escala el criterio de `formatRate`:
+  la frontera entre "hace falta precisión" y "sobra" no está en 1 sino en 100,
+  porque un peso vale mucho menos que un bolívar. Un dólar ronda los 3.100 COP y
+  con 2 decimales sobra; un bolívar ronda los 4 COP y con 2 decimales se perdería
+  la diferencia entre una jornada y otra.
+
 ### El aviso legal se queda
 
 El pie declara que los datos son de terceros, que La Tasa no fija ni certifica

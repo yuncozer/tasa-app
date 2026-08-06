@@ -1,6 +1,6 @@
 import { ImageResponse } from "next/og";
 import { formatClock, formatDate, formatRate, vigenciaBcv } from "@/lib/format";
-import { AVISO_TASAS, COLOR, Encabezado, Pie, leerFontBuffer, leerSvgComoDataUri } from "@/lib/og-shared";
+import { AVISO_TASAS, COLOR, Encabezado, FilaMoneda, Pie, leerFontBuffer, leerSvgComoDataUri } from "@/lib/og-shared";
 import { getRates } from "@/lib/rates";
 import type { Rate, RateKey, RatesSnapshot } from "@/lib/types";
 
@@ -27,45 +27,16 @@ const BANDERA_POR_TASA: Partial<Record<RateKey, string>> = {
 
 function FilaTasa({ rate, banderaSrc }: { rate: Rate; banderaSrc: string }) {
   const noDisponible = rate.bsPerUnit === null;
-  const colorTexto = noDisponible ? COLOR.warning : COLOR.accent;
   const esBcv = rate.key === "USD_BCV" || rate.key === "EUR_BCV";
-  const vigencia = esBcv ? vigenciaBcv(rate.updatedAt) : undefined;
 
   return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        border: `2px solid ${noDisponible ? COLOR.warning : COLOR.accent}`,
-        backgroundColor: COLOR.surface,
-        borderRadius: 9999,
-        padding: "16px 34px",
-      }}
-    >
-      <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
-        <div
-          style={{
-            display: "flex",
-            width: 56,
-            height: 56,
-            borderRadius: 9999,
-            overflow: "hidden",
-            border: `2px solid ${COLOR.border}`,
-          }}
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element -- Satori rasteriza, no es una <img> de navegador. */}
-          <img src={banderaSrc} width={56} height={56} style={{ objectFit: "cover", borderRadius: 9999 }} alt="" />
-        </div>
-        <div style={{ display: "flex", flexDirection: "column" }}>
-          <span style={{ fontSize: 32, color: COLOR.foreground }}>{rate.label}</span>
-          {vigencia && <span style={{ fontSize: 24, color: COLOR.foreground, fontWeight: 500, textTransform: "capitalize" }}>{`(${vigencia})`}</span>}
-        </div>
-      </div>
-      <span style={{ fontSize: 50, fontWeight: 700, color: colorTexto }}>
-        {noDisponible ? "No disponible" : `${formatRate(rate.bsPerUnit)} Bs`}
-      </span>
-    </div>
+    <FilaMoneda
+      banderaSrc={banderaSrc}
+      label={rate.label}
+      sublabel={esBcv ? vigenciaBcv(rate.updatedAt) : undefined}
+      valor={noDisponible ? "No disponible" : `${formatRate(rate.bsPerUnit)} Bs`}
+      noDisponible={noDisponible}
+    />
   );
 }
 

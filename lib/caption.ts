@@ -1,4 +1,5 @@
-import { formatDate, formatRate, vigenciaBcv } from "@/lib/format";
+import { formatCopRate, formatDate, formatRate, vigenciaBcv } from "@/lib/format";
+import { buildFilasPesos, type FilaPesosId } from "@/lib/pesos";
 import type { ArticleData } from "@/lib/providers/news";
 import type { RateKey, RatesSnapshot } from "@/lib/types";
 
@@ -46,6 +47,45 @@ export function buildCaption(snapshot: RatesSnapshot, momento?: "manana" | "tard
     "Convierte cualquier monto en la calculadora completa: link en la bio.",
     "",
     HASHTAGS,
+  ].join("\n");
+}
+
+const HASHTAGS_PESOS =
+  "#Colombia #Venezuela #TRM #PesoColombiano #DolarHoy #TasaDeCambio #Cucuta #Binance #LaTasaOnline";
+
+const TITULO_PESOS_POR_MOMENTO: Record<"manana" | "tarde", string> = {
+  manana: "Tasas de hoy en pesos por la mañana",
+  tarde: "Tasas de hoy en pesos por la tarde",
+};
+
+const EMOJI_POR_FILA_PESOS: Record<FilaPesosId, string> = {
+  TRM: "🇺🇸",
+  FRONTERA_BUY: "🇺🇸",
+  FRONTERA_SELL: "🇺🇸",
+  VES_PROMEDIO: "🇻🇪",
+};
+
+/**
+ * Caption del post diario en pesos: mismo molde que `buildCaption`, con las
+ * cifras del lado colombiano. Las filas salen de `buildFilasPesos` —las mismas
+ * que la imagen— para que caption e imagen no puedan decir cosas distintas.
+ */
+export function buildPesosCaption(snapshot: RatesSnapshot, momento?: "manana" | "tarde"): string {
+  const lineas = buildFilasPesos(snapshot).map((fila) => {
+    const valor = fila.copPerUnit === null ? "no disponible" : `${formatCopRate(fila.copPerUnit)} COP`;
+    return `${EMOJI_POR_FILA_PESOS[fila.id]} ${fila.label}: ${valor}`;
+  });
+
+  const titulo = momento ? TITULO_PESOS_POR_MOMENTO[momento] : "Tasas de hoy en pesos";
+
+  return [
+    `📊 ${titulo} — ${formatDate(snapshot.fetchedAt)}`,
+    "",
+    ...lineas,
+    "",
+    "Convierte cualquier monto en la calculadora completa: link en la bio.",
+    "",
+    HASHTAGS_PESOS,
   ].join("\n");
 }
 

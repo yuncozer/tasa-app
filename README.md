@@ -150,8 +150,8 @@ explicado en `/api/health`.
 ## Publicación automática en Instagram
 
 Cada día a las 9:00 am y a las 6:00 pm hora de Caracas, Vercel Cron dispara
-`GET /api/cron/publish-instagram` (protegido con `CRON_SECRET`), que arma el post
-con las tasas del momento y lo publica en `@latasa.online` vía la Graph API de Meta.
+`GET /api/cron/publish-instagram` (protegido con `CRON_SECRET`), que arma los posts
+con las tasas del momento y los publica en `@latasa.online` vía la Graph API de Meta.
 Los dos horarios son dos entradas separadas en `vercel.json`, cada una con
 `?momento=manana` o `?momento=tarde` en la ruta — ese query param es lo único que
 decide el título del caption ("Tasas de hoy por la mañana/tarde"); no se puede sacar
@@ -159,12 +159,27 @@ de una variable de entorno porque Vercel lee `vercel.json` en tiempo de deploy, 
 ejecución. Para cambiar los horarios hay que editar `vercel.json` directamente
 (recordar que sus `schedule` van siempre en UTC) y volver a desplegar.
 
-- `app/api/og/instagram-post/route.tsx` genera la imagen del post con `next/og`
-  (1080×1080, sin capturas ni assets estáticos con parches: se renderiza de nuevo
-  cada vez con los montos del momento). Es una ruta pública sin autenticación
+Cada disparo publica **dos** posts, así que salen cuatro al día: las tasas en
+bolívares y las mismas tasas en pesos colombianos. Van en la misma invocación —y no
+en dos entradas de cron aparte— porque comparten un único `getRates()`, de modo que
+los dos posts de la mañana no pueden mostrar cifras distintas; además el plan Hobby
+de Vercel solo admite dos entradas de cron. Se publican uno tras otro, no en
+paralelo, y cada uno con su propio manejo de error: si el segundo falla, el primero
+ya salió de verdad y la respuesta lo dice en `posts[]` en vez de devolver un error
+seco que llevaría a redisparar el cron y duplicar el post que sí funcionó.
+
+- `app/api/og/instagram-post/route.tsx` genera la imagen del post en bolívares con
+  `next/og` (1080×1080, sin capturas ni assets estáticos con parches: se renderiza de
+  nuevo cada vez con los montos del momento). Es una ruta pública sin autenticación
   porque Instagram necesita poder buscarla como cualquier imagen.
-- `lib/caption.ts` arma el texto del post con una plantilla fija, sin ningún API de
-  IA de por medio.
+- `app/api/og/instagram-post-pesos/route.tsx` hace lo mismo con las tasas en pesos:
+  misma plantilla, mismas piezas de `lib/og-shared.tsx`, otra moneda al lado del
+  número.
+- `lib/pesos.ts` calcula las filas de ese post (dólar TRM, dólar frontera de compra y
+  de venta, bolívar promedio) con `convert()`, la misma función pura de la
+  calculadora, y las comparten imagen y caption para que no puedan divergir.
+- `lib/caption.ts` arma el texto de ambos posts con plantillas fijas, sin ningún API
+  de IA de por medio.
 - `lib/instagram.ts` habla con **"Instagram API with Instagram Login"** (login
   directo por instagram.com, sin pasar por una Página de Facebook): crea el
   contenedor de media y lo publica, con reintentos cortos si Meta todavía lo
