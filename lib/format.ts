@@ -72,6 +72,28 @@ export function formatInverseRate(value: number | null): string {
   }).format(value);
 }
 
+/**
+ * Una tasa expresada en pesos, no en bolívares (post diario de Instagram en
+ * pesos). El criterio es el mismo de `rateDecimals`, solo que corrido de
+ * escala: como un peso vale mucho menos que un bolívar, la frontera entre "hace
+ * falta precisión" y "sobra" no está en 1 sino en 100. Un dólar ronda los
+ * 3.100 COP y con dos decimales ya es exacto de sobra; un bolívar ronda los 4
+ * COP y con dos decimales se perdería la diferencia entre una jornada y otra.
+ */
+function copRateDecimals(value: number): number {
+  return value < 100 ? 4 : 2;
+}
+
+export function formatCopRate(value: number | null): string {
+  if (value === null || !Number.isFinite(value)) return "—";
+
+  const decimals = copRateDecimals(value);
+  return new Intl.NumberFormat("es-VE", {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  }).format(value);
+}
+
 const MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
 
 /** Venezuela usa UTC−4 todo el año, sin horario de verano desde 2016. */

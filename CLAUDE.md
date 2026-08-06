@@ -170,6 +170,44 @@ ambas es real (verificado en vivo: ~847 vs ~838, más de un 1 %) y esconderla en
 promedio daba una imagen falsa de lo que se paga o se recibe. `BinanceDetail.mid`
 se conserva porque `COP_FRONTERA` lo sigue usando para el cruce VES↔COP.
 
+### El post diario es un carrusel: bolívares y pesos
+
+El post en bolívares responde "cuánto vale un dólar en bolívares", que es la
+pregunta del lado venezolano. Del lado colombiano la pregunta es la contraria, así
+que el post diario es un **carrusel de dos diapositivas**: bolívares primero,
+pesos después.
+
+- Un carrusel y no dos publicaciones seguidas. Cuatro posts casi idénticos al día
+  saturan el feed y la cuadrícula del perfil, y el post en pesos es el complemento
+  del de bolívares, no una noticia aparte. Además un carrusel sale entero o no
+  sale: con dos publicaciones puede quedar la primera publicada y la segunda no, y
+  entonces reintentar duplica la que sí funcionó.
+- El caption es **uno solo** (el del contenedor padre) y lleva los dos bloques de
+  cifras. No quites el de pesos pensando que ya está en la segunda diapositiva: esa
+  solo se ve si el lector desliza, y en el caption los números se leen, se copian y
+  se buscan sin deslizar nada.
+- `publishCarouselPost` crea los hijos **en paralelo** a propósito: crear un
+  contenedor es lo que hace que Meta se descargue la imagen, y las nuestras se
+  renderizan al vuelo. Por eso mismo el route del cron exporta `maxDuration = 60`:
+  son cuatro viajes a Meta más los reintentos del código 9007.
+- Las filas viven en `lib/pesos.ts` y las leen tanto la imagen como el caption. No
+  las dupliques en cada sitio: son el mismo post y tienen que decir lo mismo.
+- Todo se calcula con `convert()`, no a mano, para que el número publicado sea el
+  mismo que da la calculadora. La única excepción es el **dólar TRM**, que se toma
+  de `snapshot.trm` tal cual: derivarlo de `USD_BCV ÷ COP_OFICIAL` daría lo mismo
+  por construcción, pero con dos redondeos encima sobre una cifra oficial que el
+  lector puede contrastar con el Banco de la República.
+- El **bolívar promedio** es el promedio del dólar frontera de compra y venta
+  expresado por bolívar, y eso se simplifica a `1 ÷ COP_FRONTERA`: ambas filas de
+  frontera dividen entre la misma tasa, así que el promedio se cancela. No lo
+  "corrijas" a un promedio explícito — daría el mismo número con más redondeos por
+  el camino.
+- `formatCopRate()` (`lib/format.ts`) corre de escala el criterio de `formatRate`:
+  la frontera entre "hace falta precisión" y "sobra" no está en 1 sino en 100,
+  porque un peso vale mucho menos que un bolívar. Un dólar ronda los 3.100 COP y
+  con 2 decimales sobra; un bolívar ronda los 4 COP y con 2 decimales se perdería
+  la diferencia entre una jornada y otra.
+
 ### El aviso legal se queda
 
 El pie declara que los datos son de terceros, que La Tasa no fija ni certifica
