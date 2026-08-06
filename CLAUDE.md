@@ -202,11 +202,21 @@ pesos después.
   frontera dividen entre la misma tasa, así que el promedio se cancela. No lo
   "corrijas" a un promedio explícito — daría el mismo número con más redondeos por
   el camino.
-- `formatCopRate()` (`lib/format.ts`) corre de escala el criterio de `formatRate`:
-  la frontera entre "hace falta precisión" y "sobra" no está en 1 sino en 100,
-  porque un peso vale mucho menos que un bolívar. Un dólar ronda los 3.100 COP y
-  con 2 decimales sobra; un bolívar ronda los 4 COP y con 2 decimales se perdería
-  la diferencia entre una jornada y otra.
+- Las cifras en pesos usan `formatRate` como todo lo demás, o sea 2 decimales.
+  Hubo un `formatCopRate` con 4 decimales por debajo de 100 y **se retiró a
+  propósito**: en una lista de miles, un `4,2955` junto a un `3.640,46` se lee
+  de reojo como "cuatro mil y algo". El costo asumido es que el bolívar sale
+  `4,30 COP` mientras que invertir el `0,2328 Bs` de la otra diapositiva da
+  `4,2955`; en una imagen que se mira de pasada pesa más que se lea bien que
+  que cuadre al cuarto decimal. Si lo reintroduces, vuelve el problema.
+- Las filas de **frontera declaran su fuente** ("Binance P2P") debajo del
+  nombre: peso frontera en la diapositiva de bolívares, y los dos dólares
+  frontera más el bolívar promedio en la de pesos. Sin eso el lector las
+  atribuye a las casas de cambio de Cúcuta, que es justo lo que la app tiene
+  prohibido sugerir — no existe API pública de esas casas y el número es una
+  aproximación sobre Binance. Las demás filas no la llevan porque su nombre ya
+  la dice ("Dólar BCV", "Dólar Binance", "Dólar TRM"). El texto se lee de
+  `rate.source`, no se escribe a mano.
 
 ### El aviso legal se queda
 

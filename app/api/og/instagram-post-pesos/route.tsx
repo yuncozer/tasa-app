@@ -1,5 +1,5 @@
 import { ImageResponse } from "next/og";
-import { formatClock, formatCopRate, formatDate } from "@/lib/format";
+import { formatClock, formatDate, formatRate } from "@/lib/format";
 import { AVISO_TASAS, COLOR, Encabezado, FilaMoneda, Pie, leerFontBuffer, leerSvgComoDataUri } from "@/lib/og-shared";
 import { buildFilasPesos, type FilaPesosId } from "@/lib/pesos";
 import { getRates } from "@/lib/rates";
@@ -64,7 +64,8 @@ function PostImage({
             key={fila.id}
             banderaSrc={banderas[fila.id]}
             label={fila.label}
-            valor={fila.copPerUnit === null ? "No disponible" : `${formatCopRate(fila.copPerUnit)} COP`}
+            fuente={fila.fuente}
+            valor={fila.copPerUnit === null ? "No disponible" : `${formatRate(fila.copPerUnit)} COP`}
             noDisponible={fila.copPerUnit === null}
           />
         ))}

@@ -23,6 +23,13 @@ export interface FilaPesos {
   label: string;
   /** Cuántos pesos vale una unidad de la moneda. `null` si la fuente falló. */
   copPerUnit: number | null;
+  /**
+   * De dónde sale el número, cuando el nombre de la fila no lo dice ya. Las
+   * tres filas de frontera se leerían si no como cotizaciones de las casas de
+   * cambio de Cúcuta, y son una aproximación sobre el mercado P2P de Binance.
+   * "Dólar TRM" no la lleva: la sigla ya nombra su fuente.
+   */
+  fuente?: string;
 }
 
 /** Cuántos pesos vale una unidad de `from`, cruzando por el peso frontera. */
@@ -31,6 +38,11 @@ function enPesos(snapshot: RatesSnapshot, from: Parameters<typeof convert>[1]): 
 }
 
 export function buildFilasPesos(snapshot: RatesSnapshot): FilaPesos[] {
+  // Las tres filas de frontera cruzan por el peso frontera, así que su
+  // procedencia es la de esa tasa. Se lee del snapshot en vez de escribirla a
+  // mano para que no quede desincronizada si algún día cambia la fuente.
+  const fuenteFrontera = snapshot.rates.COP_FRONTERA.source;
+
   return [
     {
       id: "TRM",
@@ -45,11 +57,13 @@ export function buildFilasPesos(snapshot: RatesSnapshot): FilaPesos[] {
       id: "FRONTERA_BUY",
       label: "Dólar frontera (compra)",
       copPerUnit: enPesos(snapshot, "USD_BINANCE_BUY"),
+      fuente: fuenteFrontera,
     },
     {
       id: "FRONTERA_SELL",
       label: "Dólar frontera (venta)",
       copPerUnit: enPesos(snapshot, "USD_BINANCE_SELL"),
+      fuente: fuenteFrontera,
     },
     {
       id: "VES_PROMEDIO",
@@ -62,6 +76,7 @@ export function buildFilasPesos(snapshot: RatesSnapshot): FilaPesos[] {
       // No lo "corrijas" a un promedio explícito: daría el mismo número con
       // más redondeos por el camino.
       copPerUnit: enPesos(snapshot, "VES"),
+      fuente: fuenteFrontera,
     },
   ];
 }

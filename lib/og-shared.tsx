@@ -92,19 +92,29 @@ export function Encabezado({ subtitulo }: { subtitulo: string }) {
  * Fila de una tasa: bandera, nombre y monto, dentro de una píldora.
  *
  * La comparten el post en bolívares y el post en pesos, que son la misma
- * plantilla con otra moneda al lado del número. `sublabel` es opcional porque
- * solo el post en bolívares tiene algo que decir ahí (la vigencia del BCV).
+ * plantilla con otra moneda al lado del número.
+ *
+ * Debajo del nombre caben dos líneas opcionales e independientes: `sublabel`
+ * (hoy, la vigencia del BCV) y `fuente`. La fuente va en `--muted` porque es
+ * lo que el sistema de estilos reserva para las procedencias, y separada de
+ * `sublabel` para poder darle ese color sin teñir también la vigencia.
+ *
+ * El texto de `sublabel` llega con su puntuación ya puesta: quien llama sabe
+ * si necesita paréntesis, y hay etiquetas que ya traen los suyos ("Dólar
+ * frontera (compra)").
  */
 export function FilaMoneda({
   banderaSrc,
   label,
   sublabel,
+  fuente,
   valor,
   noDisponible,
 }: {
   banderaSrc: string;
   label: string;
   sublabel?: string;
+  fuente?: string;
   valor: string;
   noDisponible: boolean;
 }) {
@@ -140,9 +150,10 @@ export function FilaMoneda({
           <span style={{ fontSize: 32, color: COLOR.foreground }}>{label}</span>
           {sublabel && (
             <span style={{ fontSize: 24, color: COLOR.foreground, fontWeight: 500, textTransform: "capitalize" }}>
-              {`(${sublabel})`}
+              {sublabel}
             </span>
           )}
+          {fuente && <span style={{ fontSize: 22, color: COLOR.muted }}>{fuente}</span>}
         </div>
       </div>
       <span style={{ fontSize: 50, fontWeight: 700, color }}>{valor}</span>

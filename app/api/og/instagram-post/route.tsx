@@ -28,12 +28,18 @@ const BANDERA_POR_TASA: Partial<Record<RateKey, string>> = {
 function FilaTasa({ rate, banderaSrc }: { rate: Rate; banderaSrc: string }) {
   const noDisponible = rate.bsPerUnit === null;
   const esBcv = rate.key === "USD_BCV" || rate.key === "EUR_BCV";
+  const vigencia = esBcv ? vigenciaBcv(rate.updatedAt) : undefined;
 
   return (
     <FilaMoneda
       banderaSrc={banderaSrc}
       label={rate.label}
-      sublabel={esBcv ? vigenciaBcv(rate.updatedAt) : undefined}
+      sublabel={vigencia ? `(${vigencia})` : undefined}
+      // Solo el peso frontera necesita declarar de dónde sale: las demás filas
+      // llevan la fuente en el propio nombre. Sin esto, "Peso frontera" se lee
+      // como si viniera de las casas de cambio de Cúcuta, y es una
+      // aproximación construida sobre el mercado P2P de Binance.
+      fuente={rate.key === "COP_FRONTERA" ? rate.source : undefined}
       valor={noDisponible ? "No disponible" : `${formatRate(rate.bsPerUnit)} Bs`}
       noDisponible={noDisponible}
     />
