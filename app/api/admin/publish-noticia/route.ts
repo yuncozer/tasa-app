@@ -23,9 +23,10 @@ export async function POST(request: NextRequest) {
   }
 
   const caption = typeof body?.caption === "string" && body.caption.trim() ? body.caption : undefined;
+  const imagenPropiaPublicId = typeof body?.imagenPublicId === "string" ? body.imagenPublicId : undefined;
 
   try {
-    const { mediaId } = await publishNewsPost(url, caption);
+    const { mediaId } = await publishNewsPost(url, caption, imagenPropiaPublicId);
     return apiJson({ ok: true, mediaId }, { cachear: false });
   } catch (error) {
     return apiError("No se pudo publicar el post de la noticia", error);

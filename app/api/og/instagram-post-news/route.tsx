@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 import { ImageResponse } from "next/og";
 import sharp from "sharp";
-import { formatClock, formatDate } from "@/lib/format";
+import { formatDate } from "@/lib/format";
 import { AVISO_NOTICIA, COLOR, Encabezado, Pie, leerFontBuffer, leerSvgComoDataUri } from "@/lib/og-shared";
 import { verifyNewsImageParams } from "@/lib/news-signature";
 
@@ -46,21 +46,30 @@ async function descargarImagenComoPng(url: string): Promise<string> {
   return `data:image/png;base64,${png.toString("base64")}`;
 }
 
+/**
+ * Alto de la foto dentro del marco. En las diapositivas secundarias no hay
+ * titular debajo, así que ese espacio se lo queda la imagen en vez de dejar
+ * un hueco.
+ */
+const ALTO_FOTO = { principal: 560, secundaria: 700 };
+
 function Portada({
   title,
   source,
   imageDataUri,
   fecha,
-  hora,
   icons,
 }: {
-  title: string;
+  /** Ausente en las diapositivas secundarias de un carrusel. */
+  title?: string;
   source: string;
   imageDataUri: string;
-  fecha: string;
-  hora: string;
+  /** Ausente en las diapositivas secundarias de un carrusel. */
+  fecha?: string;
   icons: { instagram: string; browser: string };
 }) {
+  const altoFoto = title ? ALTO_FOTO.principal : ALTO_FOTO.secundaria;
+
   return (
     <div
       style={{
@@ -77,7 +86,7 @@ function Portada({
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
         <Encabezado subtitulo="Noticias" />
         <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 10, marginTop: 15 }}>
-          <span style={{ fontSize: 32, color: COLOR.foreground, fontWeight: 700 }}>{fecha}</span>
+          {fecha ? <span style={{ fontSize: 32, color: COLOR.foreground, fontWeight: 700 }}>{fecha}</span> : null}
           <span style={{ fontSize: 24, color: COLOR.muted, fontWeight: 700 }}>{`@latasa.online`}</span>
         </div>
       </div>
@@ -95,9 +104,11 @@ function Portada({
         }}
       >
         {/* eslint-disable-next-line @next/next/no-img-element -- Satori rasteriza, no es una <img> de navegador. */}
-        <img src={imageDataUri} width={968} height={560} style={{ objectFit: "cover", width: "100%", height: 560 }} alt="" />
+        <img src={imageDataUri} width={968} height={altoFoto} style={{ objectFit: "cover", width: "100%", height: altoFoto }} alt="" />
         <div style={{ display: "flex", flexDirection: "column", gap: 6, backgroundColor: COLOR.surface, padding: "18px 28px" }}>
-          <span style={{ fontSize: 44, fontWeight: 700, color: COLOR.foreground, lineHeight: 1.25 }}>{title}</span>
+          {title ? (
+            <span style={{ fontSize: 44, fontWeight: 700, color: COLOR.foreground, lineHeight: 1.25 }}>{title}</span>
+          ) : null}
           <span style={{ fontSize: 24, color: COLOR.muted }}>Fuente: {source}</span>
         </div>
       </div>
@@ -114,11 +125,18 @@ export async function GET(request: NextRequest) {
   const source = params.get("source");
   const sig = params.get("sig");
 
-  if (!title || !image || !source || !sig) {
+  if (!image || !source || !sig) {
     return new Response("Faltan parámetros", { status: 400 });
   }
 
-  if (!verifyNewsImageParams({ title, image, source }, sig)) {
+  /**
+   * El título sólo viaja en la diapositiva principal; en las secundarias de
+   * un carrusel no se repite. La firma se calcula sobre exactamente los
+   * parámetros presentes, así que quitar o añadir `title` a una URL ya
+   * firmada la invalida — no hay forma de colar un titular ajeno.
+   */
+  const firmados: Record<string, string> = title ? { title, image, source } : { image, source };
+  if (!verifyNewsImageParams(firmados, sig)) {
     return new Response("Firma inválida", { status: 403 });
   }
 
@@ -142,11 +160,10 @@ export async function GET(request: NextRequest) {
   return new ImageResponse(
     (
       <Portada
-        title={title}
+        title={title ?? undefined}
         source={source}
         imageDataUri={imageDataUri}
-        fecha={formatDate(ahora)}
-        hora={formatClock(ahora)}
+        fecha={title ? formatDate(ahora) : undefined}
         icons={{ instagram: instagramIcon, browser: browserIcon }}
       />
     ),

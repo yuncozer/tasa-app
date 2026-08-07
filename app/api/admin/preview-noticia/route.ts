@@ -22,8 +22,10 @@ export async function POST(request: NextRequest) {
     return apiError("Falta un url válido (http o https)", undefined, 400);
   }
 
+  const imagenPropiaPublicId = typeof body?.imagenPublicId === "string" ? body.imagenPublicId : undefined;
+
   try {
-    const { article, caption, imageUrl } = await previewNewsPost(url);
+    const { article, caption, imageUrl } = await previewNewsPost(url, imagenPropiaPublicId);
     return apiJson({ title: article.title, sourceHost: article.sourceHost, caption, imageUrl }, { cachear: false });
   } catch (error) {
     return apiError("No se pudo generar la vista previa del artículo", error);

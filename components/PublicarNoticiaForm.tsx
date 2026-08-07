@@ -9,6 +9,24 @@ interface Preview {
   imageUrl: string;
 }
 
+interface Diapositiva {
+  tipo: "imagen" | "video";
+  url: string;
+}
+
+/** Un elemento que el usuario sumó al carrusel, aún sin enmarcar. */
+interface Extra {
+  /** Clave estable de React: el `public_id` puede repetirse si se sube dos veces el mismo archivo. */
+  clave: string;
+  tipo: "imagen" | "video";
+  publicId: string;
+}
+
+type Modo = "url" | "manual";
+
+/** Origen de la imagen principal, resuelto en el servidor (ver `lib/publish-news.ts`). */
+type Principal = { tipo: "subida"; publicId: string } | { tipo: "articulo"; url: string };
+
 type Estado =
   | { paso: "inicial" }
   | { paso: "cargando-preview" }
@@ -18,57 +36,264 @@ type Estado =
   | { paso: "publicado"; mediaId: string }
   | { paso: "error"; mensaje: string };
 
+/** Tope de Meta para un carrusel, contando la imagen principal. */
+const MAX_ELEMENTOS = 10;
+
 async function leerError(response: Response): Promise<string> {
   const body = await response.json().catch(() => null);
   return body?.error ? `${body.error}${body.detail ? `: ${body.detail}` : ""}` : `Error ${response.status}`;
 }
 
+async function subirArchivo(archivo: File, tipo: "image" | "video"): Promise<string> {
+  const form = new FormData();
+  form.set("archivo", archivo);
+  form.set("tipo", tipo);
+  const response = await fetch("/api/admin/subir-media", { method: "POST", body: form });
+  if (!response.ok) throw new Error(await leerError(response));
+  const data = (await response.json()) as { publicId: string };
+  return data.publicId;
+}
+
 /**
- * Formulario de `/admin/noticia`: pegar la URL del artículo, ver la vista
- * previa real (imagen + caption editable) y publicar solo tras un segundo
- * paso de confirmación — es una acción externa e irreversible.
+ * Formulario de `/admin/noticia`: dos modos — pegar la URL de un artículo
+ * (scraping automático) o escribir una noticia de autoría propia con imagen
+ * subida a mano. En modo URL también se puede reemplazar la foto scrapeada
+ * por una propia, sin perder el título/fuente/caption ya armados.
+ *
+ * Si se suman elementos, el post se publica como carrusel: la imagen de la
+ * noticia va siempre de primera (da identidad al post y, por cómo funciona
+ * Instagram, fija el formato de todo el carrusel) y lo demás va detrás en el
+ * orden elegido. Publicar siempre pasa por un segundo paso de confirmación —
+ * es una acción externa e irreversible.
  */
 export function PublicarNoticiaForm() {
+  const [modo, setModo] = useState<Modo>("url");
   const [url, setUrl] = useState("");
+  const [title, setTitle] = useState("");
+  const [sourceHost, setSourceHost] = useState("");
   const [caption, setCaption] = useState("");
+  const [imagenPublicId, setImagenPublicId] = useState<string | undefined>();
+  /** Miniatura local de la foto principal, para verla al instante sin esperar al servidor. */
+  const [fotoPrincipal, setFotoPrincipal] = useState<string | undefined>();
+  const [subiendo, setSubiendo] = useState(false);
+  const [extras, setExtras] = useState<Extra[]>([]);
+  const [diapositivas, setDiapositivas] = useState<Diapositiva[] | null>(null);
+  /**
+   * El título y la fuente no van grabados en la foto: el marco los compone en
+   * cada render. Así que se pueden editar después de subirla — pero entonces
+   * lo que hay en pantalla deja de ser lo que se publicaría, y publicar a
+   * ciegas es justo lo que hay que evitar.
+   */
+  const [desactualizado, setDesactualizado] = useState(false);
   const [estado, setEstado] = useState<Estado>({ paso: "inicial" });
 
   const cargandoPreview = estado.paso === "cargando-preview";
   const publicando = estado.paso === "publicando";
+  const preview = "preview" in estado ? estado.preview : null;
+  const esCarrusel = extras.length > 0;
+  const totalElementos = extras.length + 1;
+  const lleno = totalElementos >= MAX_ELEMENTOS;
+
+  /** Origen de la imagen principal: la subida manda sobre la scrapeada. */
+  const principal: Principal = imagenPublicId
+    ? { tipo: "subida", publicId: imagenPublicId }
+    : { tipo: "articulo", url };
+
+  /** Sustituye la miniatura local liberando la anterior, que si no queda colgada en memoria. */
+  function ponerFotoPrincipal(archivo: File | undefined) {
+    setFotoPrincipal((previa) => {
+      if (previa) URL.revokeObjectURL(previa);
+      return archivo ? URL.createObjectURL(archivo) : undefined;
+    });
+  }
 
   function limpiar() {
     setUrl("");
+    setTitle("");
+    setSourceHost("");
     setCaption("");
+    setImagenPublicId(undefined);
+    ponerFotoPrincipal(undefined);
+    setExtras([]);
+    setDiapositivas(null);
+    setDesactualizado(false);
     setEstado({ paso: "inicial" });
   }
 
-  async function verVistaPrevia() {
-    setEstado({ paso: "cargando-preview" });
+  /** Quita la foto principal para poder subir otra. */
+  function quitarFotoPrincipal() {
+    setImagenPublicId(undefined);
+    ponerFotoPrincipal(undefined);
+    setEstado({ paso: "inicial" });
+  }
+
+  /**
+   * El marco compone el título y la fuente al generar la imagen, así que
+   * cambiarlos no estropea la foto ya subida: solo deja obsoleto lo que se
+   * ve. Se marca para exigir regenerar antes de publicar.
+   */
+  function editarCampoDelMarco(asignar: () => void) {
+    asignar();
+    if (preview) setDesactualizado(true);
+  }
+
+  function cambiarModo(nuevo: Modo) {
+    setModo(nuevo);
+    limpiar();
+  }
+
+  /**
+   * Pide al servidor las URLs finales de cada diapositiva, tal como se
+   * publicarían — así lo que se ve en pantalla es exactamente lo que sale,
+   * incluido el reencuadre a 1:1 del video. Se llama desde cada acción que
+   * cambia la lista, no desde un efecto: la lista nueva se pasa por argumento
+   * porque `setExtras` aún no se ha reflejado en el estado al invocarla.
+   */
+  async function refrescarCarrusel(
+    lista: Extra[],
+    principalActual: Principal = principal,
+    previewActual: Preview | null = preview,
+  ) {
+    if (!previewActual || lista.length === 0) {
+      setDiapositivas(null);
+      return;
+    }
     try {
-      const response = await fetch("/api/admin/preview-noticia", {
+      const response = await fetch("/api/admin/preview-carrusel", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url }),
+        body: JSON.stringify({
+          title: previewActual.title,
+          sourceHost: previewActual.sourceHost,
+          principal: principalActual,
+          elementos: lista.map(({ tipo, publicId }) => ({ tipo, publicId })),
+        }),
       });
       if (!response.ok) {
         setEstado({ paso: "error", mensaje: await leerError(response) });
         return;
       }
-      const preview = (await response.json()) as Preview;
-      setCaption(preview.caption);
-      setEstado({ paso: "preview", preview });
+      const data = (await response.json()) as { elementos: Diapositiva[] };
+      setDiapositivas(data.elementos);
+    } catch {
+      setEstado({ paso: "error", mensaje: "No se pudo generar la vista previa del carrusel" });
+    }
+  }
+
+  async function verVistaPrevia() {
+    setEstado({ paso: "cargando-preview" });
+    try {
+      const endpoint = modo === "url" ? "/api/admin/preview-noticia" : "/api/admin/preview-noticia-manual";
+      const body =
+        modo === "url" ? { url, imagenPublicId } : { title, sourceHost, caption, imagenPublicId };
+
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!response.ok) {
+        setEstado({ paso: "error", mensaje: await leerError(response) });
+        return;
+      }
+      const datos = (await response.json()) as Preview;
+      setCaption(datos.caption);
+      setDesactualizado(false);
+      setEstado({ paso: "preview", preview: datos });
     } catch {
       setEstado({ paso: "error", mensaje: "No se pudo conectar con el servidor" });
     }
   }
 
-  async function publicar(preview: Preview) {
-    setEstado({ paso: "publicando", preview });
+  /** Sustituye la foto principal. Si ya hay vista previa, la refresca sin tocar el caption editado. */
+  async function reemplazarImagenPrincipal(archivo: File) {
+    setSubiendo(true);
     try {
-      const response = await fetch("/api/admin/publish-noticia", {
+      const publicId = await subirArchivo(archivo, "image");
+      setImagenPublicId(publicId);
+      ponerFotoPrincipal(archivo);
+
+      if (preview) {
+        const endpoint = modo === "url" ? "/api/admin/preview-noticia" : "/api/admin/preview-noticia-manual";
+        const body =
+          modo === "url"
+            ? { url, imagenPublicId: publicId }
+            : { title, sourceHost, caption, imagenPublicId: publicId };
+        const response = await fetch(endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        if (response.ok) {
+          const data = (await response.json()) as Preview;
+          setEstado({ paso: "preview", preview: { ...preview, imageUrl: data.imageUrl } });
+        }
+        // La principal es la primera diapositiva: si cambió, el carrusel también.
+        await refrescarCarrusel(extras, { tipo: "subida", publicId }, preview);
+      }
+    } catch {
+      setEstado({ paso: "error", mensaje: "No se pudo subir la imagen" });
+    } finally {
+      setSubiendo(false);
+    }
+  }
+
+  /** Aplica una lista nueva de elementos y regenera la vista previa con ella. */
+  function aplicarExtras(lista: Extra[]) {
+    setExtras(lista);
+    void refrescarCarrusel(lista);
+  }
+
+  async function agregarExtra(archivo: File, tipo: "imagen" | "video") {
+    setSubiendo(true);
+    try {
+      const publicId = await subirArchivo(archivo, tipo === "video" ? "video" : "image");
+      aplicarExtras([...extras, { clave: `${publicId}-${extras.length}`, tipo, publicId }]);
+    } catch {
+      setEstado({ paso: "error", mensaje: `No se pudo subir ${tipo === "video" ? "el video" : "la imagen"}` });
+    } finally {
+      setSubiendo(false);
+    }
+  }
+
+  function quitarExtra(clave: string) {
+    aplicarExtras(extras.filter((extra) => extra.clave !== clave));
+  }
+
+  /** Mueve un elemento una posición; la principal no se mueve, siempre va primero. */
+  function moverExtra(indice: number, direccion: -1 | 1) {
+    const destino = indice + direccion;
+    if (destino < 0 || destino >= extras.length) return;
+    const copia = [...extras];
+    [copia[indice], copia[destino]] = [copia[destino], copia[indice]];
+    aplicarExtras(copia);
+  }
+
+  async function publicar(datos: Preview) {
+    setEstado({ paso: "publicando", preview: datos });
+    try {
+      const endpoint = esCarrusel
+        ? "/api/admin/publish-carrusel"
+        : modo === "url"
+          ? "/api/admin/publish-noticia"
+          : "/api/admin/publish-noticia-manual";
+
+      const body = esCarrusel
+        ? {
+            title: datos.title,
+            sourceHost: datos.sourceHost,
+            caption,
+            principal,
+            elementos: extras.map(({ tipo, publicId }) => ({ tipo, publicId })),
+          }
+        : modo === "url"
+          ? { url, caption, imagenPublicId }
+          : { title, sourceHost, caption, imagenPublicId };
+
+      const response = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url, caption }),
+        body: JSON.stringify(body),
       });
       if (!response.ok) {
         setEstado({ paso: "error", mensaje: await leerError(response) });
@@ -81,47 +306,157 @@ export function PublicarNoticiaForm() {
     }
   }
 
-  const preview = "preview" in estado ? estado.preview : null;
+  /**
+   * El título y la fuente se imprimen sobre la foto, así que se piden antes
+   * de subirla: evita elegir una imagen y descubrir después que el texto no
+   * encaja con ella.
+   */
+  const datosDelMarcoListos = Boolean(title.trim() && sourceHost.trim());
+  const manualListo = Boolean(datosDelMarcoListos && caption.trim() && imagenPublicId);
+  const puedeVerVistaPrevia = modo === "url" ? Boolean(url) : manualListo;
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="flex flex-col gap-1">
-        <label htmlFor="url-articulo" className="text-sm font-semibold uppercase tracking-wide text-muted">
-          URL del artículo
-        </label>
-        <div className="flex gap-2">
-          <input
-            id="url-articulo"
-            type="url"
-            inputMode="url"
-            placeholder="https://..."
-            value={url}
-            onChange={(e) => {
-              setUrl(e.target.value);
-              setEstado({ paso: "inicial" });
-            }}
-            className="flex-1 rounded-xl border border-border-soft bg-surface-strong px-4 py-3 text-base text-foreground outline-none"
-          />
-          {url && (
-            <button
-              type="button"
-              onClick={limpiar}
-              aria-label="Limpiar URL"
-              className="rounded-xl border border-border-soft bg-surface-strong px-4 py-3 text-base font-semibold text-muted transition active:scale-95"
-            >
-              ✕
-            </button>
-          )}
-        </div>
+      <div className="flex gap-2" role="tablist" aria-label="Origen de la noticia">
+        {(["url", "manual"] as const).map((opcion) => (
+          <button
+            key={opcion}
+            type="button"
+            role="tab"
+            aria-selected={modo === opcion}
+            onClick={() => cambiarModo(opcion)}
+            className={`flex-1 rounded-xl border px-3 py-2 text-sm font-semibold transition active:scale-95 ${
+              modo === opcion ? "border-accent bg-accent/15 text-accent" : "border-border-soft bg-surface text-muted"
+            }`}
+          >
+            {opcion === "url" ? "Desde un artículo" : "Noticia propia"}
+          </button>
+        ))}
       </div>
+
+      {modo === "url" ? (
+        <div className="flex flex-col gap-1">
+          <label htmlFor="url-articulo" className="text-sm font-semibold uppercase tracking-wide text-muted">
+            URL del artículo
+          </label>
+          <div className="flex gap-2">
+            <input
+              id="url-articulo"
+              type="url"
+              inputMode="url"
+              placeholder="https://..."
+              value={url}
+              onChange={(e) => {
+                setUrl(e.target.value);
+                setEstado({ paso: "inicial" });
+              }}
+              className="flex-1 rounded-xl border border-border-soft bg-surface-strong px-4 py-3 text-base text-foreground outline-none"
+            />
+            {url && (
+              <button
+                type="button"
+                onClick={limpiar}
+                aria-label="Limpiar URL"
+                className="rounded-xl border border-border-soft bg-surface-strong px-4 py-3 text-base font-semibold text-muted transition active:scale-95"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-1">
+            <label htmlFor="titulo-manual" className="text-sm font-semibold uppercase tracking-wide text-muted">
+              Título
+            </label>
+            <input
+              id="titulo-manual"
+              type="text"
+              value={title}
+              onChange={(e) => editarCampoDelMarco(() => setTitle(e.target.value))}
+              className="rounded-xl border border-border-soft bg-surface-strong px-4 py-3 text-base text-foreground outline-none"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label htmlFor="fuente-manual" className="text-sm font-semibold uppercase tracking-wide text-muted">
+              Fuente
+            </label>
+            <input
+              id="fuente-manual"
+              type="text"
+              placeholder="La Tasa"
+              value={sourceHost}
+              onChange={(e) => editarCampoDelMarco(() => setSourceHost(e.target.value))}
+              className="rounded-xl border border-border-soft bg-surface-strong px-4 py-3 text-base text-foreground outline-none"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label htmlFor="caption-manual" className="text-sm font-semibold uppercase tracking-wide text-muted">
+              Caption
+            </label>
+            <textarea
+              id="caption-manual"
+              value={caption}
+              onChange={(e) => setCaption(e.target.value)}
+              rows={6}
+              className="whitespace-pre-wrap rounded-xl border border-border-soft bg-surface-strong px-4 py-3 text-sm text-foreground outline-none"
+            />
+          </div>
+          <div className="flex flex-col gap-2">
+            <span className="text-sm font-semibold uppercase tracking-wide text-muted">Imagen</span>
+
+            {fotoPrincipal && (
+              <div className="flex items-center gap-3 rounded-xl border border-border-soft bg-surface-strong px-3 py-3">
+                {/* eslint-disable-next-line @next/next/no-img-element -- previsualización local del archivo elegido. */}
+                <img
+                  src={fotoPrincipal}
+                  alt=""
+                  className="h-20 w-20 shrink-0 rounded-xl border border-border-soft object-cover"
+                />
+                <span className="flex-1 text-sm text-foreground">Foto cargada</span>
+                <button
+                  type="button"
+                  onClick={quitarFotoPrincipal}
+                  aria-label="Quitar la foto"
+                  className="shrink-0 rounded-full border border-border-soft px-3 py-1 text-xs font-medium text-muted transition active:scale-95"
+                >
+                  ✕
+                </button>
+              </div>
+            )}
+
+            {datosDelMarcoListos ? (
+              <label className="flex cursor-pointer items-center justify-center rounded-xl border border-dashed border-border-soft bg-surface-strong px-4 py-4 text-sm font-semibold text-muted transition active:scale-95">
+                {subiendo ? "Subiendo…" : fotoPrincipal ? "Cambiar la foto" : "Elegir imagen"}
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  disabled={subiendo}
+                  onChange={(e) => {
+                    const archivo = e.target.files?.[0];
+                    if (archivo) void reemplazarImagenPrincipal(archivo);
+                    e.target.value = "";
+                  }}
+                />
+              </label>
+            ) : (
+              <p className="rounded-xl border border-border-soft bg-surface-strong px-4 py-3 text-xs text-muted">
+                Escribe primero el título y la fuente: van impresos sobre esta foto.
+              </p>
+            )}
+          </div>
+        </div>
+      )}
 
       <button
         type="button"
         onClick={verVistaPrevia}
-        disabled={!url || cargandoPreview || publicando}
+        disabled={!puedeVerVistaPrevia || cargandoPreview || publicando}
         className="rounded-xl border border-accent bg-accent/15 px-4 py-3 text-base font-semibold text-accent transition active:scale-95 disabled:opacity-50"
       >
-        {cargandoPreview ? "Cargando vista previa…" : "Vista previa"}
+        {cargandoPreview ? "Cargando vista previa…" : desactualizado ? "Actualizar vista previa" : "Vista previa"}
       </button>
 
       {estado.paso === "error" && (
@@ -138,8 +473,147 @@ export function PublicarNoticiaForm() {
 
       {preview && (
         <div className="flex flex-col gap-4 rounded-2xl border border-border-soft bg-surface px-4 py-4">
-          {/* eslint-disable-next-line @next/next/no-img-element -- imagen generada dinámicamente, no un asset estático. */}
-          <img src={preview.imageUrl} alt="" className="w-full rounded-2xl border border-border-soft" />
+          {desactualizado && (
+            <p className="rounded-2xl border border-warning/40 bg-warning/5 px-4 py-3 text-sm text-warning">
+              Cambiaste el título o la fuente: esto ya no es lo que se publicaría. Actualiza la vista previa.
+            </p>
+          )}
+
+          {esCarrusel ? (
+            <div className="flex flex-col gap-2">
+              <span className="text-sm font-semibold uppercase tracking-wide text-muted">
+                Carrusel · <span className="tabular">{totalElementos}</span> de{" "}
+                <span className="tabular">{MAX_ELEMENTOS}</span>
+              </span>
+              {diapositivas ? (
+                <ul className="flex gap-2 overflow-x-auto pb-1">
+                  {diapositivas.map((diapositiva, indice) => (
+                    <li key={`${diapositiva.url}-${indice}`} className="shrink-0">
+                      {diapositiva.tipo === "video" ? (
+                        <video
+                          src={diapositiva.url}
+                          controls
+                          className="h-40 w-40 rounded-xl border border-border-soft object-cover"
+                        />
+                      ) : (
+                        // eslint-disable-next-line @next/next/no-img-element -- imagen generada dinámicamente, no un asset estático.
+                        <img
+                          src={diapositiva.url}
+                          alt=""
+                          className="h-40 w-40 rounded-xl border border-border-soft object-cover"
+                        />
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-xs text-muted">Generando vista previa del carrusel…</p>
+              )}
+            </div>
+          ) : (
+            // eslint-disable-next-line @next/next/no-img-element -- imagen generada dinámicamente, no un asset estático.
+            <img src={preview.imageUrl} alt="" className="w-full rounded-2xl border border-border-soft" />
+          )}
+
+          {modo === "url" && (
+            <label className="flex cursor-pointer items-center justify-center rounded-xl border border-dashed border-border-soft bg-surface-strong px-4 py-3 text-sm font-semibold text-muted transition active:scale-95">
+              {subiendo ? "Subiendo…" : imagenPublicId ? "Imagen principal propia · cambiar" : "Usar una imagen propia"}
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const archivo = e.target.files?.[0];
+                  if (archivo) void reemplazarImagenPrincipal(archivo);
+                  e.target.value = "";
+                }}
+              />
+            </label>
+          )}
+
+          <div className="flex flex-col gap-2">
+            <span className="text-sm font-semibold uppercase tracking-wide text-muted">Añadir al carrusel</span>
+
+            {lleno ? (
+              <p className="rounded-xl border border-warning/40 bg-warning/5 px-4 py-3 text-xs text-warning">
+                Llegaste al máximo de {MAX_ELEMENTOS} elementos que permite Instagram.
+              </p>
+            ) : (
+              <div className="flex gap-2">
+                <label className="flex flex-1 cursor-pointer items-center justify-center rounded-xl border border-dashed border-border-soft bg-surface-strong px-3 py-3 text-sm font-semibold text-muted transition active:scale-95">
+                  {subiendo ? "Subiendo…" : "+ Imagen"}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    disabled={subiendo || publicando}
+                    onChange={(e) => {
+                      const archivo = e.target.files?.[0];
+                      if (archivo) void agregarExtra(archivo, "imagen");
+                      e.target.value = "";
+                    }}
+                  />
+                </label>
+                <label className="flex flex-1 cursor-pointer items-center justify-center rounded-xl border border-dashed border-border-soft bg-surface-strong px-3 py-3 text-sm font-semibold text-muted transition active:scale-95">
+                  {subiendo ? "Subiendo…" : "+ Video"}
+                  <input
+                    type="file"
+                    accept="video/*"
+                    className="hidden"
+                    disabled={subiendo || publicando}
+                    onChange={(e) => {
+                      const archivo = e.target.files?.[0];
+                      if (archivo) void agregarExtra(archivo, "video");
+                      e.target.value = "";
+                    }}
+                  />
+                </label>
+              </div>
+            )}
+
+            {extras.length > 0 && (
+              <ul className="flex flex-col gap-2">
+                {extras.map((extra, indice) => (
+                  <li
+                    key={extra.clave}
+                    className="flex items-center justify-between gap-3 rounded-xl border border-border-soft bg-surface-strong px-3 py-2"
+                  >
+                    <span className="truncate text-sm text-foreground">
+                      <span className="tabular">{indice + 2}</span>. {extra.tipo === "video" ? "Video" : "Imagen"}
+                    </span>
+                    <div className="flex shrink-0 gap-1">
+                      <button
+                        type="button"
+                        onClick={() => moverExtra(indice, -1)}
+                        disabled={indice === 0}
+                        aria-label="Mover antes"
+                        className="rounded-full border border-border-soft px-3 py-1 text-xs font-medium text-muted transition active:scale-95 disabled:opacity-50"
+                      >
+                        ↑
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => moverExtra(indice, 1)}
+                        disabled={indice === extras.length - 1}
+                        aria-label="Mover después"
+                        className="rounded-full border border-border-soft px-3 py-1 text-xs font-medium text-muted transition active:scale-95 disabled:opacity-50"
+                      >
+                        ↓
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => quitarExtra(extra.clave)}
+                        aria-label="Quitar del carrusel"
+                        className="rounded-full border border-border-soft px-3 py-1 text-xs font-medium text-muted transition active:scale-95"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
 
           <div className="flex flex-col gap-1">
             <label htmlFor="caption" className="text-sm font-semibold uppercase tracking-wide text-muted">
@@ -158,7 +632,11 @@ export function PublicarNoticiaForm() {
 
           {estado.paso === "confirmar" ? (
             <div className="flex flex-col gap-2 rounded-2xl border border-warning/40 bg-warning/5 px-4 py-3">
-              <p className="text-sm text-warning">¿Publicar ahora en la cuenta real de Instagram?</p>
+              <p className="text-sm text-warning">
+                {esCarrusel
+                  ? `¿Publicar ahora un carrusel de ${totalElementos} elementos en la cuenta real de Instagram?`
+                  : "¿Publicar ahora en la cuenta real de Instagram?"}
+              </p>
               <div className="flex gap-2">
                 <button
                   type="button"
@@ -180,10 +658,10 @@ export function PublicarNoticiaForm() {
             <button
               type="button"
               onClick={() => setEstado({ paso: "confirmar", preview })}
-              disabled={publicando}
+              disabled={publicando || subiendo || desactualizado}
               className="rounded-xl border border-warning bg-warning/15 px-4 py-3 text-base font-semibold text-warning transition active:scale-95 disabled:opacity-50"
             >
-              {publicando ? "Publicando…" : "Publicar"}
+              {publicando ? "Publicando…" : esCarrusel ? "Publicar carrusel" : "Publicar"}
             </button>
           )}
         </div>
