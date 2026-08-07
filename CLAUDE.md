@@ -261,6 +261,74 @@ el teléfono, ver más abajo) — nunca por cron.
 - El caption se puede editar a mano en `/admin/noticia` antes de publicar
   (`publishNewsPost` acepta un `captionOverride`): el scraper no siempre trae
   exactamente los párrafos que se quieren usar.
+- El título es **opcional** en la firma y en la plantilla: las diapositivas
+  secundarias de un carrusel no lo llevan (ver más abajo). La firma cubre
+  exactamente los parámetros presentes, así que añadir o quitar `title` de una
+  URL ya firmada la invalida — no hay forma de colar un titular ajeno.
+
+### El post de noticias también admite contenido propio, carrusel y Reel
+
+Sobre lo anterior se puede montar más material: varias imágenes propias, un
+video, o una noticia escrita de cero sin artículo externo. Todo desde
+`/admin/noticia`, con un switch **Post / Reel** que se decide antes de cargar
+nada, porque determina el encuadre.
+
+- **La imagen propia no sustituye a la plantilla, la alimenta.** Lo que sube
+  el usuario va a Cloudinary y de ahí entra al mismo marco firmado que la foto
+  scrapeada. Nunca se publica una imagen cruda con la cuenta de La Tasa.
+- **El título y la fuente no se graban en la foto**: el marco los compone en
+  cada render, leyendo los valores actuales. Por eso editarlos después de
+  subir la imagen no la estropea — solo deja obsoleto lo que se ve en
+  pantalla. La interfaz lo marca como desactualizado y bloquea publicar hasta
+  regenerar, en vez de bloquear los campos: obligar a borrar y resubir la foto
+  por corregir una tilde cuesta una subida entera desde el teléfono.
+- Las **diapositivas secundarias** van sin titular ni fecha, y la foto se
+  queda ese espacio (`ALTO_FOTO` en la plantilla). Repetir el titular en cada
+  una no aporta y le quita sitio a la imagen.
+
+Instagram impone dos reglas que explican el resto del diseño:
+
+- **Todos los elementos de un carrusel comparten relación de aspecto**, la del
+  primero, o Meta rechaza el contenedor padre. Por eso la imagen principal va
+  siempre primera y el video se reencuadra según su destino.
+- **Un video dentro de un carrusel no es un Reel**: va como `media_type=VIDEO`,
+  no `REELS` —Meta los excluye explícitamente— y no aparece en la pestaña de
+  Reels. De ahí el switch: `carrusel` reencuadra a 1:1 para casar con la imagen
+  cuadrada, `reel` a 9:16 que es lo único que entra en esa pestaña.
+
+`publishCarousel` (`lib/instagram.ts`) es la **única** primitiva de carrusel y
+la comparten el post diario y el de noticias; `publishCarouselPost` quedó como
+atajo para el diario, que siempre son imágenes. Mantiene la creación de hijos
+en paralelo por el motivo ya explicado arriba, y la espera de los videos va
+**después** de crearlos todos, no intercalada, para que Meta los procese a la
+vez en vez de encadenar un polling tras otro.
+
+### El video se marca en Cloudinary, no en el servidor
+
+Superponer una franja de marca sobre **todo** el clip es una operación de
+video, y ni Satori ni `sharp` la hacen. Las dos alternativas obvias no caben:
+un binario de ffmpeg pesa 70–100 MB y empuja el bundle hacia el tope de la
+función, y Remotion depende de Chromium — su propia documentación dice que no
+se puede renderizar en Vercel Serverless. Se eligió **Cloudinary** porque el
+overlay fijo es exactamente una transformación por URL, sin componer nada a
+mano, y su plan gratis no exige tarjeta ni una cuenta de AWS como pedían las
+otras opciones evaluadas (Remotion Lambda, Shotstack).
+
+Vive en `lib/providers/cloudinary.ts`, con tres detalles que costó encontrar:
+
+- La posición (`gravity`, `x`, `y`) va en el componente **`fl_layer_apply`**,
+  no junto al `overlay`. Puesta junto al overlay, Cloudinary la ignora **en
+  silencio** y centra todas las capas encima del video: no falla, solo sale
+  mal (verificado en vivo).
+- El **encuadre va primero**, antes de las capas. Al revés, los tamaños del
+  logo y del texto se calculan contra el lienzo original y quedan
+  descuadrados al escalar.
+- Se encaja con `pad` y no con `fill`: recortar perdería los bordes del
+  encuadre que grabó el usuario.
+
+Las credenciales (`CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`,
+`CLOUDINARY_API_SECRET`) nunca llegan al navegador: la subida pasa por
+`app/api/admin/subir-media`, protegido por la cookie de sesión de `/admin`.
 
 ### `/admin` usa su propia contraseña, no `CRON_SECRET`
 
@@ -323,7 +391,14 @@ pegar en el navegador y ver la imagen generada. Lee `CRON_SECRET` de
 o el botón "Publicar" de `/admin/noticia` publican de verdad).
 
 Para probar `/admin/noticia` en sí hace falta además `ADMIN_PASSWORD` en
-`.env.local`.
+`.env.local`, y las tres `CLOUDINARY_*` para todo lo que suba imágenes o
+video.
+
+Para **verificar el video con marca sin publicarlo**, la forma fiable es pedir
+un fotograma en vez de reproducirlo: la URL que devuelve `urlVideoConMarca()`
+acepta `.jpg` sobre la misma transformación y devuelve una imagen que se puede
+mirar directamente. Reproducir el `<video>` en el navegador para ver si el
+overlay quedó bien es mucho más lento y no deja nada que revisar después.
 
 ### El entorno de desarrollo
 
@@ -334,10 +409,15 @@ que lanzarlo con el proxy para alcanzar direcciones externas.
 Además, en algunas máquinas de desarrollo un antivirus con inspección TLS
 (AVG, visible como `SSLKEYLOGFILE=...avgMonFltProxy...` en el entorno)
 intercepta las peticiones HTTPS salientes con su propio certificado, que el
-proceso de `next dev` no confía por defecto — la descarga de la imagen del
-artículo en `app/api/og/instagram-post-news` falla con
-`UNABLE_TO_VERIFY_LEAF_SIGNATURE`. Es un problema puramente local (no ocurre
-en producción ni con `curl`); si aparece, arranca así en su lugar:
+proceso de `next dev` no confía por defecto. Falla la descarga de la imagen
+del artículo en `app/api/og/instagram-post-news`
+(`UNABLE_TO_VERIFY_LEAF_SIGNATURE`) y la subida a Cloudinary (`unable to
+verify the first certificate`). Es un problema puramente local: no ocurre en
+producción, ni con `curl`, ni siquiera con `node` a secas — solo dentro de
+`next dev`.
+
+`.claude/launch.json` ya arranca el servidor con el flag, así que por ahí no
+hay que hacer nada. A mano hace falta ponerlo:
 
 ```bash
 NODE_OPTIONS="--use-system-ca" npm run dev
