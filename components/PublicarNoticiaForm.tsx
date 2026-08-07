@@ -2,7 +2,9 @@
 
 import { useState } from "react";
 import type { PublicacionPayload } from "@/lib/publish-news";
+import { BarraProgreso } from "@/components/BarraProgreso";
 import { ProgramarPublicacion } from "@/components/ProgramarPublicacion";
+import { subirMediaConProgreso, type FaseSubida } from "@/lib/subida";
 
 interface Preview {
   title: string;
@@ -26,6 +28,23 @@ interface Extra {
 
 type Modo = "url" | "manual";
 
+/**
+ * Subida en curso. `origen` no es decorativo: es lo que permite pintar la barra
+ * justo debajo del control que se tocó, y no como un aviso suelto lejos de él —
+ * en esta pantalla hay tres sitios distintos desde donde se puede subir.
+ */
+interface Subida {
+  origen: "principal" | "extra";
+  que: "imagen" | "video";
+  fase: FaseSubida;
+}
+
+/** Qué se está haciendo con el archivo, en palabras, según la fase. */
+function textoDeSubida({ que, fase }: Subida): string {
+  if (fase.tipo === "enviando") return que === "video" ? "Enviando el video" : "Enviando la imagen";
+  return que === "video" ? "Procesando el video y aplicando la marca…" : "Procesando la imagen…";
+}
+
 /** Origen de la imagen principal, resuelto en el servidor (ver `lib/publish-news.ts`). */
 type Principal = { tipo: "subida"; publicId: string } | { tipo: "articulo"; url: string };
 
@@ -44,16 +63,6 @@ const MAX_ELEMENTOS = 10;
 async function leerError(response: Response): Promise<string> {
   const body = await response.json().catch(() => null);
   return body?.error ? `${body.error}${body.detail ? `: ${body.detail}` : ""}` : `Error ${response.status}`;
-}
-
-async function subirArchivo(archivo: File, tipo: "image" | "video"): Promise<string> {
-  const form = new FormData();
-  form.set("archivo", archivo);
-  form.set("tipo", tipo);
-  const response = await fetch("/api/admin/subir-media", { method: "POST", body: form });
-  if (!response.ok) throw new Error(await leerError(response));
-  const data = (await response.json()) as { publicId: string };
-  return data.publicId;
 }
 
 /**
@@ -77,7 +86,7 @@ export function PublicarNoticiaForm({ onProgramada }: { onProgramada: () => void
   const [imagenPublicId, setImagenPublicId] = useState<string | undefined>();
   /** Miniatura local de la foto principal, para verla al instante sin esperar al servidor. */
   const [fotoPrincipal, setFotoPrincipal] = useState<string | undefined>();
-  const [subiendo, setSubiendo] = useState(false);
+  const [subida, setSubida] = useState<Subida | null>(null);
   const [extras, setExtras] = useState<Extra[]>([]);
   const [diapositivas, setDiapositivas] = useState<Diapositiva[] | null>(null);
   /**
@@ -89,6 +98,7 @@ export function PublicarNoticiaForm({ onProgramada }: { onProgramada: () => void
   const [desactualizado, setDesactualizado] = useState(false);
   const [estado, setEstado] = useState<Estado>({ paso: "inicial" });
 
+  const subiendo = subida !== null;
   const cargandoPreview = estado.paso === "cargando-preview";
   const publicando = estado.paso === "publicando";
   const preview = "preview" in estado ? estado.preview : null;
@@ -209,9 +219,11 @@ export function PublicarNoticiaForm({ onProgramada }: { onProgramada: () => void
 
   /** Sustituye la foto principal. Si ya hay vista previa, la refresca sin tocar el caption editado. */
   async function reemplazarImagenPrincipal(archivo: File) {
-    setSubiendo(true);
+    setSubida({ origen: "principal", que: "imagen", fase: { tipo: "enviando", porcentaje: 0 } });
     try {
-      const publicId = await subirArchivo(archivo, "image");
+      const publicId = await subirMediaConProgreso(archivo, "image", (fase) =>
+        setSubida({ origen: "principal", que: "imagen", fase }),
+      );
       setImagenPublicId(publicId);
       ponerFotoPrincipal(archivo);
 
@@ -233,10 +245,12 @@ export function PublicarNoticiaForm({ onProgramada }: { onProgramada: () => void
         // La principal es la primera diapositiva: si cambió, el carrusel también.
         await refrescarCarrusel(extras, { tipo: "subida", publicId }, preview);
       }
-    } catch {
-      setEstado({ paso: "error", mensaje: "No se pudo subir la imagen" });
+    } catch (error) {
+      // El servidor explica por qué falló (p. ej. el tope de 100 MB); eso dice
+      // más que un «no se pudo subir» genérico.
+      setEstado({ paso: "error", mensaje: error instanceof Error ? error.message : "No se pudo subir la imagen" });
     } finally {
-      setSubiendo(false);
+      setSubida(null);
     }
   }
 
@@ -247,14 +261,19 @@ export function PublicarNoticiaForm({ onProgramada }: { onProgramada: () => void
   }
 
   async function agregarExtra(archivo: File, tipo: "imagen" | "video") {
-    setSubiendo(true);
+    setSubida({ origen: "extra", que: tipo, fase: { tipo: "enviando", porcentaje: 0 } });
     try {
-      const publicId = await subirArchivo(archivo, tipo === "video" ? "video" : "image");
+      const publicId = await subirMediaConProgreso(archivo, tipo === "video" ? "video" : "image", (fase) =>
+        setSubida({ origen: "extra", que: tipo, fase }),
+      );
+      // A partir de aquí toma el relevo el aviso propio del carrusel
+      // («Generando vista previa del carrusel…»), así que la barra se retira.
       aplicarExtras([...extras, { clave: `${publicId}-${extras.length}`, tipo, publicId }]);
-    } catch {
-      setEstado({ paso: "error", mensaje: `No se pudo subir ${tipo === "video" ? "el video" : "la imagen"}` });
+    } catch (error) {
+      const generico = `No se pudo subir ${tipo === "video" ? "el video" : "la imagen"}`;
+      setEstado({ paso: "error", mensaje: error instanceof Error ? error.message : generico });
     } finally {
-      setSubiendo(false);
+      setSubida(null);
     }
   }
 
@@ -466,20 +485,25 @@ export function PublicarNoticiaForm({ onProgramada }: { onProgramada: () => void
             )}
 
             {datosDelMarcoListos ? (
-              <label className="flex cursor-pointer items-center justify-center rounded-xl border border-dashed border-border-soft bg-surface-strong px-4 py-4 text-sm font-semibold text-muted transition active:scale-95">
-                {subiendo ? "Subiendo…" : fotoPrincipal ? "Cambiar la foto" : "Elegir imagen"}
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  disabled={subiendo}
-                  onChange={(e) => {
-                    const archivo = e.target.files?.[0];
-                    if (archivo) void reemplazarImagenPrincipal(archivo);
-                    e.target.value = "";
-                  }}
-                />
-              </label>
+              <>
+                <label className="flex cursor-pointer items-center justify-center rounded-xl border border-dashed border-border-soft bg-surface-strong px-4 py-4 text-sm font-semibold text-muted transition active:scale-95">
+                  {fotoPrincipal ? "Cambiar la foto" : "Elegir imagen"}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    disabled={subiendo}
+                    onChange={(e) => {
+                      const archivo = e.target.files?.[0];
+                      if (archivo) void reemplazarImagenPrincipal(archivo);
+                      e.target.value = "";
+                    }}
+                  />
+                </label>
+                {subida?.origen === "principal" && (
+                  <BarraProgreso fase={subida.fase} etiqueta={textoDeSubida(subida)} />
+                )}
+              </>
             ) : (
               <p className="rounded-xl border border-border-soft bg-surface-strong px-4 py-3 text-xs text-muted">
                 Escribe primero el título y la fuente: van impresos sobre esta foto.
@@ -555,19 +579,25 @@ export function PublicarNoticiaForm({ onProgramada }: { onProgramada: () => void
           )}
 
           {modo === "url" && (
-            <label className="flex cursor-pointer items-center justify-center rounded-xl border border-dashed border-border-soft bg-surface-strong px-4 py-3 text-sm font-semibold text-muted transition active:scale-95">
-              {subiendo ? "Subiendo…" : imagenPublicId ? "Imagen principal propia · cambiar" : "Usar una imagen propia"}
-              <input
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(e) => {
-                  const archivo = e.target.files?.[0];
-                  if (archivo) void reemplazarImagenPrincipal(archivo);
-                  e.target.value = "";
-                }}
-              />
-            </label>
+            <div className="flex flex-col gap-2">
+              <label className="flex cursor-pointer items-center justify-center rounded-xl border border-dashed border-border-soft bg-surface-strong px-4 py-3 text-sm font-semibold text-muted transition active:scale-95">
+                {imagenPublicId ? "Imagen principal propia · cambiar" : "Usar una imagen propia"}
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  disabled={subiendo || publicando}
+                  onChange={(e) => {
+                    const archivo = e.target.files?.[0];
+                    if (archivo) void reemplazarImagenPrincipal(archivo);
+                    e.target.value = "";
+                  }}
+                />
+              </label>
+              {subida?.origen === "principal" && (
+                <BarraProgreso fase={subida.fase} etiqueta={textoDeSubida(subida)} />
+              )}
+            </div>
           )}
 
           <div className="flex flex-col gap-2">
@@ -580,7 +610,7 @@ export function PublicarNoticiaForm({ onProgramada }: { onProgramada: () => void
             ) : (
               <div className="flex gap-2">
                 <label className="flex flex-1 cursor-pointer items-center justify-center rounded-xl border border-dashed border-border-soft bg-surface-strong px-3 py-3 text-sm font-semibold text-muted transition active:scale-95">
-                  {subiendo ? "Subiendo…" : "+ Imagen"}
+                  + Imagen
                   <input
                     type="file"
                     accept="image/*"
@@ -594,7 +624,7 @@ export function PublicarNoticiaForm({ onProgramada }: { onProgramada: () => void
                   />
                 </label>
                 <label className="flex flex-1 cursor-pointer items-center justify-center rounded-xl border border-dashed border-border-soft bg-surface-strong px-3 py-3 text-sm font-semibold text-muted transition active:scale-95">
-                  {subiendo ? "Subiendo…" : "+ Video"}
+                  + Video
                   <input
                     type="file"
                     accept="video/*"
@@ -609,6 +639,8 @@ export function PublicarNoticiaForm({ onProgramada }: { onProgramada: () => void
                 </label>
               </div>
             )}
+
+            {subida?.origen === "extra" && <BarraProgreso fase={subida.fase} etiqueta={textoDeSubida(subida)} />}
 
             {extras.length > 0 && (
               <ul className="flex flex-col gap-2">

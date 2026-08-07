@@ -378,6 +378,35 @@ en paralelo por el motivo ya explicado arriba, y la espera de los videos va
 **después** de crearlos todos, no intercalada, para que Meta los procese a la
 vez en vez de encadenar un polling tras otro.
 
+### La barra de subida mide un tramo y declara el otro
+
+Subir un video desde el teléfono tarda, y antes solo se veía un texto fijo
+("Subiendo y aplicando la marca…") sin manera de saber si avanzaba. Ahora hay
+barra con porcentaje, pero **solo en el tramo que de verdad se puede medir**.
+
+- El porcentaje sale de `XMLHttpRequest.upload.onprogress` (`lib/subida.ts`), y
+  es la única razón por la que ahí se usa la API vieja en vez de `fetch()`:
+  `fetch()` no emite progreso de subida. El resto del proyecto sigue con
+  `fetch()`, que no tiene nada que medir.
+- Ese porcentaje cubre el viaje **del teléfono a nuestro servidor**. Lo que
+  sigue —servidor → Cloudinary y, en el video, la marca— es una petición
+  abierta de la que el navegador no recibe ningún avance. Al terminar el envío
+  (`upload.onload`) la barra pasa a indeterminada y el texto dice qué está
+  pasando. No lo cambies a estimar un porcentaje hasta 100: sería un número
+  inventado, y en un video pesado se quedaría clavado en 95 % un buen rato.
+- `Subida.origen` en `PublicarNoticiaForm` existe para pintar la barra **debajo
+  del control que se tocó**: esa pantalla tiene tres sitios desde donde subir, y
+  una barra suelta no dice cuál de ellos está trabajando.
+- Los errores de subida ahora muestran el mensaje del servidor (p. ej. el tope
+  de 100 MB de `subirMedia`) en vez de un "no se pudo subir" genérico: el
+  motivo es lo que le dice al admin si reintentar o cambiar el archivo.
+
+Aparte, en Vercel el cuerpo de una petición a una función tiene un tope de unos
+4,5 MB, así que un video grande falla en `/api/admin/subir-media` por debajo de
+los 100 MB que valida Cloudinary. La barra lo vuelve visible antes —se ve llegar
+al final y luego el error— pero no lo resuelve; resolverlo sería subir desde el
+navegador directo a Cloudinary con una firma emitida por el servidor.
+
 ### El video se marca en Cloudinary, no en el servidor
 
 Superponer una franja de marca sobre **todo** el clip es una operación de

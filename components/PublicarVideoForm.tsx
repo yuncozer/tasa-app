@@ -2,11 +2,13 @@
 
 import { useState } from "react";
 import type { PublicacionPayload } from "@/lib/publish-news";
+import { BarraProgreso } from "@/components/BarraProgreso";
 import { ProgramarPublicacion } from "@/components/ProgramarPublicacion";
+import { subirMediaConProgreso, type FaseSubida } from "@/lib/subida";
 
 type Estado =
   | { paso: "inicial" }
-  | { paso: "subiendo" }
+  | { paso: "subiendo"; fase: FaseSubida }
   | { paso: "preview"; videoUrl: string; videoPublicId: string }
   | { paso: "confirmar"; videoUrl: string; videoPublicId: string }
   | { paso: "publicando"; videoUrl: string; videoPublicId: string }
@@ -32,18 +34,15 @@ export function PublicarVideoForm({ onProgramada }: { onProgramada: () => void }
   const publicando = estado.paso === "publicando";
 
   async function subirVideo(archivo: File) {
-    setEstado({ paso: "subiendo" });
+    setEstado({ paso: "subiendo", fase: { tipo: "enviando", porcentaje: 0 } });
     try {
-      const form = new FormData();
-      form.set("archivo", archivo);
-      form.set("tipo", "video");
-      const subida = await fetch("/api/admin/subir-media", { method: "POST", body: form });
-      if (!subida.ok) {
-        setEstado({ paso: "error", mensaje: await leerError(subida) });
-        return;
-      }
-      const { publicId } = (await subida.json()) as { publicId: string };
+      const publicId = await subirMediaConProgreso(archivo, "video", (fase) =>
+        setEstado({ paso: "subiendo", fase }),
+      );
 
+      // La marca se aplica al pedir esta vista previa (`urlVideoConMarca`), así
+      // que sigue dentro de la fase de proceso: la barra no se retira hasta que
+      // haya un video que mirar.
       const preview = await fetch("/api/admin/preview-video", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -55,8 +54,11 @@ export function PublicarVideoForm({ onProgramada }: { onProgramada: () => void }
       }
       const { videoUrl } = (await preview.json()) as { videoUrl: string };
       setEstado({ paso: "preview", videoUrl, videoPublicId: publicId });
-    } catch {
-      setEstado({ paso: "error", mensaje: "No se pudo conectar con el servidor" });
+    } catch (error) {
+      // La subida rechaza con el mensaje que devolvió el servidor (p. ej. el
+      // tope de 100 MB), que dice bastante más que un fallo de conexión.
+      const mensaje = error instanceof Error ? error.message : "No se pudo conectar con el servidor";
+      setEstado({ paso: "error", mensaje });
     }
   }
 
@@ -90,7 +92,7 @@ export function PublicarVideoForm({ onProgramada }: { onProgramada: () => void }
       </div>
 
       <label className="flex cursor-pointer items-center justify-center rounded-xl border border-dashed border-border-soft bg-surface-strong px-4 py-4 text-sm font-semibold text-muted transition active:scale-95">
-        {subiendo ? "Subiendo y aplicando la marca…" : conVideo ? "Video cargado · cambiar" : "Elegir video"}
+        {conVideo ? "Video cargado · cambiar" : "Elegir video"}
         <input
           type="file"
           accept="video/*"
@@ -103,6 +105,15 @@ export function PublicarVideoForm({ onProgramada }: { onProgramada: () => void }
           }}
         />
       </label>
+
+      {estado.paso === "subiendo" && (
+        <BarraProgreso
+          fase={estado.fase}
+          etiqueta={
+            estado.fase.tipo === "enviando" ? "Enviando el video" : "Procesando el video y aplicando la marca…"
+          }
+        />
+      )}
 
       {estado.paso === "error" && (
         <p className="rounded-2xl border border-warning/40 bg-warning/5 px-4 py-3 text-sm text-warning">

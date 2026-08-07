@@ -206,6 +206,19 @@ transition active:scale-95 disabled:opacity-50
 rounded-2xl border border-accent/40 bg-accent/10 px-4 py-3
 ```
 
+**Barra de progreso** (`BarraProgreso`, debajo del control que disparó la acción)
+
+```
+pista:    h-1 w-full overflow-hidden rounded-full bg-surface-strong
+relleno:  h-full rounded-full bg-accent   (+ width en % si hay porcentaje)
+etiqueta: text-xs text-muted   ·   cifra: tabular text-xs text-muted
+```
+
+Con porcentaje solo cuando el porcentaje es real. Cuando no se puede medir, el
+relleno pasa a `barra-splash w-1/3` —la misma animación indeterminada del
+splash, con su `prefers-reduced-motion` ya resuelto— y el texto dice qué está
+pasando. Inventar una cifra rompe la regla de §8.
+
 **Aviso de dato ausente (superficie)**
 
 ```
