@@ -1,8 +1,7 @@
-import { readFileSync } from "node:fs";
-import path from "node:path";
 import { buildNewsCaption } from "../lib/caption";
 import { signNewsImageParams } from "../lib/news-signature";
 import { fetchArticle } from "../lib/providers/news";
+import { cargarEnvLocal } from "./_env";
 
 /**
  * Arma la URL local firmada de `/api/og/instagram-post-news` a partir de un
@@ -15,20 +14,6 @@ import { fetchArticle } from "../lib/providers/news";
  * Requiere que `npm run dev` esté corriendo en otra terminal y que
  * `.env.local` tenga `CRON_SECRET` (el mismo que usa la API).
  */
-
-function cargarEnvLocal(): void {
-  const ruta = path.join(process.cwd(), ".env.local");
-  let contenido: string;
-  try {
-    contenido = readFileSync(ruta, "utf8");
-  } catch {
-    return;
-  }
-  for (const linea of contenido.split("\n")) {
-    const match = /^([A-Z0-9_]+)=(.*)$/.exec(linea.trim());
-    if (match && !process.env[match[1]]) process.env[match[1]] = match[2];
-  }
-}
 
 async function main() {
   cargarEnvLocal();

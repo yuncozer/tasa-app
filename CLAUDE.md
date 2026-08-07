@@ -515,11 +515,52 @@ Para probar `/admin/noticia` en sí hace falta además `ADMIN_PASSWORD` en
 `.env.local`, y las tres `CLOUDINARY_*` para todo lo que suba imágenes o
 video.
 
-Para **verificar el video con marca sin publicarlo**, la forma fiable es pedir
-un fotograma en vez de reproducirlo: la URL que devuelve `urlVideoConMarca()`
-acepta `.jpg` sobre la misma transformación y devuelve una imagen que se puede
-mirar directamente. Reproducir el `<video>` en el navegador para ver si el
-overlay quedó bien es mucho más lento y no deja nada que revisar después.
+### Probar las marcas sin publicar ni pasar por `/admin`
+
+`preview-noticia.ts` cubre solo una de las cuatro piezas que la app marca: la
+imagen principal de un artículo scrapeado. Para las otras tres —y para probar
+con material propio en vez de con un artículo— está
+`scripts/preview-marca.ts`, que sube el archivo y devuelve las URLs de todas
+las variantes que le correspondan:
+
+```bash
+npx tsx scripts/preview-marca.ts foto.jpg   # principal (con titular) y secundaria de carrusel
+npx tsx scripts/preview-marca.ts clip.mp4   # carrusel 1:1 y Reel 9:16, cada uno con su fotograma
+npx tsx scripts/preview-marca.ts --public-id <id> --tipo video   # reusa lo ya subido
+```
+
+| Pieza | Quién la compone | Dónde se edita |
+| --- | --- | --- |
+| Imagen principal de post | Satori, con titular y fecha | `app/api/og/instagram-post-news/route.tsx`, `lib/og-shared.ts` |
+| Imagen secundaria de carrusel | Satori, sin titular (`ALTO_FOTO.secundaria`) | los mismos |
+| Video en carrusel (1:1) | Cloudinary, transformación por URL | `lib/providers/cloudinary.ts` |
+| Video como Reel (9:16) | Cloudinary, misma cadena, otro lienzo | el mismo |
+
+Al iterar, las dos mitades se comportan distinto y conviene saberlo:
+
+- **Imagen**: la firma cubre los parámetros, no el HTML. Editas la plantilla,
+  recargas el navegador con `npm run dev` levantado y ya — no hace falta
+  volver a correr el script. Solo hay que regenerar la URL si cambia el
+  artículo o si se añade o quita el título, porque la firma cubre exactamente
+  el conjunto de claves presentes.
+- **Video**: la transformación viaja en la URL, así que hay que volver a
+  correr el script (con `--public-id`, que no vuelve a subir el original) tras
+  cada cambio. Como la URL nueva es otra, tampoco hay caché vieja que
+  invalidar.
+
+Del video se revisa el **fotograma**, no el clip: `urlFotogramaConMarca()` pide
+un JPG sobre la misma transformación que `urlVideoConMarca()` —comparten
+`transformacionMarca()` justamente para que lo revisado sea lo publicado—, y
+mirarlo es inmediato y deja algo que comparar después. Reproducir el `<video>`
+para ver si el overlay quedó bien es mucho más lento.
+
+El script necesita las tres `CLOUDINARY_*` y `CRON_SECRET` en `.env.local`, y
+correrse desde la raíz del repo (`asegurarLogo()` lee `public/icon-512.png`
+relativo al directorio de trabajo). `npm run dev` hace falta solo para las URLs
+de imagen; las de video las sirve Cloudinary. Ten en cuenta que cada corrida
+sin `--public-id` gasta almacenamiento del plan gratuito (25 créditos al mes;
+1 crédito = 1 GB de almacenamiento o de ancho de banda de video), y que los
+archivos de prueba se borran a mano desde el panel de Cloudinary.
 
 ### El entorno de desarrollo
 

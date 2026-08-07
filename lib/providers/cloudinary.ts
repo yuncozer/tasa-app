@@ -114,9 +114,9 @@ const LIENZO: Record<FormatoVideo, { width: number; height: number }> = {
 };
 
 /**
- * URL pública del video con la franja de marca superpuesta (logo arriba a la
- * izquierda, texto abajo). Sin `so_`/`eo_` en la transformación, Cloudinary
- * aplica el overlay a toda la duración del clip por defecto.
+ * Encuadre + franja de marca (logo arriba a la izquierda, texto abajo). Sin
+ * `so_`/`eo_` en la transformación, Cloudinary aplica el overlay a toda la
+ * duración del clip por defecto.
  *
  * Dos detalles que costó encontrar y conviene no deshacer:
  *
@@ -129,29 +129,60 @@ const LIENZO: Record<FormatoVideo, { width: number; height: number }> = {
  *
  * Se encaja con `pad` y no con `fill`: recortar perdería los bordes del
  * encuadre original del video, que es contenido que el usuario grabó.
+ *
+ * Vive aparte porque la comparten el video que se publica y el fotograma con
+ * el que se revisa la marca: si divergieran, lo revisado dejaría de ser lo
+ * publicado.
  */
+function transformacionMarca(formato: FormatoVideo) {
+  return [
+    { ...LIENZO[formato], crop: "pad", background: "#0b1120" },
+    { overlay: LOGO_PUBLIC_ID, width: 140, crop: "scale" },
+    { flags: "layer_apply", gravity: "north_west", x: 40, y: 40 },
+    {
+      overlay: {
+        font_family: "Arial",
+        font_size: 44,
+        font_weight: "bold",
+        text: TEXTO_MARCA,
+      },
+      color: "#f1f5f9",
+      background: "#0b1120",
+    },
+    { flags: "layer_apply", gravity: "south", y: 60 },
+  ];
+}
+
+/** URL pública del video con la franja de marca superpuesta. */
 export async function urlVideoConMarca(publicId: string, formato: FormatoVideo): Promise<string> {
   await asegurarLogo();
   const client = configurar();
   return client.url(publicId, {
     resource_type: "video",
     secure: true,
-    transformation: [
-      { ...LIENZO[formato], crop: "pad", background: "#0b1120" },
-      { overlay: LOGO_PUBLIC_ID, width: 140, crop: "scale" },
-      { flags: "layer_apply", gravity: "north_west", x: 40, y: 40 },
-      {
-        overlay: {
-          font_family: "Arial",
-          font_size: 44,
-          font_weight: "bold",
-          text: TEXTO_MARCA,
-        },
-        color: "#f1f5f9",
-        background: "#0b1120",
-      },
-      { flags: "layer_apply", gravity: "south", y: 60 },
-    ],
+    transformation: transformacionMarca(formato),
+  });
+}
+
+/**
+ * Un fotograma del video ya marcado, como imagen. Es la forma fiable de
+ * revisar la marca sin publicar nada: mirar un JPG es inmediato y deja algo
+ * que se puede comparar después, mientras que reproducir el clip entero tarda
+ * y no deja rastro. Lo usa `scripts/preview-marca.ts`.
+ */
+export async function urlFotogramaConMarca(
+  publicId: string,
+  formato: FormatoVideo,
+  segundo = 0,
+): Promise<string> {
+  await asegurarLogo();
+  const client = configurar();
+  return client.url(publicId, {
+    resource_type: "video",
+    secure: true,
+    format: "jpg",
+    start_offset: String(segundo),
+    transformation: transformacionMarca(formato),
   });
 }
 
