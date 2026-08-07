@@ -6,6 +6,12 @@ import { ejecutarPublicacion } from "@/lib/publish-news";
 /** Publica el video propio (ya con marca) como Reel. Protegida por la cookie de sesión. */
 export const runtime = "nodejs";
 
+/**
+ * Igual que los routes de cron: esperar a que Meta procese el video
+ * consume bastante más que el tope por defecto de la función.
+ */
+export const maxDuration = 60;
+
 export async function POST(request: NextRequest) {
   if (!esSesionValida(request.cookies.get(COOKIE_SESION)?.value)) {
     return apiError("No autorizado", undefined, 401);

@@ -371,6 +371,23 @@ Instagram impone dos reglas que explican el resto del diseño:
   Reels. De ahí el switch: `carrusel` reencuadra a 1:1 para casar con la imagen
   cuadrada, `reel` a 9:16 que es lo único que entra en esa pestaña.
 
+**Antes de publicar cualquier contenedor hay que sondear su `status_code`.** Es
+el paso intermedio del flujo de Meta —crear, sondear hasta `FINISHED`,
+publicar— y saltárselo devuelve el error 9007, "Media ID is not available". Se
+sondean los hijos de video **y también el padre del carrusel**: el padre
+también se procesa, y con un video dentro tarda mucho más que los pocos
+segundos del reintento corto de `publicarContenedor`. Mientras solo se
+sondearon los hijos, el carrusel de puras imágenes pasaba de milagro —su padre
+está listo casi al instante— y el que llevaba video fallaba siempre al darle
+"Publicar". Si Meta no devuelve el campo `status_code`, se sigue adelante en vez
+de esperar en balde: queda el reintento ante el 9007, que es como funcionaba
+antes de existir el sondeo.
+
+Por lo mismo, los routes que publican (`/api/admin/publish-carrusel`,
+`/api/admin/publish-video`, `/api/publish-instagram-news`) declaran
+`maxDuration = 60` igual que los de cron: esperar a que Meta procese un video
+no cabe en el tope por defecto de una función.
+
 `publishCarousel` (`lib/instagram.ts`) es la **única** primitiva de carrusel y
 la comparten el post diario y el de noticias; `publishCarouselPost` quedó como
 atajo para el diario, que siempre son imágenes. Mantiene la creación de hijos

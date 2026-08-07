@@ -35,7 +35,13 @@ interface GraphErrorBody {
 
 export class InstagramApiError extends Error {
   constructor(message: string, graphError: GraphErrorBody) {
-    super(`${message}: ${graphError.error?.message ?? "error desconocido"}`);
+    // El código va en el mensaje porque este texto es lo único que ve el admin
+    // desde el teléfono: sin él, dos fallos muy distintos de Meta se leen igual
+    // y no hay forma de saber si conviene reintentar o no.
+    const codigo = graphError.error?.code;
+    super(
+      `${message}: ${graphError.error?.message ?? "error desconocido"}${codigo ? ` (código ${codigo})` : ""}`,
+    );
   }
 }
 
@@ -61,12 +67,15 @@ async function crearContenedor(params: Record<string, string>, queHace: string):
 }
 
 /**
- * El video tarda más en procesarse que la imagen (de segundos a minutos), así
- * que a diferencia de `publicarContenedor` (pensado para el reintento corto
- * ante el error 9007) aquí se hace polling explícito de `status_code` antes
- * de intentar publicar.
+ * Espera a que Meta termine de procesar un contenedor antes de publicarlo.
+ *
+ * Es el paso intermedio que documenta Meta —crear, sondear `status_code` hasta
+ * `FINISHED`, publicar— y saltárselo es exactamente lo que devuelve el error
+ * 9007 ("Media ID is not available"). El reintento corto de
+ * `publicarContenedor` alcanza para una imagen suelta, pero no para un video
+ * ni para el padre de un carrusel que lleva uno.
  */
-async function esperarVideoListo(containerId: string): Promise<void> {
+async function esperarContenedorListo(containerId: string, queEs: string): Promise<void> {
   const { accessToken } = credenciales();
   const url = new URL(`${GRAPH_BASE}/${containerId}`);
   url.searchParams.set("fields", "status_code");
@@ -75,15 +84,21 @@ async function esperarVideoListo(containerId: string): Promise<void> {
   for (let intento = 1; intento <= POLL_MAX_INTENTOS; intento++) {
     const res = await fetch(url);
     const body = await res.json();
-    if (!res.ok) throw new InstagramApiError("No se pudo consultar el estado del video", body);
+    if (!res.ok) throw new InstagramApiError(`No se pudo consultar el estado de ${queEs}`, body);
 
-    if (body.status_code === "FINISHED") return;
-    if (body.status_code === "ERROR") throw new Error("Instagram no pudo procesar el video");
+    // Si Meta no sirve el campo, se sigue adelante en vez de esperar en balde:
+    // queda el reintento ante el 9007, que es como funcionaba antes de existir
+    // este sondeo. Esperar los tres minutos completos para acabar fallando
+    // sería peor que intentar publicar.
+    if (body.status_code === undefined) return;
+    if (body.status_code === "FINISHED" || body.status_code === "PUBLISHED") return;
+    if (body.status_code === "ERROR") throw new Error(`Instagram no pudo procesar ${queEs}`);
+    if (body.status_code === "EXPIRED") throw new Error(`El contenedor de ${queEs} caducó sin publicarse`);
 
     await new Promise((resolve) => setTimeout(resolve, POLL_INTERVALO_MS));
   }
 
-  throw new Error("El video de Instagram no terminó de procesarse a tiempo");
+  throw new Error(`Instagram no terminó de procesar ${queEs} a tiempo`);
 }
 
 function esMediaNoLista(body: GraphErrorBody): boolean {
@@ -136,7 +151,7 @@ export async function publishReel(videoUrl: string, caption: string): Promise<{ 
     { media_type: "REELS", video_url: videoUrl, caption },
     "el contenedor del Reel",
   );
-  await esperarVideoListo(containerId);
+  await esperarContenedorListo(containerId, "el Reel");
   const mediaId = await publicarContenedor(containerId);
   return { mediaId };
 }
@@ -185,13 +200,22 @@ export async function publishCarousel(
 
   // Si el padre se arma antes de que Meta termine de procesar un video, lo rechaza.
   await Promise.all(
-    hijos.filter((_, i) => elementos[i].tipo === "video").map((id) => esperarVideoListo(id)),
+    hijos
+      .filter((_, i) => elementos[i].tipo === "video")
+      .map((id) => esperarContenedorListo(id, "un video del carrusel")),
   );
 
   const padre = await crearContenedor(
     { media_type: "CAROUSEL", children: hijos.join(","), caption },
     "el contenedor del carrusel",
   );
+
+  // El padre también se procesa, y con un video dentro tarda bastante más que
+  // los pocos segundos que cubre el reintento de `publicarContenedor`. Sin esta
+  // espera, publicar un carrusel con video fallaba con el 9007 de Meta ("Media
+  // ID is not available") mientras el de solo imágenes pasaba de milagro,
+  // porque su padre está listo casi al instante.
+  await esperarContenedorListo(padre, "el carrusel");
 
   const mediaId = await publicarContenedor(padre);
   return { mediaId };

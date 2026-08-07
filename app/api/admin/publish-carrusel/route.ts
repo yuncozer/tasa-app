@@ -7,6 +7,12 @@ import { ejecutarPublicacion, leerElementosCarrusel, leerPrincipalCarrusel } fro
 /** Publica el carrusel desde `/admin/noticia`. Protegida por la cookie de sesión. */
 export const runtime = "nodejs";
 
+/**
+ * Igual que los routes de cron: el carrusel puede llevar video, y esperar a
+ * que Meta lo procese consume bastante más que el tope por defecto.
+ */
+export const maxDuration = 60;
+
 export async function POST(request: NextRequest) {
   if (!esSesionValida(request.cookies.get(COOKIE_SESION)?.value)) {
     return apiError("No autorizado", undefined, 401);

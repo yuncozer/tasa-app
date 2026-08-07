@@ -15,6 +15,12 @@ import { esUrlValida } from "@/lib/validar-url";
  */
 export const runtime = "nodejs";
 
+/**
+ * Igual que los routes de cron: la publicación puede llevar video, y
+ * esperar a que Meta lo procese consume más que el tope por defecto.
+ */
+export const maxDuration = 60;
+
 export async function POST(request: NextRequest) {
   const auth = request.headers.get("authorization");
   if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
