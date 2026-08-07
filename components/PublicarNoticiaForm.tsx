@@ -39,6 +39,17 @@ interface Subida {
   fase: FaseSubida;
 }
 
+/**
+ * Selector de archivo. El `disabled` real vive en el `<input>`, que va oculto,
+ * así que la opacidad hay que ponerla a mano en la etiqueta: si no, el botón se
+ * ve tocable mientras hay una subida en curso y no lo está.
+ */
+function claseSelector(base: string, inactivo: boolean): string {
+  return `flex cursor-pointer items-center justify-center rounded-xl border border-dashed border-border-soft bg-surface-strong text-sm font-semibold text-muted transition active:scale-95 ${base}${
+    inactivo ? " opacity-50" : ""
+  }`;
+}
+
 /** Qué se está haciendo con el archivo, en palabras, según la fase. */
 function textoDeSubida({ que, fase }: Subida): string {
   if (fase.tipo === "enviando") return que === "video" ? "Enviando el video" : "Enviando la imagen";
@@ -486,7 +497,7 @@ export function PublicarNoticiaForm({ onProgramada }: { onProgramada: () => void
 
             {datosDelMarcoListos ? (
               <>
-                <label className="flex cursor-pointer items-center justify-center rounded-xl border border-dashed border-border-soft bg-surface-strong px-4 py-4 text-sm font-semibold text-muted transition active:scale-95">
+                <label className={claseSelector("px-4 py-4", subiendo)}>
                   {fotoPrincipal ? "Cambiar la foto" : "Elegir imagen"}
                   <input
                     type="file"
@@ -580,7 +591,7 @@ export function PublicarNoticiaForm({ onProgramada }: { onProgramada: () => void
 
           {modo === "url" && (
             <div className="flex flex-col gap-2">
-              <label className="flex cursor-pointer items-center justify-center rounded-xl border border-dashed border-border-soft bg-surface-strong px-4 py-3 text-sm font-semibold text-muted transition active:scale-95">
+              <label className={claseSelector("px-4 py-3", subiendo || publicando)}>
                 {imagenPublicId ? "Imagen principal propia · cambiar" : "Usar una imagen propia"}
                 <input
                   type="file"
@@ -609,7 +620,7 @@ export function PublicarNoticiaForm({ onProgramada }: { onProgramada: () => void
               </p>
             ) : (
               <div className="flex gap-2">
-                <label className="flex flex-1 cursor-pointer items-center justify-center rounded-xl border border-dashed border-border-soft bg-surface-strong px-3 py-3 text-sm font-semibold text-muted transition active:scale-95">
+                <label className={claseSelector("flex-1 px-3 py-3", subiendo || publicando)}>
                   + Imagen
                   <input
                     type="file"
@@ -623,7 +634,7 @@ export function PublicarNoticiaForm({ onProgramada }: { onProgramada: () => void
                     }}
                   />
                 </label>
-                <label className="flex flex-1 cursor-pointer items-center justify-center rounded-xl border border-dashed border-border-soft bg-surface-strong px-3 py-3 text-sm font-semibold text-muted transition active:scale-95">
+                <label className={claseSelector("flex-1 px-3 py-3", subiendo || publicando)}>
                   + Video
                   <input
                     type="file"

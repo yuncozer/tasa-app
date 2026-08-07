@@ -91,7 +91,13 @@ export function PublicarVideoForm({ onProgramada }: { onProgramada: () => void }
         <p className="text-xs text-muted">Se le monta la franja de marca de La Tasa y se publica como Reel.</p>
       </div>
 
-      <label className="flex cursor-pointer items-center justify-center rounded-xl border border-dashed border-border-soft bg-surface-strong px-4 py-4 text-sm font-semibold text-muted transition active:scale-95">
+      {/* El `disabled` real vive en el `<input>` oculto, así que la opacidad de
+          deshabilitado hay que ponerla a mano en la etiqueta. */}
+      <label
+        className={`flex cursor-pointer items-center justify-center rounded-xl border border-dashed border-border-soft bg-surface-strong px-4 py-4 text-sm font-semibold text-muted transition active:scale-95 ${
+          subiendo || publicando ? "opacity-50" : ""
+        }`}
+      >
         {conVideo ? "Video cargado · cambiar" : "Elegir video"}
         <input
           type="file"
