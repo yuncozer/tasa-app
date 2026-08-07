@@ -218,6 +218,50 @@ pesos después.
   la dice ("Dólar BCV", "Dólar Binance", "Dólar TRM"). El texto se lee de
   `rate.source`, no se escribe a mano.
 
+### Los crons ya no son de Vercel, y por eso hay cola de programadas
+
+Un post de `/admin/noticia` se puede dejar en cola para que salga a cierta hora.
+La Graph API de Instagram no programa publicaciones de feed, así que la cola
+vive aquí.
+
+- **Los tres disparos están en cron-job.org**, no en `vercel.json`, que quedó sin
+  `crons`. El motivo no es el número de slots del plan Hobby sino la frecuencia:
+  ahí **cada cron solo se ejecuta una vez al día**, lo que no sirve para mirar
+  una cola cada diez minutos. Y de paso se arregló algo que pasaba
+  desapercibido: los crons de Hobby disparan "dentro de la hora", así que el
+  post de tasas de las 9:00 podía salir a las 9:50. Si los devuelves a
+  `vercel.json`, las programadas dejan de salir.
+- **El post se congela al programar, no al publicar**
+  (`materializarParaProgramar` en `lib/publish-news.ts`). `publishNewsPost`
+  vuelve a scrapear el artículo cuando publica, que para el botón inmediato da
+  igual pero para algo que sale dentro de seis horas no: el portal puede editar
+  el titular, cambiar la foto o caerse. Se resuelve todo por adelantado y la
+  foto se copia a Cloudinary con `subirDesdeUrl()`, de modo que lo guardado es
+  siempre un payload autocontenido. No lo cambies a guardar la URL y scrapear
+  al final: rompe la regla de que lo que se muestra es lo que se publica.
+- **Publicar al instante y publicar programado pasan por la misma puerta**,
+  `ejecutarPublicacion()`. Si divergen, lo que sale a la hora programada deja
+  de ser lo que se probó con "Publicar".
+- **El reclamo de la cola es atómico y ahí está el riesgo real**
+  (`reclamarVencida` en `lib/programadas.ts`). El `estado=eq.pendiente` del
+  filtro se traduce en un `WHERE` sobre el `UPDATE`: si dos disparos se
+  solapan, solo uno se lleva la fila. Sin esa condición el modo de fallo es un
+  post duplicado en la cuenta real, que no se deshace. Por lo mismo,
+  cron-job.org va **sin reintentos automáticos** y no hay rescate automático de
+  las que se quedan en `publicando`: si una ejecución muere después de que Meta
+  aceptara el post, reintentarla lo duplicaría. Se quedan visibles en la cola
+  para decidirlas a mano.
+- La tabla lleva **RLS activada y ninguna política**, así que solo la
+  `service_role` la ve. El navegador nunca habla con Supabase: todo pasa por
+  las rutas `/api/admin/*`, que ya exigen la cookie de sesión.
+- La hora se escribe y se lee **en Caracas** (`isoDesdeHoraCaracas`), no en la
+  del dispositivo: desde Cúcuta el teléfono va en UTC−5 y un post "de las 7"
+  saldría corrido.
+- La cola la lee la **página en el servidor** y baja por props. Pedirla desde
+  el cliente obligaba a un `setState` dentro de un efecto, que es el patrón que
+  el proyecto evita (mismo motivo que `useSyncExternalStore` más arriba) y que
+  el linter rechaza.
+
 ### El aviso legal se queda
 
 El pie declara que los datos son de terceros, que La Tasa no fija ni certifica

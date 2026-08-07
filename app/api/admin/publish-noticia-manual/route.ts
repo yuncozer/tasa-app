@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 import { apiError, apiJson } from "@/lib/api";
 import { COOKIE_SESION, esSesionValida } from "@/lib/admin-session";
-import { publishManualNewsPost } from "@/lib/publish-news";
+import { ejecutarPublicacion } from "@/lib/publish-news";
 
 /** Publica una noticia de autoría propia. Protegida por la cookie de sesión. */
 export const runtime = "nodejs";
@@ -22,7 +22,10 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const { mediaId } = await publishManualNewsPost({ title, sourceHost, caption, imagenPublicId });
+    const { mediaId } = await ejecutarPublicacion({
+      tipo: "manual",
+      datos: { title, sourceHost, caption, imagenPublicId },
+    });
     return apiJson({ ok: true, mediaId }, { cachear: false });
   } catch (error) {
     return apiError("No se pudo publicar la noticia", error);

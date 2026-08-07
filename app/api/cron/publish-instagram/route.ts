@@ -5,11 +5,15 @@ import { publishCarouselPost } from "@/lib/instagram";
 import { getRates } from "@/lib/rates";
 
 /**
- * Dispara Vercel Cron (ver `vercel.json`) dos veces al día, hora de Caracas:
- * 9:00 am y 6:00 pm. Cada entrada de `vercel.json` llama a esta misma ruta
- * con `?momento=manana` o `?momento=tarde`, que es lo que decide el título
- * del caption — explícito en vez de inferirlo de la hora del reloj, así no
- * se rompe si algún día se cambian los horarios.
+ * Se dispara dos veces al día, hora de Caracas: 9:00 am y 6:00 pm. Cada
+ * disparo llama a esta misma ruta con `?momento=manana` o `?momento=tarde`,
+ * que es lo que decide el título del caption — explícito en vez de inferirlo
+ * de la hora del reloj, así no se rompe si algún día se cambian los horarios.
+ *
+ * Quien dispara es **cron-job.org**, no Vercel Cron: en el plan Hobby los
+ * crons se ejecutan "dentro de la hora" y no a la hora exacta, así que el post
+ * de las 9:00 podía salir a las 9:50. Ver la sección de publicaciones
+ * programadas en `CLAUDE.md`.
  *
  * Cada disparo publica **un carrusel de dos diapositivas**: las tasas en
  * bolívares y las mismas tasas en pesos. Son un solo post y no dos porque

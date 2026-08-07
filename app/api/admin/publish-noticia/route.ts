@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 import { apiError, apiJson } from "@/lib/api";
 import { COOKIE_SESION, esSesionValida } from "@/lib/admin-session";
-import { publishNewsPost } from "@/lib/publish-news";
+import { ejecutarPublicacion } from "@/lib/publish-news";
 import { esUrlValida } from "@/lib/validar-url";
 
 /**
@@ -26,7 +26,12 @@ export async function POST(request: NextRequest) {
   const imagenPropiaPublicId = typeof body?.imagenPublicId === "string" ? body.imagenPublicId : undefined;
 
   try {
-    const { mediaId } = await publishNewsPost(url, caption, imagenPropiaPublicId);
+    const { mediaId } = await ejecutarPublicacion({
+      tipo: "articulo",
+      url,
+      caption,
+      imagenPublicId: imagenPropiaPublicId,
+    });
     return apiJson({ ok: true, mediaId }, { cachear: false });
   } catch (error) {
     return apiError("No se pudo publicar el post de la noticia", error);

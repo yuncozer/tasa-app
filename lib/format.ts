@@ -118,6 +118,36 @@ export function formatClock(iso: string | null): string {
   return `${hora}:${minuto} ${ampm}`;
 }
 
+/**
+ * Traduce lo que escribe un `<input type="datetime-local">` ("2026-08-07T19:00")
+ * a un instante ISO, interpretándolo **en hora de Caracas** y no en la del
+ * dispositivo. Importa: desde Cúcuta el teléfono va en UTC−5, y un post que se
+ * programa "para las 7" saldría corrido una hora.
+ *
+ * Devuelve `null` si el texto no tiene la forma que produce ese input.
+ */
+export function isoDesdeHoraCaracas(local: string): string | null {
+  const partes = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(local);
+  if (!partes) return null;
+
+  const [anio, mes, dia, hora, minuto] = partes.slice(1).map(Number);
+  const instante = Date.UTC(anio, mes - 1, dia, hora, minuto) + CARACAS_OFFSET_MS;
+  if (Number.isNaN(instante)) return null;
+
+  return new Date(instante).toISOString();
+}
+
+/** El mismo formato, de vuelta: sirve para el `min` del input. */
+export function horaCaracasDesdeIso(iso: string): string {
+  const caracas = new Date(new Date(iso).getTime() - CARACAS_OFFSET_MS);
+  const dosDigitos = (n: number) => String(n).padStart(2, "0");
+
+  return (
+    `${caracas.getUTCFullYear()}-${dosDigitos(caracas.getUTCMonth() + 1)}-${dosDigitos(caracas.getUTCDate())}` +
+    `T${dosDigitos(caracas.getUTCHours())}:${dosDigitos(caracas.getUTCMinutes())}`
+  );
+}
+
 const MINUTO = 60_000;
 const HORA = 60 * MINUTO;
 const DIA = 24 * HORA;

@@ -2,7 +2,7 @@ import { buildNewsCaption } from "@/lib/caption";
 import type { ElementoCarrusel } from "@/lib/instagram";
 import { publishCarousel, publishDailyPost, publishReel } from "@/lib/instagram";
 import { signNewsImageParams } from "@/lib/news-signature";
-import { urlImagen, urlVideoConMarca } from "@/lib/providers/cloudinary";
+import { subirDesdeUrl, urlImagen, urlVideoConMarca } from "@/lib/providers/cloudinary";
 import type { ArticleData } from "@/lib/providers/news";
 import { fetchArticle } from "@/lib/providers/news";
 import { esUrlValida } from "@/lib/validar-url";
@@ -224,4 +224,127 @@ export async function publishNewsCarouselPost(
 ): Promise<{ mediaId: string }> {
   const elementos = await buildCarousel(datos);
   return publishCarousel(elementos, caption);
+}
+
+/**
+ * Una publicación de `/admin/noticia`, en la forma exacta en que se ejecuta.
+ * Existe para que publicar al instante y publicar programado sean **el mismo
+ * camino**: si divergieran, lo que sale a la hora programada dejaría de ser lo
+ * que se probó con el botón "Publicar".
+ */
+export type PublicacionPayload =
+  | { tipo: "articulo"; url: string; caption?: string; imagenPublicId?: string }
+  | { tipo: "manual"; datos: NoticiaManual }
+  | { tipo: "carrusel"; datos: CarruselEntrada; caption: string }
+  | { tipo: "reel"; videoPublicId: string; caption: string };
+
+/** Única puerta de publicación: la usan las rutas inmediatas y el worker de la cola. */
+export async function ejecutarPublicacion(payload: PublicacionPayload): Promise<{ mediaId: string }> {
+  switch (payload.tipo) {
+    case "articulo":
+      return publishNewsPost(payload.url, payload.caption, payload.imagenPublicId);
+    case "manual":
+      return publishManualNewsPost(payload.datos);
+    case "carrusel":
+      return publishNewsCarouselPost(payload.datos, payload.caption);
+    case "reel":
+      return publishNewsVideoPost(payload.videoPublicId, payload.caption);
+  }
+}
+
+/**
+ * Valida un payload tal como vuelve de la base de datos o llega del navegador.
+ * Se comprueba aunque venga de nuestra propia tabla: lo que se guardó pudo
+ * escribirse con una versión anterior del código.
+ */
+export function leerPublicacionPayload(valor: unknown): PublicacionPayload | null {
+  const p = valor as { tipo?: unknown } | null;
+  const texto = (v: unknown) => (typeof v === "string" ? v.trim() : "");
+
+  if (p?.tipo === "articulo") {
+    const dato = p as { url?: unknown; caption?: unknown; imagenPublicId?: unknown };
+    if (!esUrlValida(dato.url as string)) return null;
+    return {
+      tipo: "articulo",
+      url: dato.url as string,
+      caption: texto(dato.caption) || undefined,
+      imagenPublicId: texto(dato.imagenPublicId) || undefined,
+    };
+  }
+
+  if (p?.tipo === "manual") {
+    const d = (p as { datos?: NoticiaManual }).datos;
+    const datos = {
+      title: texto(d?.title),
+      sourceHost: texto(d?.sourceHost),
+      caption: texto(d?.caption),
+      imagenPublicId: texto(d?.imagenPublicId),
+    };
+    if (!datos.title || !datos.sourceHost || !datos.caption || !datos.imagenPublicId) return null;
+    return { tipo: "manual", datos };
+  }
+
+  if (p?.tipo === "carrusel") {
+    const d = (p as { datos?: Partial<CarruselEntrada>; caption?: unknown }).datos;
+    const caption = texto((p as { caption?: unknown }).caption);
+    const title = texto(d?.title);
+    const sourceHost = texto(d?.sourceHost);
+    const principal = leerPrincipalCarrusel(d?.principal);
+    const elementos = leerElementosCarrusel(d?.elementos);
+    if (!caption || !title || !sourceHost || !principal || !elementos) return null;
+    return { tipo: "carrusel", datos: { title, sourceHost, principal, elementos }, caption };
+  }
+
+  if (p?.tipo === "reel") {
+    const d = p as { videoPublicId?: unknown; caption?: unknown };
+    const videoPublicId = texto(d.videoPublicId);
+    const caption = texto(d.caption);
+    if (!videoPublicId || !caption) return null;
+    return { tipo: "reel", videoPublicId, caption };
+  }
+
+  return null;
+}
+
+/**
+ * Deja el post listo para publicarse más tarde sin depender de nadie más.
+ *
+ * `publishNewsPost` vuelve a scrapear el artículo en el momento de publicar,
+ * que para el botón inmediato da igual pero para un post programado no: entre
+ * que se programa y sale, el portal puede editar el titular, cambiar la foto o
+ * caerse, y entonces lo publicado no sería lo que se vio en la vista previa.
+ *
+ * Así que aquí se resuelve todo por adelantado y la foto del artículo se copia
+ * a Cloudinary. El resultado es siempre un payload autocontenido —`manual` o
+ * `carrusel` con `public_id`s—, formas que el código ya sabe publicar.
+ */
+export async function materializarParaProgramar(
+  payload: PublicacionPayload,
+): Promise<PublicacionPayload> {
+  if (payload.tipo === "articulo") {
+    const article = await fetchArticle(payload.url);
+    return {
+      tipo: "manual",
+      datos: {
+        title: article.title,
+        sourceHost: article.sourceHost,
+        caption: payload.caption ?? buildNewsCaption(article),
+        imagenPublicId: payload.imagenPublicId ?? (await subirDesdeUrl(article.imageUrl)),
+      },
+    };
+  }
+
+  if (payload.tipo === "carrusel" && payload.datos.principal.tipo === "articulo") {
+    const article = await fetchArticle(payload.datos.principal.url);
+    return {
+      ...payload,
+      datos: {
+        ...payload.datos,
+        principal: { tipo: "subida", publicId: await subirDesdeUrl(article.imageUrl) },
+      },
+    };
+  }
+
+  // `manual` y `reel` ya viven enteros en Cloudinary.
+  return payload;
 }

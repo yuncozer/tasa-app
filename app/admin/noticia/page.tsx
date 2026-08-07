@@ -1,19 +1,46 @@
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import type { ProgramadaVista } from "@/components/ColaProgramadas";
 import { Logo } from "@/components/Logo";
 import { PublicarPanel } from "@/components/PublicarPanel";
 import { COOKIE_SESION, esSesionValida } from "@/lib/admin-session";
+import { listarProgramadas } from "@/lib/programadas";
 
 export const metadata: Metadata = {
   title: "Publicar noticia — La Tasa",
 };
+
+/**
+ * La cola se lee aquí, en el servidor, y baja por props: pedirla desde el
+ * cliente obligaría a un `setState` dentro de un efecto, que es justo el
+ * patrón que el proyecto evita.
+ *
+ * Si Supabase no está configurado se devuelve vacía en vez de tumbar la
+ * página: programar es opcional, y sin esas variables todo lo demás de
+ * `/admin/noticia` sigue funcionando igual.
+ */
+async function leerCola(): Promise<ProgramadaVista[]> {
+  try {
+    const programadas = await listarProgramadas();
+    return programadas.map((p) => ({
+      id: p.id,
+      publicarEn: p.publicar_en,
+      estado: p.estado,
+      error: p.error,
+    }));
+  } catch {
+    return [];
+  }
+}
 
 export default async function AdminNoticiaPage() {
   const cookieStore = await cookies();
   if (!esSesionValida(cookieStore.get(COOKIE_SESION)?.value)) {
     redirect("/admin/login");
   }
+
+  const programadas = await leerCola();
 
   return (
     <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-6 px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(1.5rem,env(safe-area-inset-top))] sm:px-6">
@@ -34,7 +61,7 @@ export default async function AdminNoticiaPage() {
         </form>
       </header>
 
-      <PublicarPanel />
+      <PublicarPanel programadas={programadas} />
     </main>
   );
 }

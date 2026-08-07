@@ -2,7 +2,7 @@ import type { NextRequest } from "next/server";
 import { apiError, apiJson } from "@/lib/api";
 import { COOKIE_SESION, esSesionValida } from "@/lib/admin-session";
 import { MAX_ELEMENTOS_CARRUSEL } from "@/lib/instagram";
-import { leerElementosCarrusel, leerPrincipalCarrusel, publishNewsCarouselPost } from "@/lib/publish-news";
+import { ejecutarPublicacion, leerElementosCarrusel, leerPrincipalCarrusel } from "@/lib/publish-news";
 
 /** Publica el carrusel desde `/admin/noticia`. Protegida por la cookie de sesión. */
 export const runtime = "nodejs";
@@ -28,7 +28,11 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const { mediaId } = await publishNewsCarouselPost({ title, sourceHost, principal, elementos }, caption);
+    const { mediaId } = await ejecutarPublicacion({
+      tipo: "carrusel",
+      datos: { title, sourceHost, principal, elementos },
+      caption,
+    });
     return apiJson({ ok: true, mediaId }, { cachear: false });
   } catch (error) {
     return apiError("No se pudo publicar el carrusel", error);

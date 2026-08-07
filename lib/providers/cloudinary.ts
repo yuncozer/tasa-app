@@ -72,6 +72,29 @@ export async function subirMedia(buffer: Buffer, resourceType: "image" | "video"
   return { publicId: resultado.public_id, resourceType, bytes: resultado.bytes };
 }
 
+/** Margen para descargar la foto de un artículo, igual que el del scraper. */
+const TIMEOUT_DESCARGA_MS = 12_000;
+
+/**
+ * Copia a Cloudinary una imagen que vive en otro sitio, y devuelve su
+ * `public_id`. La usa la programación de posts: un post programado no puede
+ * depender de que el portal siga sirviendo la foto dentro de unas horas.
+ *
+ * La descarga la hace este servidor y no Cloudinary (que también sabe subir
+ * desde una URL) porque el portal ya nos respondió una vez durante el
+ * scraping, mientras que a Cloudinary podría bloquearlo.
+ */
+export async function subirDesdeUrl(url: string): Promise<string> {
+  const response = await fetch(url, {
+    cache: "no-store",
+    signal: AbortSignal.timeout(TIMEOUT_DESCARGA_MS),
+  });
+  if (!response.ok) throw new Error(`La imagen del artículo respondió ${response.status}`);
+
+  const { publicId } = await subirMedia(Buffer.from(await response.arrayBuffer()), "image");
+  return publicId;
+}
+
 const TEXTO_MARCA = "La Tasa · www.latasa.online · @latasa.online";
 
 /**

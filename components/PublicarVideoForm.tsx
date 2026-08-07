@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import type { PublicacionPayload } from "@/lib/publish-news";
+import { ProgramarPublicacion } from "@/components/ProgramarPublicacion";
 
 type Estado =
   | { paso: "inicial" }
@@ -22,7 +24,7 @@ async function leerError(response: Response): Promise<string> {
  * permite combinarlos en un mismo post fuera de un carrusel, así que aquí se
  * publican por separado, cada uno con su confirmación.
  */
-export function PublicarVideoForm() {
+export function PublicarVideoForm({ onProgramada }: { onProgramada: () => void }) {
   const [caption, setCaption] = useState("");
   const [estado, setEstado] = useState<Estado>({ paso: "inicial" });
 
@@ -162,6 +164,16 @@ export function PublicarVideoForm() {
               {publicando ? "Publicando…" : "Publicar Reel"}
             </button>
           )}
+
+          <ProgramarPublicacion
+            payload={
+              caption.trim()
+                ? ({ tipo: "reel", videoPublicId: conVideo.videoPublicId, caption } satisfies PublicacionPayload)
+                : null
+            }
+            deshabilitado={publicando || subiendo}
+            onProgramada={onProgramada}
+          />
         </div>
       )}
     </div>

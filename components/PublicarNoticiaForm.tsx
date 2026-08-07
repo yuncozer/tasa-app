@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import type { PublicacionPayload } from "@/lib/publish-news";
+import { ProgramarPublicacion } from "@/components/ProgramarPublicacion";
 
 interface Preview {
   title: string;
@@ -66,7 +68,7 @@ async function subirArchivo(archivo: File, tipo: "image" | "video"): Promise<str
  * orden elegido. Publicar siempre pasa por un segundo paso de confirmación —
  * es una acción externa e irreversible.
  */
-export function PublicarNoticiaForm() {
+export function PublicarNoticiaForm({ onProgramada }: { onProgramada: () => void }) {
   const [modo, setModo] = useState<Modo>("url");
   const [url, setUrl] = useState("");
   const [title, setTitle] = useState("");
@@ -267,6 +269,43 @@ export function PublicarNoticiaForm() {
     const copia = [...extras];
     [copia[indice], copia[destino]] = [copia[destino], copia[indice]];
     aplicarExtras(copia);
+  }
+
+  /**
+   * El post tal cual se va a ejecutar, en la forma que entiende el servidor
+   * (`PublicacionPayload`). Se arma en un solo sitio para publicar y para
+   * programar: si cada camino lo compusiera por su cuenta, lo que sale a la
+   * hora programada podría dejar de ser lo que se probó con "Publicar".
+   *
+   * `null` mientras falte algo, que es lo que deshabilita el botón de
+   * programar.
+   */
+  function construirPayload(datos: Preview | null): PublicacionPayload | null {
+    if (!caption.trim()) return null;
+
+    if (esCarrusel) {
+      const title = datos?.title ?? "";
+      const sourceHost = datos?.sourceHost ?? "";
+      if (!title || !sourceHost) return null;
+      return {
+        tipo: "carrusel",
+        datos: {
+          title,
+          sourceHost,
+          principal,
+          elementos: extras.map(({ tipo, publicId }) => ({ tipo, publicId })),
+        },
+        caption,
+      };
+    }
+
+    if (modo === "url") {
+      return url ? { tipo: "articulo", url, caption, imagenPublicId } : null;
+    }
+
+    return imagenPublicId && title.trim() && sourceHost.trim()
+      ? { tipo: "manual", datos: { title, sourceHost, caption, imagenPublicId } }
+      : null;
   }
 
   async function publicar(datos: Preview) {
@@ -664,6 +703,12 @@ export function PublicarNoticiaForm() {
               {publicando ? "Publicando…" : esCarrusel ? "Publicar carrusel" : "Publicar"}
             </button>
           )}
+
+          <ProgramarPublicacion
+            payload={construirPayload(preview)}
+            deshabilitado={publicando || subiendo || desactualizado}
+            onProgramada={onProgramada}
+          />
         </div>
       )}
     </div>

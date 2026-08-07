@@ -1,6 +1,9 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useState } from "react";
+import type { ProgramadaVista } from "@/components/ColaProgramadas";
+import { ColaProgramadas } from "@/components/ColaProgramadas";
 import { PublicarNoticiaForm } from "@/components/PublicarNoticiaForm";
 import { PublicarVideoForm } from "@/components/PublicarVideoForm";
 
@@ -13,8 +16,16 @@ type Destino = "post" | "reel";
  * Reel va solo y en 9:16. Cambiar de idea a mitad implicaría reencuadrar todo,
  * así que la decisión se toma al principio.
  */
-export function PublicarPanel() {
+export function PublicarPanel({ programadas }: { programadas: ProgramadaVista[] }) {
   const [destino, setDestino] = useState<Destino>("post");
+  const router = useRouter();
+
+  /**
+   * La cola vive encima de los dos formularios porque es común a los dos, y la
+   * lee el servidor: cuando uno de ellos programa algo, basta con volver a
+   * pedir la página.
+   */
+  const alProgramar = () => router.refresh();
 
   const opciones: Array<{ valor: Destino; etiqueta: string }> = [
     { valor: "post", etiqueta: "Post" },
@@ -23,6 +34,8 @@ export function PublicarPanel() {
 
   return (
     <div className="flex flex-col gap-5">
+      <ColaProgramadas programadas={programadas} />
+
       <div className="flex flex-col gap-1.5">
         <span className="text-sm font-semibold uppercase tracking-wide text-muted">Tipo de publicación</span>
         <div className="flex gap-2" role="tablist" aria-label="Tipo de publicación">
@@ -50,7 +63,11 @@ export function PublicarPanel() {
         </p>
       </div>
 
-      {destino === "post" ? <PublicarNoticiaForm /> : <PublicarVideoForm />}
+      {destino === "post" ? (
+        <PublicarNoticiaForm onProgramada={alProgramar} />
+      ) : (
+        <PublicarVideoForm onProgramada={alProgramar} />
+      )}
     </div>
   );
 }

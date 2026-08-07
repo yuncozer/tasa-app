@@ -111,10 +111,12 @@ ellas, el resto de la app funciona igual. Ver `.env.example`.
 | --- | --- | --- |
 | `BINANCE_REFERENCE_USD_AMOUNT` | `100` | Monto (en USD) de la operación de referencia usada para filtrar anuncios por `transAmount`, en VES y en COP |
 | `BINANCE_REFERENCE_PAY_TYPE` | `PagoMovil` | Identificador de Binance para el método de pago usado en el filtro `payTypes`, solo en VES |
-| `CRON_SECRET` | — | Autentica la llamada de Vercel Cron a `/api/cron/publish-instagram` |
+| `CRON_SECRET` | — | Autentica las llamadas de cron-job.org a `/api/cron/*` |
 | `SITE_URL` | — | Dominio público de producción; Instagram lo usa para buscar la imagen del post |
 | `IG_BUSINESS_ACCOUNT_ID` | — | ID de la cuenta de Instagram Business que publica |
 | `IG_ACCESS_TOKEN` | — | Token de acceso de larga duración con permiso `instagram_content_publish` |
+| `SUPABASE_URL` | — | Proyecto de Supabase donde vive la cola de publicaciones programadas |
+| `SUPABASE_SERVICE_ROLE_KEY` | — | Clave `service_role` del mismo proyecto. Salta el RLS: solo servidor, nunca `NEXT_PUBLIC_` |
 
 ## Caché y actualización
 
@@ -149,15 +151,28 @@ explicado en `/api/health`.
 
 ## Publicación automática en Instagram
 
-Cada día a las 9:00 am y a las 6:00 pm hora de Caracas, Vercel Cron dispara
+Cada día a las 9:00 am y a las 6:00 pm hora de Caracas se dispara
 `GET /api/cron/publish-instagram` (protegido con `CRON_SECRET`), que arma los posts
 con las tasas del momento y los publica en `@latasa.online` vía la Graph API de Meta.
-Los dos horarios son dos entradas separadas en `vercel.json`, cada una con
-`?momento=manana` o `?momento=tarde` en la ruta — ese query param es lo único que
-decide el título del caption ("Tasas de hoy por la mañana/tarde"); no se puede sacar
-de una variable de entorno porque Vercel lee `vercel.json` en tiempo de deploy, no de
-ejecución. Para cambiar los horarios hay que editar `vercel.json` directamente
-(recordar que sus `schedule` van siempre en UTC) y volver a desplegar.
+Los dos horarios son dos tareas separadas, cada una con `?momento=manana` o
+`?momento=tarde` en la ruta — ese query param es lo único que decide el título del
+caption ("Tasas de hoy por la mañana/tarde").
+
+Quien dispara es **cron-job.org**, no Vercel Cron. En el plan Hobby los crons se
+ejecutan "dentro de la hora" y no a la hora exacta, así que el post de las 9:00 podía
+salir a las 9:50; y además solo admiten un disparo diario, lo que no sirve para la
+cola de publicaciones programadas. Los tres disparos viven ahí, con el header
+`Authorization: Bearer <CRON_SECRET>`:
+
+| Tarea | Cuándo (UTC) |
+| --- | --- |
+| `/api/cron/publish-instagram?momento=manana` | `0 13 * * *` |
+| `/api/cron/publish-instagram?momento=tarde` | `0 22 * * *` |
+| `/api/cron/publicar-programadas` | cada 10 min |
+
+Al configurarlas, **desactivar los reintentos automáticos**: el post diario no es
+idempotente, y si una ejecución se pasa del tope de tiempo pero Meta ya publicó, un
+reintento duplicaría el post.
 
 Cada disparo publica **un carrusel de dos diapositivas**: las tasas en bolívares y
 las mismas tasas en pesos colombianos. Son un solo post y no dos porque cuatro
