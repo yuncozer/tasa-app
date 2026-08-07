@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { Logo } from "@/components/Logo";
-import { PublicarNoticiaForm } from "@/components/PublicarNoticiaForm";
+import { PublicarPanel } from "@/components/PublicarPanel";
 import { COOKIE_SESION, esSesionValida } from "@/lib/admin-session";
 
 export const metadata: Metadata = {
@@ -34,7 +34,7 @@ export default async function AdminNoticiaPage() {
         </form>
       </header>
 
-      <PublicarNoticiaForm />
+      <PublicarPanel />
     </main>
   );
 }
