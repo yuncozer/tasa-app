@@ -242,7 +242,38 @@ el teléfono, ver más abajo) — nunca por cron.
   la primera clase de la lista por usar el theme Bricks Builder) — así que vive
   en `CONTENEDOR_POR_HOST`, una entrada por portal que se agrega a mano cuando
   se suma uno nuevo. Si el portal no está en el mapa, se degrada a la
-  descripción corta del `<meta name="description">` en vez de romper.
+  descripción corta del `<meta>` en vez de romper. Ahí se prueba
+  `og:description` **antes** que `description`: la genérica es donde se cuelan
+  los restos del theme, y en identidadcorrentina.com.ar hay dos —la primera es
+  literalmente "Newspaper & Magazine HTML Template"— y `metaContent` devuelve
+  la primera que encuentra.
+- Que los meta tags sean estándar no significa que vengan limpios. Tres cosas
+  que hay que deshacer antes de publicar nada, todas verificadas en vivo:
+  - **El nombre del portal se cuela en el `og:title`**, y no siempre detrás:
+    identidadcorrentina.com.ar lo pone delante (`Identidad Correntina »
+    Colombia y Venezuela…`) y bitlyanews encadena dos (`… - AlbertoNews -
+    Periodismo sin censura`). `quitarNombreDelSitio()` recorta por prefijo y
+    por sufijo, en bucle, pero **solo si el fragmento coincide** con el
+    `og:site_name` (o alguno de sus trozos) o con el hostname, comparando sin
+    acentos ni puntuación. Esa condición es lo que hace seguro el recorte: sin
+    ella, cortar por el primer separador se comería titulares legítimos como
+    "Alerta: sube el dólar" o "VIDEO: tiroteo en Tailandia".
+  - **Las entidades HTML se decodifican completas**, no con un mapa corto.
+    Hubo uno de seis entradas y se publicó un titular con `&raquo;` a la vista
+    y otro con `&ntilde;` partiendo una palabra. Ahora entra todo el bloque
+    Latin-1 —generado desde una lista de nombres en orden de código, porque el
+    estándar los define consecutivos— más las numéricas. Se decodifica en
+    **una sola pasada**: encadenar dos convertiría `&amp;lt;` en `<`, que no
+    es lo que el portal escribió.
+  - **Hay portales que sirven UTF-8 declarándolo Latin-1** y llega
+    `corresponsalÃ­a`. `repararMojibake()` lo deshace, con dos guardas para no
+    estropear texto sano: se abstiene si el texto tiene algún carácter fuera
+    de Latin-1 (señal de que ya está bien decodificado) y descarta el
+    resultado si aparece `�`.
+
+  Y el orden importa: se decodifica **antes** de recortar el nombre del sitio.
+  Mientras el separador siga siendo `&raquo;` en vez de `»`, no hay dónde
+  cortar.
 - El crédito de fuente (`sourceHost`) sale siempre del hostname de la URL que
   se pidió publicar, **nunca** de `og:site_name`: se encontró un caso real
   (bitlyanews.com) donde el propio HTML se identifica como otro dominio —

@@ -39,37 +39,171 @@ async function fetchHtml(url: string): Promise<string> {
  */
 function metaContent(html: string, key: string): string | null {
   const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  // El valor se cierra con la misma comilla con la que abrió: un titular con
+  // apóstrofo recto (`content="El 'acuerdo' de…"`) se cortaba a la mitad
+  // cuando el cierre era `["']` a secas.
   const match = new RegExp(
-    `<meta[^>]*(?:property|name)=["']${escaped}["'][^>]*content=["']([^"']*)["']`,
+    `<meta[^>]*(?:property|name)=["']${escaped}["'][^>]*content=(["'])([\\s\\S]*?)\\1`,
     "i",
   ).exec(html);
-  return match ? match[1] : null;
+  return match ? match[2] : null;
 }
 
+/**
+ * Nombres de las entidades del bloque Latin-1, en orden de punto de código
+ * (160 = `&nbsp;` … 255 = `&yuml;`). Van como lista y se mapean por posición
+ * en vez de escribirse como 96 pares a mano: el estándar las define
+ * consecutivas, así que la lista *es* la tabla.
+ */
+const LATIN1 =
+  "nbsp iexcl cent pound curren yen brvbar sect uml copy ordf laquo not shy reg macr " +
+  "deg plusmn sup2 sup3 acute micro para middot cedil sup1 ordm raquo frac14 frac12 frac34 iquest " +
+  "Agrave Aacute Acirc Atilde Auml Aring AElig Ccedil Egrave Eacute Ecirc Euml Igrave Iacute Icirc Iuml " +
+  "ETH Ntilde Ograve Oacute Ocirc Otilde Ouml times Oslash Ugrave Uacute Ucirc Uuml Yacute THORN szlig " +
+  "agrave aacute acirc atilde auml aring aelig ccedil egrave eacute ecirc euml igrave iacute icirc iuml " +
+  "eth ntilde ograve oacute ocirc otilde ouml divide oslash ugrave uacute ucirc uuml yacute thorn yuml";
+
+/**
+ * Entidades nombradas que se reconocen. Antes eran seis escritas a mano y
+ * cualquier otra llegaba cruda al post: así se publicó un titular con
+ * `&raquo;` a la vista, y otro con `&ntilde;` en mitad de una palabra. El
+ * bloque Latin-1 cubre todas las letras acentuadas del español; encima van
+ * las básicas y el puñado de signos tipográficos que sí usan los portales.
+ */
 const ENTIDADES: Record<string, string> = {
-  "&nbsp;": " ",
-  "&hellip;": "…",
-  "&amp;": "&",
-  "&quot;": '"',
-  "&#039;": "'",
-  "&apos;": "'",
+  ...Object.fromEntries(LATIN1.split(" ").map((nombre, i) => [nombre, String.fromCodePoint(160 + i)])),
+  amp: "&",
+  lt: "<",
+  gt: ">",
+  quot: '"',
+  apos: "'",
+  hellip: "…",
+  mdash: "—",
+  ndash: "–",
+  lsquo: "‘",
+  rsquo: "’",
+  ldquo: "“",
+  rdquo: "”",
+  bull: "•",
+  euro: "€",
+  trade: "™",
+  // El espacio duro se normaliza a uno normal, como hacía el mapa anterior:
+  // en un titular no aporta nada y complica los recortes posteriores.
+  nbsp: " ",
 };
 
+const ENTIDAD = /&(?:#(\d+)|#[xX]([0-9a-fA-F]+)|([a-zA-Z][a-zA-Z0-9]*));/g;
+
+/** Descarta puntos de código que no representan un carácter utilizable. */
+function puntoDeCodigo(codigo: number): string | null {
+  if (!Number.isFinite(codigo) || codigo <= 0 || codigo > 0x10ffff) return null;
+  if (codigo >= 0xd800 && codigo <= 0xdfff) return null; // Surrogates sueltos.
+  return String.fromCodePoint(codigo);
+}
+
+/**
+ * Decodifica entidades nombradas y numéricas (decimales y hexadecimales) en
+ * **una sola pasada**: encadenar dos convertiría `&amp;lt;` en `<`, que no es
+ * lo que el portal escribió. Lo que no se reconoce se deja tal cual.
+ */
 function decodeEntities(text: string): string {
-  return text.replace(/&nbsp;|&hellip;|&amp;|&quot;|&#039;|&apos;/g, (m) => ENTIDADES[m] ?? m);
+  return text.replace(ENTIDAD, (crudo, dec, hex, nombre) => {
+    if (dec !== undefined) return puntoDeCodigo(Number.parseInt(dec, 10)) ?? crudo;
+    if (hex !== undefined) return puntoDeCodigo(Number.parseInt(hex, 16)) ?? crudo;
+    return ENTIDADES[nombre] ?? crudo;
+  });
 }
 
-/** Recorta el sufijo `" - ${siteName}"` que algunos portales pegan al og:title. */
-function stripSiteNameSuffix(title: string, siteName: string | null): string {
-  if (!siteName) return title;
-  const suffix = ` - ${siteName}`;
-  return title.endsWith(suffix) ? title.slice(0, -suffix.length) : title;
+/**
+ * Deshace el doble encodado de los portales que sirven UTF-8 declarándolo
+ * Latin-1: llega `corresponsalÃ­a` en vez de `corresponsalía` (visto en el
+ * `og:description` de identidadcorrentina.com.ar, cuyo cuerpo sí viene bien).
+ * La firma es una `Ã`/`Â` seguida de un byte de continuación.
+ *
+ * Dos guardas evitan estropear texto sano: si aparece algún carácter fuera de
+ * Latin-1 el texto ya está bien decodificado —reinterpretarlo lo truncaría a
+ * su byte bajo—, y si la reinterpretación produce `�` es que no era
+ * mojibake y se devuelve el original.
+ */
+function repararMojibake(texto: string): string {
+  if (!/[\u00c3\u00c2][\u0080-\u00bf]/.test(texto)) return texto;
+  if (/[^\u0000-\u00ff]/.test(texto)) return texto;
+  const reparado = Buffer.from(texto, "latin1").toString("utf8");
+  return reparado.includes("\ufffd") ? texto : reparado;
 }
 
-/** Decodifica entidades, quita el marcador de truncado que deja WordPress en
- * los excerpts automáticos y colapsa espacios repetidos. */
+/**
+ * Separadores con los que los portales pegan su nombre al titular. `-` y `:`
+ * exigen espacio para no partir `Colombia-Venezuela` ni una hora.
+ */
+const SEPARADOR = /\s*[»«|–—·]\s*|\s*:\s+|\s+-\s+/g;
+
+/** Minúsculas, sin acentos ni puntuación: así `Identidad Correntina` casa con `identidadcorrentina.com.ar`. */
+function normalizarNombre(texto: string): string {
+  return texto
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
+}
+
+/**
+ * Quita el nombre del portal del titular, vaya de prefijo o de sufijo. Antes
+ * solo se contemplaba el sufijo `" - ${siteName}"`, y un portal que lo pone
+ * delante (`Identidad Correntina » Colombia y Venezuela…`) publicaba el
+ * titular con su marca encima del nuestro.
+ *
+ * El recorte solo ocurre si el fragmento **coincide** con el nombre del sitio
+ * o con su hostname, comparando normalizado — el `og:site_name` de ese portal
+ * es `Identidad Correntina » www.identidadcorrentina.com.ar`, así que también
+ * se prueban sus trozos por separado. Sin esa condición, cortar por el primer
+ * separador se comería titulares legítimos (`Alerta: sube el dólar`).
+ */
+function quitarNombreDelSitio(title: string, siteName: string | null, sourceHost: string): string {
+  const nombres = new Set(
+    [siteName ?? "", ...(siteName ?? "").split(SEPARADOR), sourceHost, sourceHost.replace(/\.[a-z.]+$/i, "")]
+      .map(normalizarNombre)
+      .filter(Boolean),
+  );
+
+  // En bucle porque los portales encadenan varios: bitlyanews publica
+  // "…enfermedad - AlbertoNews - Periodismo sin censura", y quitar solo el
+  // último trozo dejaría "…enfermedad - AlbertoNews" a medio limpiar.
+  let actual = title;
+  for (;;) {
+    const recortado = recortarNombre(actual, nombres);
+    if (recortado === actual) return actual;
+    actual = recortado;
+  }
+}
+
+/** Una pasada de `quitarNombreDelSitio`: prueba el primer prefijo y el último sufijo. */
+function recortarNombre(title: string, nombres: Set<string>): string {
+  const cortes = [...title.matchAll(SEPARADOR)];
+  if (cortes.length === 0) return title;
+
+  const primero = cortes[0];
+  const prefijo = title.slice(0, primero.index);
+  if (nombres.has(normalizarNombre(prefijo))) {
+    const resto = title.slice(primero.index + primero[0].length).trim();
+    if (resto) return resto;
+  }
+
+  const ultimo = cortes[cortes.length - 1];
+  const sufijo = title.slice(ultimo.index + ultimo[0].length);
+  if (nombres.has(normalizarNombre(sufijo))) {
+    const resto = title.slice(0, ultimo.index).trim();
+    if (resto) return resto;
+  }
+
+  return title;
+}
+
+/** Decodifica entidades, repara el mojibake de origen, quita el marcador de
+ * truncado que deja WordPress en los excerpts automáticos y colapsa espacios
+ * repetidos. */
 function limpiarTexto(raw: string): string {
-  return decodeEntities(raw)
+  return repararMojibake(decodeEntities(raw))
     .replace(/\s*\[…\]\s*$/, "")
     .replace(/\s+/g, " ")
     .trim();
@@ -128,6 +262,7 @@ const CONTENEDOR_POR_HOST: Record<string, string> = {
   "lapatilla.com": "entry-content",
   "bitlyanews.com": "content-inner",
   "lanacionweb.com": "textnota",
+  "identidadcorrentina.com.ar": "blog-single-content",
 };
 
 /**
@@ -186,16 +321,26 @@ export async function fetchArticle(url: string): Promise<ArticleData> {
   const sourceHost = new URL(url).hostname.replace(/^www\./, "");
 
   const cuerpo = extraerCuerpo(html, sourceHost);
+  // `og:description` va primero: es el texto que el portal escribe para
+  // compartir. El `<meta name="description">` genérico es donde se cuelan los
+  // restos del theme —identidadcorrentina.com.ar trae dos, y la primera es
+  // "Newspaper & Magazine HTML Template"—, así que solo sirve de respaldo.
   const description = cuerpo
     ? cortarTexto(cuerpo, sourceHost, LARGO_CUERPO)
     : cortarTexto(
-        limpiarTexto(metaContent(html, "description") || metaContent(html, "og:description") || ""),
+        limpiarTexto(metaContent(html, "og:description") || metaContent(html, "description") || ""),
         sourceHost,
         LARGO_DESCRIPCION,
       );
 
   return {
-    title: decodeEntities(stripSiteNameSuffix(ogTitle, siteName)),
+    // Se limpia antes de recortar el nombre del sitio: mientras el separador
+    // siga siendo `&raquo;` en vez de `»`, no hay dónde cortar.
+    title: quitarNombreDelSitio(
+      limpiarTexto(ogTitle),
+      siteName ? limpiarTexto(siteName) : null,
+      sourceHost,
+    ),
     imageUrl,
     description,
     sourceHost,
