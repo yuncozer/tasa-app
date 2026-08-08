@@ -1,23 +1,28 @@
 import type { NextRequest } from "next/server";
 import { apiError, apiJson } from "@/lib/api";
-import { cerrarProgramada, reclamarVencida } from "@/lib/programadas";
-import { ejecutarPublicacion, leerPublicacionPayload } from "@/lib/publish-news";
+import { reclamarEnProceso, reclamarVencida } from "@/lib/programadas";
+import { avanzarPublicacion } from "@/lib/worker-programadas";
 
 /**
- * Saca de la cola las publicaciones que ya vencieron y las manda a Instagram.
+ * Saca de la cola las publicaciones que ya vencieron y las lleva un trozo más
+ * cerca de Instagram.
  *
- * Lo dispara cron-job.org cada diez minutos, no Vercel Cron: en el plan Hobby
- * cada cron solo puede ejecutarse **una vez al día**, así que no sirve para
- * mirar una cola (ver la sección de publicaciones programadas en `CLAUDE.md`).
- * De ahí que el margen sea de diez minutos y no al minuto exacto.
+ * Lo dispara cron-job.org, no Vercel Cron: en el plan Hobby cada cron solo
+ * puede ejecutarse **una vez al día**, así que no sirve para mirar una cola
+ * (ver la sección de publicaciones programadas en `CLAUDE.md`).
  *
- * Publica **una sola** por ejecución: cada publicación son varios viajes a
- * Meta y no caben más dentro del tope de tiempo. Con un disparo cada diez
- * minutos, una cola de varios posts se vacía sola.
+ * Cada disparo avanza **una sola** publicación y solo mientras le quede
+ * presupuesto de tiempo (`avanzarPublicacion`), porque un carrusel con video
+ * necesita esperas de Meta que no caben ni en el minuto de la función ni en
+ * los 30 segundos que cron-job.org espera por una respuesta. Lo que falte lo
+ * hace el disparo siguiente: la fila recuerda por dónde iba.
+ *
+ * Por lo mismo se atiende primero lo que quedó a medias y solo después se saca
+ * algo nuevo de la cola: terminar lo empezado antes de empezar otra cosa.
  */
 export const runtime = "nodejs";
 
-/** Mismo motivo que el cron diario: son varios viajes a Meta más reintentos. */
+/** Aun con presupuesto, un viaje lento a Meta puede estirar la ejecución. */
 export const maxDuration = 60;
 
 export async function GET(request: NextRequest) {
@@ -28,7 +33,7 @@ export async function GET(request: NextRequest) {
 
   let programada;
   try {
-    programada = await reclamarVencida();
+    programada = (await reclamarEnProceso()) ?? (await reclamarVencida());
   } catch (error) {
     return apiError("No se pudo leer la cola de publicaciones", error);
   }
@@ -37,21 +42,6 @@ export async function GET(request: NextRequest) {
     return apiJson({ ok: true, publicada: null }, { cachear: false });
   }
 
-  // Se valida aunque venga de nuestra propia tabla: pudo guardarse con una
-  // versión anterior del código.
-  const payload = leerPublicacionPayload(programada.payload);
-  if (!payload) {
-    await cerrarProgramada(programada.id, { error: "El contenido guardado ya no es válido" });
-    return apiError("El contenido guardado ya no es válido", undefined, 422);
-  }
-
-  try {
-    const { mediaId } = await ejecutarPublicacion(payload);
-    await cerrarProgramada(programada.id, { mediaId });
-    return apiJson({ ok: true, publicada: programada.id, mediaId }, { cachear: false });
-  } catch (error) {
-    const detalle = error instanceof Error ? error.message : String(error);
-    await cerrarProgramada(programada.id, { error: detalle });
-    return apiError("No se pudo publicar la programada", error);
-  }
+  const resultado = await avanzarPublicacion(programada);
+  return apiJson({ ok: true, id: programada.id, ...resultado }, { cachear: false });
 }

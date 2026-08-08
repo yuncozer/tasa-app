@@ -255,17 +255,50 @@ export type PublicacionPayload =
   | { tipo: "carrusel"; datos: CarruselEntrada; caption: string }
   | { tipo: "reel"; videoPublicId: string; caption: string; fuente?: string };
 
-/** Única puerta de publicación: la usan las rutas inmediatas y el worker de la cola. */
-export async function ejecutarPublicacion(payload: PublicacionPayload): Promise<{ mediaId: string }> {
+/**
+ * Lo que se le va a entregar a Meta, ya resuelto: URLs definitivas y caption.
+ * Es todo el trabajo previo a hablar con Instagram —scrapear, firmar la
+ * imagen, componer la marca del video— y va aparte porque la cola de
+ * programadas necesita hacerlo en un disparo y publicar en otro.
+ */
+export type PublicacionPreparada =
+  | { tipo: "imagen"; imageUrl: string; caption: string }
+  | { tipo: "reel"; videoUrl: string; caption: string }
+  | { tipo: "carrusel"; elementos: ElementoCarrusel[]; caption: string };
+
+/** Resuelve el payload a URLs, sin tocar la API de Instagram. */
+export async function prepararPublicacion(payload: PublicacionPayload): Promise<PublicacionPreparada> {
   switch (payload.tipo) {
-    case "articulo":
-      return publishNewsPost(payload.url, payload.caption, payload.imagenPublicId);
+    case "articulo": {
+      const { imageUrl, caption } = await buildNewsPost(payload.url, payload.imagenPublicId);
+      return { tipo: "imagen", imageUrl, caption: payload.caption ?? caption };
+    }
     case "manual":
-      return publishManualNewsPost(payload.datos);
+      return { tipo: "imagen", ...previewManualNewsPost(payload.datos), caption: payload.datos.caption };
     case "carrusel":
-      return publishNewsCarouselPost(payload.datos, payload.caption);
+      return { tipo: "carrusel", elementos: await buildCarousel(payload.datos), caption: payload.caption };
+    case "reel": {
+      const { videoUrl } = await previewNewsVideoPost(payload.videoPublicId, payload.fuente);
+      return { tipo: "reel", videoUrl, caption: payload.caption };
+    }
+  }
+}
+
+/**
+ * Única puerta de publicación de un tirón: la usan las rutas inmediatas, que
+ * publican con el navegador esperando. La cola de programadas comparte
+ * `prepararPublicacion()` pero reparte el resto entre varios disparos del
+ * cron, porque un carrusel con video no cabe en el tope de una función.
+ */
+export async function ejecutarPublicacion(payload: PublicacionPayload): Promise<{ mediaId: string }> {
+  const preparada = await prepararPublicacion(payload);
+  switch (preparada.tipo) {
+    case "imagen":
+      return publishDailyPost(preparada.imageUrl, preparada.caption);
     case "reel":
-      return publishNewsVideoPost(payload.videoPublicId, payload.caption, payload.fuente);
+      return publishReel(preparada.videoUrl, preparada.caption);
+    case "carrusel":
+      return publishCarousel(preparada.elementos, preparada.caption);
   }
 }
 
@@ -340,6 +373,8 @@ export function leerPublicacionPayload(valor: unknown): PublicacionPayload | nul
 export async function materializarParaProgramar(
   payload: PublicacionPayload,
 ): Promise<PublicacionPayload> {
+  await calentarVideo(payload);
+
   if (payload.tipo === "articulo") {
     const article = await fetchArticle(payload.url);
     return {
@@ -366,4 +401,34 @@ export async function materializarParaProgramar(
 
   // `manual` y `reel` ya viven enteros en Cloudinary.
   return payload;
+}
+
+/**
+ * Pide una vez el video con marca para que Cloudinary genere el derivado
+ * **al programar** y no cuando Meta lo pida.
+ *
+ * La marca es una transformación por URL: la primera petición transcodifica el
+ * clip entero y puede tardar bastante. Si esa espera cae dentro de la
+ * publicación, se le suma al procesamiento de Meta y es tiempo que la cola no
+ * tiene. Aquí, en cambio, la paga el momento de programar, donde no hay prisa.
+ *
+ * Se descarta el resultado y se ignora el fallo a propósito: es una
+ * optimización, no un requisito, y no debe impedir que se programe el post.
+ */
+async function calentarVideo(payload: PublicacionPayload): Promise<void> {
+  const videos =
+    payload.tipo === "reel"
+      ? [urlVideoConMarca(payload.videoPublicId, "reel", payload.fuente)]
+      : payload.tipo === "carrusel"
+        ? payload.datos.elementos
+            .filter((e) => e.tipo === "video")
+            .map((e) => urlVideoConMarca(e.publicId, "carrusel", e.fuente))
+        : [];
+
+  await Promise.allSettled(
+    videos.map(async (promesa) => {
+      const url = await promesa;
+      await fetch(url, { method: "GET", cache: "no-store", signal: AbortSignal.timeout(45_000) });
+    }),
+  );
 }

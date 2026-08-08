@@ -227,7 +227,9 @@ vive aquí.
 - **Los tres disparos están en cron-job.org**, no en `vercel.json`, que quedó sin
   `crons`. El motivo no es el número de slots del plan Hobby sino la frecuencia:
   ahí **cada cron solo se ejecuta una vez al día**, lo que no sirve para mirar
-  una cola cada diez minutos. Y de paso se arregló algo que pasaba
+  una cola cada pocos minutos. El de la cola va **cada 2 minutos**, no cada
+  diez: con la publicación repartida en fases (ver más abajo), un intervalo
+  largo multiplicaría la espera por el número de fases. Y de paso se arregló algo que pasaba
   desapercibido: los crons de Hobby disparan "dentro de la hora", así que el
   post de tasas de las 9:00 podía salir a las 9:50. Si los devuelves a
   `vercel.json`, las programadas dejan de salir.
@@ -247,10 +249,45 @@ vive aquí.
   filtro se traduce en un `WHERE` sobre el `UPDATE`: si dos disparos se
   solapan, solo uno se lleva la fila. Sin esa condición el modo de fallo es un
   post duplicado en la cuenta real, que no se deshace. Por lo mismo,
-  cron-job.org va **sin reintentos automáticos** y no hay rescate automático de
-  las que se quedan en `publicando`: si una ejecución muere después de que Meta
-  aceptara el post, reintentarla lo duplicaría. Se quedan visibles en la cola
-  para decidirlas a mano.
+  cron-job.org va **sin reintentos automáticos**: el reintento vive en la
+  propia cola, que sí sabe por dónde iba.
+- **La publicación va por fases, y no de un tirón.** Un carrusel con video no
+  cabe en una sola petición: Meta procesa cada contenedor de forma asíncrona y
+  hay que sondearlo, lo que puede llevar minutos, mientras que una función de
+  Vercel muere al minuto y cron-job.org da por fallida cualquier respuesta que
+  pase de 30 segundos. Verificado en producción: una programada de las 9:30 con
+  imagen + video murió a mitad, y como el `catch` del route nunca llegó a
+  correr, `cerrarProgramada()` tampoco: la fila se quedó en `publicando` sin
+  publicarse y sin poder reintentarse.
+
+  Ahora `avanzarPublicacion()` (`lib/worker-programadas.ts`) hace un trozo
+  acotado —20 s de presupuesto— y **anota la fase en la fila**
+  (`creando → esperando_hijos → esperando_padre → publicando_meta`), de modo
+  que el disparo siguiente retoma donde se quedó. Al terminar el turno suelta
+  la fila (`liberarProgramada`) para que la retomen enseguida; el margen de
+  abandono de 90 s es solo para las ejecuciones que mueren sin soltarla.
+
+  No subas el presupuesto pensando que así termina antes: lo que lo limita no
+  es nuestro código sino los 30 s que espera cron-job.org por una respuesta.
+- **`publicando_meta` es la única fase que no se retoma sola.** Es el
+  `media_publish`, el único paso irreversible: crear contenedores o sondear
+  estados se puede repetir sin consecuencias —un contenedor de más caduca
+  solo—, pero reintentar la publicación podría duplicar el post. Las que mueran
+  ahí se quedan visibles en la cola para decidirlas a mano, que es el lado
+  seguro del error.
+- **El botón "Publicar ahora" y el cron son el mismo worker**, por el mismo
+  motivo que `ejecutarPublicacion()`. El botón tampoco publica de una sola
+  llamada: pide un paso, muestra la fase en lenguaje llano y vuelve a pedir
+  otro. Si se cierra el navegador a mitad, el cron la termina igual.
+- **Una `fallida` se puede reintentar o eliminar desde la cola**; una
+  `publicando` no. Esa puede haber llegado a Meta, y borrar la fila perdería el
+  único rastro de qué salió y qué no.
+- **El video se calienta al programar** (`calentarVideo`, en
+  `lib/publish-news.ts`). La marca del video es una transformación por URL: la
+  primera petición transcodifica el clip entero. Si esa espera cae dentro de la
+  publicación se le suma al procesamiento de Meta, así que se paga por
+  adelantado, al programar, donde no hay prisa. Si falla, se ignora: es una
+  optimización, no un requisito.
 - La tabla lleva **RLS activada y ninguna política**, así que solo la
   `service_role` la ve. El navegador nunca habla con Supabase: todo pasa por
   las rutas `/api/admin/*`, que ya exigen la cookie de sesión.
