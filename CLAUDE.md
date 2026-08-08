@@ -447,6 +447,31 @@ Vive en `lib/providers/cloudinary.ts`, con tres detalles que costó encontrar:
 - Se encaja con `pad` y no con `fill`: recortar perdería los bordes del
   encuadre que grabó el usuario.
 
+La marca de identidad son los **sellos** superpuestos, que van en todo video.
+La franja de texto de abajo es otra cosa: es el **crédito de la fuente**, y por
+eso es opcional — el material propio no tiene a quién acreditar y una franja
+vacía solo le quita sitio al video. Cuando no se pide, `transformacionMarca()`
+no añade ni el `overlay` de texto ni su `layer_apply`.
+
+- El prefijo `Fuente: ` lo pone el código (`PREFIJO_FUENTE`), no el usuario:
+  así todos los posts lo dicen igual y no se cuela uno acreditado a medias.
+- La fuente del video es un campo **aparte del `sourceHost`** que llena el
+  marco de las imágenes, y en un carrusel va por elemento: un clip prestado no
+  tiene por qué venir del mismo portal que la noticia que acompaña.
+- El texto pasa por `limpiarFuente()` antes de entrar en la URL. No es
+  cosmética: viaja dentro del **path** de Cloudinary, donde `,` separa
+  parámetros y `/` separa componentes, así que sin sustituirlos un nombre con
+  coma partiría la transformación en vez de dibujarse. Se sustituyen y no se
+  rechazan para no bloquear la publicación por un detalle de puntuación.
+- Devuelve `undefined` cuando no queda nada, de modo que "casilla activada pero
+  campo en blanco" se comporte igual que "desactivada". Sin eso saldría una
+  franja que solo dice `Fuente:`.
+- En la interfaz, editar la fuente **no** regenera el video en pantalla: la
+  marca la compone Cloudinary al pedir la URL. Se marca la previa como
+  desactualizada y se bloquea publicar hasta pulsar "Actualizar vista previa",
+  el mismo trato que ya recibían el título y la fuente del marco — y por el
+  mismo motivo, que publicar a ciegas es justo lo que hay que evitar.
+
 Las credenciales (`CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`,
 `CLOUDINARY_API_SECRET`) nunca llegan al navegador: la subida pasa por
 `app/api/admin/subir-media`, protegido por la cookie de sesión de `/admin`.
@@ -515,11 +540,52 @@ Para probar `/admin/noticia` en sí hace falta además `ADMIN_PASSWORD` en
 `.env.local`, y las tres `CLOUDINARY_*` para todo lo que suba imágenes o
 video.
 
-Para **verificar el video con marca sin publicarlo**, la forma fiable es pedir
-un fotograma en vez de reproducirlo: la URL que devuelve `urlVideoConMarca()`
-acepta `.jpg` sobre la misma transformación y devuelve una imagen que se puede
-mirar directamente. Reproducir el `<video>` en el navegador para ver si el
-overlay quedó bien es mucho más lento y no deja nada que revisar después.
+### Probar las marcas sin publicar ni pasar por `/admin`
+
+`preview-noticia.ts` cubre solo una de las cuatro piezas que la app marca: la
+imagen principal de un artículo scrapeado. Para las otras tres —y para probar
+con material propio en vez de con un artículo— está
+`scripts/preview-marca.ts`, que sube el archivo y devuelve las URLs de todas
+las variantes que le correspondan:
+
+```bash
+npx tsx scripts/preview-marca.ts foto.jpg   # principal (con titular) y secundaria de carrusel
+npx tsx scripts/preview-marca.ts clip.mp4   # carrusel 1:1 y Reel 9:16, cada uno con su fotograma
+npx tsx scripts/preview-marca.ts --public-id <id> --tipo video   # reusa lo ya subido
+```
+
+| Pieza | Quién la compone | Dónde se edita |
+| --- | --- | --- |
+| Imagen principal de post | Satori, con titular y fecha | `app/api/og/instagram-post-news/route.tsx`, `lib/og-shared.ts` |
+| Imagen secundaria de carrusel | Satori, sin titular (`ALTO_FOTO.secundaria`) | los mismos |
+| Video en carrusel (1:1) | Cloudinary, transformación por URL | `lib/providers/cloudinary.ts` |
+| Video como Reel (9:16) | Cloudinary, misma cadena, otro lienzo | el mismo |
+
+Al iterar, las dos mitades se comportan distinto y conviene saberlo:
+
+- **Imagen**: la firma cubre los parámetros, no el HTML. Editas la plantilla,
+  recargas el navegador con `npm run dev` levantado y ya — no hace falta
+  volver a correr el script. Solo hay que regenerar la URL si cambia el
+  artículo o si se añade o quita el título, porque la firma cubre exactamente
+  el conjunto de claves presentes.
+- **Video**: la transformación viaja en la URL, así que hay que volver a
+  correr el script (con `--public-id`, que no vuelve a subir el original) tras
+  cada cambio. Como la URL nueva es otra, tampoco hay caché vieja que
+  invalidar.
+
+Del video se revisa el **fotograma**, no el clip: `urlFotogramaConMarca()` pide
+un JPG sobre la misma transformación que `urlVideoConMarca()` —comparten
+`transformacionMarca()` justamente para que lo revisado sea lo publicado—, y
+mirarlo es inmediato y deja algo que comparar después. Reproducir el `<video>`
+para ver si el overlay quedó bien es mucho más lento.
+
+El script necesita las tres `CLOUDINARY_*` y `CRON_SECRET` en `.env.local`, y
+correrse desde la raíz del repo (`asegurarLogo()` lee `public/icon-512.png`
+relativo al directorio de trabajo). `npm run dev` hace falta solo para las URLs
+de imagen; las de video las sirve Cloudinary. Ten en cuenta que cada corrida
+sin `--public-id` gasta almacenamiento del plan gratuito (25 créditos al mes;
+1 crédito = 1 GB de almacenamiento o de ancho de banda de video), y que los
+archivos de prueba se borran a mano desde el panel de Cloudinary.
 
 ### El entorno de desarrollo
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { PublicacionPayload } from "@/lib/publish-news";
+import type { ElementoCarruselEntrada, PublicacionPayload } from "@/lib/publish-news";
 import { BarraProgreso } from "@/components/BarraProgreso";
 import { ProgramarPublicacion } from "@/components/ProgramarPublicacion";
 import { subirMediaConProgreso, type FaseSubida } from "@/lib/subida";
@@ -24,6 +24,13 @@ interface Extra {
   clave: string;
   tipo: "imagen" | "video";
   publicId: string;
+  /**
+   * Crédito que se pinta sobre el video, propio de este clip y distinto del
+   * `sourceHost` del post: el video puede venir de otro sitio que la noticia.
+   * `undefined` significa "sin franja"; una cadena vacía, "pedida pero aún sin
+   * escribir", que es lo que distingue la casilla activada de la apagada.
+   */
+  fuente?: string;
 }
 
 type Modo = "url" | "manual";
@@ -74,6 +81,18 @@ const MAX_ELEMENTOS = 10;
 async function leerError(response: Response): Promise<string> {
   const body = await response.json().catch(() => null);
   return body?.error ? `${body.error}${body.detail ? `: ${body.detail}` : ""}` : `Error ${response.status}`;
+}
+
+/**
+ * Los extras tal como los espera el servidor: sin la `clave`, que solo existe
+ * para React. Se arma en un sitio porque lo comparten la vista previa, publicar
+ * y programar — si alguno olvidara un campo, lo publicado dejaría de ser lo
+ * revisado.
+ */
+function aElementos(lista: Extra[]): ElementoCarruselEntrada[] {
+  return lista.map(({ tipo, publicId, fuente }) =>
+    tipo === "video" ? { tipo, publicId, fuente } : { tipo, publicId },
+  );
 }
 
 /**
@@ -189,7 +208,7 @@ export function PublicarNoticiaForm({ onProgramada }: { onProgramada: () => void
           title: previewActual.title,
           sourceHost: previewActual.sourceHost,
           principal: principalActual,
-          elementos: lista.map(({ tipo, publicId }) => ({ tipo, publicId })),
+          elementos: aElementos(lista),
         }),
       });
       if (!response.ok) {
@@ -223,6 +242,10 @@ export function PublicarNoticiaForm({ onProgramada }: { onProgramada: () => void
       setCaption(datos.caption);
       setDesactualizado(false);
       setEstado({ paso: "preview", preview: datos });
+      // Las diapositivas también dependen de lo que se acaba de editar —la
+      // fuente del video, el título y la fuente del marco—, así que este botón
+      // tiene que regenerarlas o quedarían mostrando la versión anterior.
+      await refrescarCarrusel(extras, principal, datos);
     } catch {
       setEstado({ paso: "error", mensaje: "No se pudo conectar con el servidor" });
     }
@@ -288,6 +311,18 @@ export function PublicarNoticiaForm({ onProgramada }: { onProgramada: () => void
     }
   }
 
+  /**
+   * Cambia el crédito de un video del carrusel. No regenera la vista previa en
+   * cada tecla —serían tantas transformaciones de Cloudinary como letras—: se
+   * marca desactualizada, igual que al editar el título o la fuente del marco,
+   * y el usuario pulsa el botón de vista previa cuando termina.
+   */
+  function cambiarFuenteExtra(clave: string, fuente: string | undefined) {
+    editarCampoDelMarco(() => {
+      setExtras(extras.map((extra) => (extra.clave === clave ? { ...extra, fuente } : extra)));
+    });
+  }
+
   function quitarExtra(clave: string) {
     aplicarExtras(extras.filter((extra) => extra.clave !== clave));
   }
@@ -323,7 +358,7 @@ export function PublicarNoticiaForm({ onProgramada }: { onProgramada: () => void
           title,
           sourceHost,
           principal,
-          elementos: extras.map(({ tipo, publicId }) => ({ tipo, publicId })),
+          elementos: aElementos(extras),
         },
         caption,
       };
@@ -353,7 +388,7 @@ export function PublicarNoticiaForm({ onProgramada }: { onProgramada: () => void
             sourceHost: datos.sourceHost,
             caption,
             principal,
-            elementos: extras.map(({ tipo, publicId }) => ({ tipo, publicId })),
+            elementos: aElementos(extras),
           }
         : modo === "url"
           ? { url, caption, imagenPublicId }
@@ -658,39 +693,72 @@ export function PublicarNoticiaForm({ onProgramada }: { onProgramada: () => void
                 {extras.map((extra, indice) => (
                   <li
                     key={extra.clave}
-                    className="flex items-center justify-between gap-3 rounded-xl border border-border-soft bg-surface-strong px-3 py-2"
+                    className="flex flex-col gap-2 rounded-xl border border-border-soft bg-surface-strong px-3 py-2"
                   >
-                    <span className="truncate text-sm text-foreground">
-                      <span className="tabular">{indice + 2}</span>. {extra.tipo === "video" ? "Video" : "Imagen"}
-                    </span>
-                    <div className="flex shrink-0 gap-1">
-                      <button
-                        type="button"
-                        onClick={() => moverExtra(indice, -1)}
-                        disabled={indice === 0}
-                        aria-label="Mover antes"
-                        className="rounded-full border border-border-soft px-3 py-1 text-xs font-medium text-muted transition active:scale-95 disabled:opacity-50"
-                      >
-                        ↑
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => moverExtra(indice, 1)}
-                        disabled={indice === extras.length - 1}
-                        aria-label="Mover después"
-                        className="rounded-full border border-border-soft px-3 py-1 text-xs font-medium text-muted transition active:scale-95 disabled:opacity-50"
-                      >
-                        ↓
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => quitarExtra(extra.clave)}
-                        aria-label="Quitar del carrusel"
-                        className="rounded-full border border-border-soft px-3 py-1 text-xs font-medium text-muted transition active:scale-95"
-                      >
-                        ✕
-                      </button>
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="truncate text-sm text-foreground">
+                        <span className="tabular">{indice + 2}</span>.{" "}
+                        {extra.tipo === "video" ? "Video" : "Imagen"}
+                      </span>
+                      <div className="flex shrink-0 gap-1">
+                        <button
+                          type="button"
+                          onClick={() => moverExtra(indice, -1)}
+                          disabled={indice === 0}
+                          aria-label="Mover antes"
+                          className="rounded-full border border-border-soft px-3 py-1 text-xs font-medium text-muted transition active:scale-95 disabled:opacity-50"
+                        >
+                          ↑
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => moverExtra(indice, 1)}
+                          disabled={indice === extras.length - 1}
+                          aria-label="Mover después"
+                          className="rounded-full border border-border-soft px-3 py-1 text-xs font-medium text-muted transition active:scale-95 disabled:opacity-50"
+                        >
+                          ↓
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => quitarExtra(extra.clave)}
+                          aria-label="Quitar del carrusel"
+                          className="rounded-full border border-border-soft px-3 py-1 text-xs font-medium text-muted transition active:scale-95"
+                        >
+                          ✕
+                        </button>
+                      </div>
                     </div>
+
+                    {extra.tipo === "video" && (
+                      <div className="flex flex-col gap-2">
+                        <button
+                          type="button"
+                          aria-pressed={extra.fuente !== undefined}
+                          onClick={() =>
+                            cambiarFuenteExtra(extra.clave, extra.fuente === undefined ? "" : undefined)
+                          }
+                          disabled={publicando}
+                          className={`rounded-xl border px-3 py-2 text-xs font-semibold transition active:scale-95 disabled:opacity-50 ${
+                            extra.fuente !== undefined
+                              ? "border-accent bg-accent/15 text-accent"
+                              : "border-border-soft bg-surface text-muted"
+                          }`}
+                        >
+                          Acreditar la fuente en el video
+                        </button>
+
+                        {extra.fuente !== undefined && (
+                          <input
+                            value={extra.fuente}
+                            onChange={(e) => cambiarFuenteExtra(extra.clave, e.target.value)}
+                            placeholder="lapatilla.com"
+                            aria-label="Fuente del video"
+                            className="rounded-xl border border-border-soft bg-surface px-4 py-3 text-base text-foreground outline-none"
+                          />
+                        )}
+                      </div>
+                    )}
                   </li>
                 ))}
               </ul>

@@ -17,8 +17,10 @@ export async function POST(request: NextRequest) {
     return apiError("Falta videoPublicId", undefined, 400);
   }
 
+  const fuente = typeof body?.fuente === "string" ? body.fuente : undefined;
+
   try {
-    const { videoUrl } = await previewNewsVideoPost(videoPublicId);
+    const { videoUrl } = await previewNewsVideoPost(videoPublicId, fuente);
     return apiJson({ videoUrl }, { cachear: false });
   } catch (error) {
     return apiError("No se pudo generar la vista previa del video", error);

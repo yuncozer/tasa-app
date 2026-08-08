@@ -28,10 +28,37 @@ async function leerError(response: Response): Promise<string> {
  */
 export function PublicarVideoForm({ onProgramada }: { onProgramada: () => void }) {
   const [caption, setCaption] = useState("");
+  const [conFuente, setConFuente] = useState(false);
+  const [fuente, setFuente] = useState("");
+  /**
+   * El crédito que de verdad está horneado en la URL que se está mirando. La
+   * marca la compone Cloudinary al pedir la URL, así que editar el campo no
+   * cambia el video en pantalla: hay que volver a pedirla. Guardarlo aparte es
+   * lo que permite avisar de que lo que se ve ya no es lo que se publicaría.
+   */
+  const [fuenteAplicada, setFuenteAplicada] = useState("");
+  const [refrescando, setRefrescando] = useState(false);
   const [estado, setEstado] = useState<Estado>({ paso: "inicial" });
 
   const subiendo = estado.paso === "subiendo";
   const publicando = estado.paso === "publicando";
+  /** Sin la casilla activada el video va sin franja, aunque quede texto escrito. */
+  const fuenteDeseada = conFuente ? fuente.trim() : "";
+
+  async function pedirPreview(videoPublicId: string): Promise<void> {
+    const preview = await fetch("/api/admin/preview-video", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ videoPublicId, fuente: fuenteDeseada }),
+    });
+    if (!preview.ok) {
+      setEstado({ paso: "error", mensaje: await leerError(preview) });
+      return;
+    }
+    const { videoUrl } = (await preview.json()) as { videoUrl: string };
+    setFuenteAplicada(fuenteDeseada);
+    setEstado({ paso: "preview", videoUrl, videoPublicId });
+  }
 
   async function subirVideo(archivo: File) {
     setEstado({ paso: "subiendo", fase: { tipo: "enviando", porcentaje: 0 } });
@@ -43,22 +70,23 @@ export function PublicarVideoForm({ onProgramada }: { onProgramada: () => void }
       // La marca se aplica al pedir esta vista previa (`urlVideoConMarca`), así
       // que sigue dentro de la fase de proceso: la barra no se retira hasta que
       // haya un video que mirar.
-      const preview = await fetch("/api/admin/preview-video", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ videoPublicId: publicId }),
-      });
-      if (!preview.ok) {
-        setEstado({ paso: "error", mensaje: await leerError(preview) });
-        return;
-      }
-      const { videoUrl } = (await preview.json()) as { videoUrl: string };
-      setEstado({ paso: "preview", videoUrl, videoPublicId: publicId });
+      await pedirPreview(publicId);
     } catch (error) {
       // La subida rechaza con el mensaje que devolvió el servidor (p. ej. el
       // tope de 100 MB), que dice bastante más que un fallo de conexión.
       const mensaje = error instanceof Error ? error.message : "No se pudo conectar con el servidor";
       setEstado({ paso: "error", mensaje });
+    }
+  }
+
+  async function actualizarPreview(videoPublicId: string) {
+    setRefrescando(true);
+    try {
+      await pedirPreview(videoPublicId);
+    } catch {
+      setEstado({ paso: "error", mensaje: "No se pudo generar la vista previa del video" });
+    } finally {
+      setRefrescando(false);
     }
   }
 
@@ -69,7 +97,7 @@ export function PublicarVideoForm({ onProgramada }: { onProgramada: () => void }
       const response = await fetch("/api/admin/publish-video", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ videoPublicId, caption }),
+        body: JSON.stringify({ videoPublicId, caption, fuente: fuenteAplicada }),
       });
       if (!response.ok) {
         setEstado({ paso: "error", mensaje: await leerError(response) });
@@ -83,12 +111,17 @@ export function PublicarVideoForm({ onProgramada }: { onProgramada: () => void }
   }
 
   const conVideo = "videoUrl" in estado ? estado : null;
+  /** Lo que se ve dejó de ser lo que se publicaría: hay que regenerar la URL. */
+  const desactualizado = conVideo !== null && fuenteDeseada !== fuenteAplicada;
 
   return (
     <div className="flex flex-col gap-5 rounded-2xl border border-border-soft bg-surface px-4 py-4">
       <div className="flex flex-col gap-1">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">Video propio</h2>
-        <p className="text-xs text-muted">Se le monta la franja de marca de La Tasa y se publica como Reel.</p>
+        <p className="text-xs text-muted">
+          Se le montan los sellos de La Tasa y se publica como Reel. El crédito de la fuente es
+          opcional.
+        </p>
       </div>
 
       {/* El `disabled` real vive en el `<input>` oculto, así que la opacidad de
@@ -137,6 +170,48 @@ export function PublicarVideoForm({ onProgramada }: { onProgramada: () => void }
         <div className="flex flex-col gap-4">
           <video src={conVideo.videoUrl} controls className="w-full rounded-2xl border border-border-soft" />
 
+          <div className="flex flex-col gap-2">
+            <button
+              type="button"
+              aria-pressed={conFuente}
+              onClick={() => setConFuente(!conFuente)}
+              disabled={publicando}
+              className={`rounded-xl border px-4 py-3 text-sm font-semibold transition active:scale-95 disabled:opacity-50 ${
+                conFuente
+                  ? "border-accent bg-accent/15 text-accent"
+                  : "border-border-soft bg-surface text-muted"
+              }`}
+            >
+              Acreditar la fuente en el video
+            </button>
+
+            {conFuente && (
+              <input
+                id="fuente-video"
+                value={fuente}
+                onChange={(e) => setFuente(e.target.value)}
+                placeholder="lapatilla.com"
+                className="rounded-xl border border-border-soft bg-surface-strong px-4 py-3 text-base text-foreground outline-none"
+              />
+            )}
+          </div>
+
+          {desactualizado && (
+            <div className="flex flex-col gap-2 rounded-2xl border border-warning/40 bg-warning/5 px-4 py-3">
+              <p className="text-sm text-warning">
+                Cambiaste la fuente: el video de arriba ya no es el que se publicaría.
+              </p>
+              <button
+                type="button"
+                onClick={() => void actualizarPreview(conVideo.videoPublicId)}
+                disabled={refrescando}
+                className="rounded-xl border border-accent bg-accent/15 px-4 py-3 text-sm font-semibold text-accent transition active:scale-95 disabled:opacity-50"
+              >
+                {refrescando ? "Actualizando…" : "Actualizar vista previa"}
+              </button>
+            </div>
+          )}
+
           <div className="flex flex-col gap-1">
             <label htmlFor="caption-video" className="text-sm font-semibold uppercase tracking-wide text-muted">
               Caption
@@ -175,7 +250,7 @@ export function PublicarVideoForm({ onProgramada }: { onProgramada: () => void }
             <button
               type="button"
               onClick={() => setEstado({ paso: "confirmar", videoUrl: conVideo.videoUrl, videoPublicId: conVideo.videoPublicId })}
-              disabled={!caption.trim() || publicando}
+              disabled={!caption.trim() || publicando || desactualizado || refrescando}
               className="rounded-xl border border-warning bg-warning/15 px-4 py-3 text-base font-semibold text-warning transition active:scale-95 disabled:opacity-50"
             >
               {publicando ? "Publicando…" : "Publicar Reel"}
@@ -185,10 +260,15 @@ export function PublicarVideoForm({ onProgramada }: { onProgramada: () => void }
           <ProgramarPublicacion
             payload={
               caption.trim()
-                ? ({ tipo: "reel", videoPublicId: conVideo.videoPublicId, caption } satisfies PublicacionPayload)
+                ? ({
+                    tipo: "reel",
+                    videoPublicId: conVideo.videoPublicId,
+                    caption,
+                    fuente: fuenteAplicada || undefined,
+                  } satisfies PublicacionPayload)
                 : null
             }
-            deshabilitado={publicando || subiendo}
+            deshabilitado={publicando || subiendo || desactualizado || refrescando}
             onProgramada={onProgramada}
           />
         </div>
