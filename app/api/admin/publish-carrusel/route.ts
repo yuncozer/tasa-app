@@ -2,7 +2,12 @@ import type { NextRequest } from "next/server";
 import { apiError, apiJson } from "@/lib/api";
 import { COOKIE_SESION, esSesionValida } from "@/lib/admin-session";
 import { MAX_ELEMENTOS_CARRUSEL } from "@/lib/instagram";
-import { ejecutarPublicacion, leerElementosCarrusel, leerPrincipalCarrusel } from "@/lib/publish-news";
+import {
+  ejecutarPublicacion,
+  leerElementosCarrusel,
+  leerPrincipalCarrusel,
+  leerProporcionCarrusel,
+} from "@/lib/publish-news";
 
 /** Publica el carrusel desde `/admin/noticia`. Protegida por la cookie de sesión. */
 export const runtime = "nodejs";
@@ -24,11 +29,14 @@ export async function POST(request: NextRequest) {
   const caption = typeof body?.caption === "string" ? body.caption.trim() : "";
   const elementos = leerElementosCarrusel(body?.elementos);
   const principal = leerPrincipalCarrusel(body?.principal);
+  const proporcion = leerProporcionCarrusel(body?.proporcion);
 
-  if (!title || !sourceHost || !caption || !principal || !elementos) {
-    return apiError("Faltan título, fuente, caption, imagen principal o elementos válidos", undefined, 400);
+  // El título solo hace falta cuando el principal es una imagen: un video
+  // principal no lo imprime en ningún sitio.
+  if (!sourceHost || !caption || !principal || !elementos || (principal.tipo !== "video" && !title)) {
+    return apiError("Faltan título, fuente, caption, elemento principal o elementos válidos", undefined, 400);
   }
-  // +1 por la imagen principal, que no viene en la lista de elementos.
+  // +1 por el elemento principal, que no viene en la lista de elementos.
   if (elementos.length + 1 > MAX_ELEMENTOS_CARRUSEL) {
     return apiError(`Un carrusel admite como máximo ${MAX_ELEMENTOS_CARRUSEL} elementos`, undefined, 400);
   }
@@ -36,7 +44,7 @@ export async function POST(request: NextRequest) {
   try {
     const { mediaId } = await ejecutarPublicacion({
       tipo: "carrusel",
-      datos: { title, sourceHost, principal, elementos },
+      datos: { title: title || undefined, sourceHost, principal, elementos, proporcion },
       caption,
     });
     return apiJson({ ok: true, mediaId }, { cachear: false });

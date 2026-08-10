@@ -182,16 +182,28 @@ export function limpiarFuente(valor: unknown): string | undefined {
  * exigencia de Instagram:
  *
  * - `reel`: 9:16, lo único que entra en la pestaña de Reels.
- * - `carrusel`: 1:1, porque en un carrusel **todos** los elementos deben
- *   compartir relación de aspecto (la del primero manda) y la imagen de marca
- *   es cuadrada. Si se mezclan, Meta rechaza el contenedor padre.
+ * - `carrusel`: 1:1, y `carrusel-4-5`: 4:5 — las dos proporciones que Meta
+ *   admite para el primer elemento de un carrusel. En un carrusel **todos**
+ *   los elementos deben compartir la relación de aspecto del primero: si se
+ *   mezclan, Meta rechaza el contenedor padre.
  */
-export type FormatoVideo = "reel" | "carrusel";
+export type FormatoVideo = "reel" | "carrusel" | "carrusel-4-5";
 
 const LIENZO: Record<FormatoVideo, { width: number; height: number }> = {
   reel: { width: 1080, height: 1920 },
   carrusel: { width: 1080, height: 1080 },
+  "carrusel-4-5": { width: 1080, height: 1350 },
 };
+
+/**
+ * El sello se pensó para el lienzo de un Reel (1920 px de alto), donde
+ * `y: 800` lo deja a media altura. Copiar ese número tal cual a un lienzo
+ * más bajo (carrusel 1:1 o 4:5) lo descuadra, así que se recalcula
+ * proporcional a la altura de cada lienzo en vez de repetir el literal.
+ */
+function yDelSello(altoLienzo: number): number {
+  return Math.round(altoLienzo * (800 / 1920));
+}
 
 /**
  * Encuadre + sellos de marca, y abajo la franja con el crédito de la fuente
@@ -224,7 +236,7 @@ function transformacionMarca(formato: FormatoVideo, fuente?: string) {
     // { overlay: SELLO_PUBLIC_ID, width: 800, crop: "scale", opacity: 20 },
     // { flags: "layer_apply", gravity: "north_west", x: 150, y: 200 },
     { overlay: SELLO_PUBLIC_ID, width: 800, crop: "scale", opacity: 10 },
-    { flags: "layer_apply", gravity: "north_west", x: 150, y: 800 },
+    { flags: "layer_apply", gravity: "north_west", x: 150, y: yDelSello(LIENZO[formato].height) },
     // { overlay: SELLO_PUBLIC_ID, width: 800, crop: "scale", opacity: 20 },
     // { flags: "layer_apply", gravity: "north_west", x: 150, y: 1400 },
     ...(credito

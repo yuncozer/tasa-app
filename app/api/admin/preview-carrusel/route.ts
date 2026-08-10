@@ -2,7 +2,12 @@ import type { NextRequest } from "next/server";
 import { apiError, apiJson } from "@/lib/api";
 import { COOKIE_SESION, esSesionValida } from "@/lib/admin-session";
 import { MAX_ELEMENTOS_CARRUSEL } from "@/lib/instagram";
-import { leerElementosCarrusel, leerPrincipalCarrusel, previewCarouselPost } from "@/lib/publish-news";
+import {
+  leerElementosCarrusel,
+  leerPrincipalCarrusel,
+  leerProporcionCarrusel,
+  previewCarouselPost,
+} from "@/lib/publish-news";
 
 /**
  * Vista previa del carrusel de `/admin/noticia`: las URLs reales de cada
@@ -21,17 +26,25 @@ export async function POST(request: NextRequest) {
   const sourceHost = typeof body?.sourceHost === "string" ? body.sourceHost.trim() : "";
   const elementos = leerElementosCarrusel(body?.elementos);
   const principal = leerPrincipalCarrusel(body?.principal);
+  const proporcion = leerProporcionCarrusel(body?.proporcion);
 
-  if (!title || !sourceHost || !principal || !elementos) {
-    return apiError("Faltan título, fuente, imagen principal o elementos válidos", undefined, 400);
+  // El título solo hace falta cuando el principal es una imagen.
+  if (!sourceHost || !principal || !elementos || (principal.tipo !== "video" && !title)) {
+    return apiError("Faltan título, fuente, elemento principal o elementos válidos", undefined, 400);
   }
-  // +1 por la imagen principal, que no viene en la lista de elementos.
+  // +1 por el elemento principal, que no viene en la lista de elementos.
   if (elementos.length + 1 > MAX_ELEMENTOS_CARRUSEL) {
     return apiError(`Un carrusel admite como máximo ${MAX_ELEMENTOS_CARRUSEL} elementos`, undefined, 400);
   }
 
   try {
-    const { elementos: resultado } = await previewCarouselPost({ title, sourceHost, principal, elementos });
+    const { elementos: resultado } = await previewCarouselPost({
+      title: title || undefined,
+      sourceHost,
+      principal,
+      elementos,
+      proporcion,
+    });
     return apiJson({ elementos: resultado }, { cachear: false });
   } catch (error) {
     return apiError("No se pudo generar la vista previa del carrusel", error);
