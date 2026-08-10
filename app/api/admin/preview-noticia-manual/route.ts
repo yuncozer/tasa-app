@@ -6,7 +6,8 @@ import { previewManualNewsPost } from "@/lib/publish-news";
 /**
  * Vista previa de una noticia de autoría propia (sin URL de artículo): el
  * título, la fuente y el caption los escribe el usuario, la imagen ya fue
- * subida antes a Cloudinary vía `/api/admin/subir-media`.
+ * subida antes a Cloudinary desde el navegador, con la firma que emite
+ * `/api/admin/firmar-subida`.
  */
 export const runtime = "nodejs";
 

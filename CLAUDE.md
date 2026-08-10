@@ -447,24 +447,43 @@ barra con porcentaje, pero **solo en el tramo que de verdad se puede medir**.
   es la única razón por la que ahí se usa la API vieja en vez de `fetch()`:
   `fetch()` no emite progreso de subida. El resto del proyecto sigue con
   `fetch()`, que no tiene nada que medir.
-- Ese porcentaje cubre el viaje **del teléfono a nuestro servidor**. Lo que
-  sigue —servidor → Cloudinary y, en el video, la marca— es una petición
-  abierta de la que el navegador no recibe ningún avance. Al terminar el envío
-  (`upload.onload`) la barra pasa a indeterminada y el texto dice qué está
-  pasando. No lo cambies a estimar un porcentaje hasta 100: sería un número
-  inventado, y en un video pesado se quedaría clavado en 95 % un buen rato.
+- Ese porcentaje cubre el viaje **del teléfono a Cloudinary**. Lo que sigue
+  —Cloudinary procesando el archivo antes de responder— es una espera de la que
+  el navegador no recibe ningún avance. Al terminar el envío (`upload.onload`)
+  la barra pasa a indeterminada y el texto dice qué está pasando. No lo cambies
+  a estimar un porcentaje hasta 100: sería un número inventado, y en un video
+  pesado se quedaría clavado en 95 % un buen rato.
 - `Subida.origen` en `PublicarNoticiaForm` existe para pintar la barra **debajo
   del control que se tocó**: esa pantalla tiene tres sitios desde donde subir, y
   una barra suelta no dice cuál de ellos está trabajando.
-- Los errores de subida ahora muestran el mensaje del servidor (p. ej. el tope
-  de 100 MB de `subirMedia`) en vez de un "no se pudo subir" genérico: el
-  motivo es lo que le dice al admin si reintentar o cambiar el archivo.
+- Los errores de subida muestran el mensaje que devuelve quien falló (el tope de
+  tamaño, o el `error.message` de Cloudinary) en vez de un "no se pudo subir"
+  genérico: el motivo es lo que le dice al admin si reintentar o cambiar el
+  archivo.
 
-Aparte, en Vercel el cuerpo de una petición a una función tiene un tope de unos
-4,5 MB, así que un video grande falla en `/api/admin/subir-media` por debajo de
-los 100 MB que valida Cloudinary. La barra lo vuelve visible antes —se ve llegar
-al final y luego el error— pero no lo resuelve; resolverlo sería subir desde el
-navegador directo a Cloudinary con una firma emitida por el servidor.
+### El archivo va directo del navegador a Cloudinary
+
+En Vercel el cuerpo de una petición a una función tiene un tope de unos 4,5 MB.
+Mientras el archivo pasaba por `/api/admin/subir-media`, cualquier video de
+teléfono lo superaba —18 MB para 1:17 a 720p, verificado— y la plataforma
+respondía **413 antes de ejecutar una línea de código nuestro**: ni siquiera
+llegaba a correr la validación de 100 MB de `subirMedia`, así que el admin veía
+la barra llegar al final y luego un error sin explicación.
+
+Por eso esa ruta ya no existe y el archivo sube **directo a Cloudinary**, que
+acepta hasta el tope real. Nuestro servidor sigue siendo quien autoriza:
+
+- `/api/admin/firmar-subida` comprueba la cookie de sesión y devuelve una firma
+  de un solo uso (`firmarSubidaDirecta`). `CLOUDINARY_API_SECRET` nunca llega al
+  navegador; la `api_key` sí, que es pública por diseño.
+- Se firma **solo el `timestamp`**. La firma de Cloudinary cubre exactamente los
+  parámetros incluidos, así que dejar fuera todo lo demás es lo que impide que
+  el navegador añada ninguno: cualquier parámetro extra la invalida. No le
+  agregues campos "por comodidad" sin entender que amplías lo que un cliente
+  puede pedir. El `resource_type` no se firma porque viaja en la ruta.
+- El tope de tamaño lo sigue decidiendo el servidor —viaja en el permiso— pero
+  lo aplica el navegador: al no ver ya el archivo, el servidor no puede medirlo.
+  No lo dupliques como constante en el cliente.
 
 ### El video se marca en Cloudinary, no en el servidor
 
