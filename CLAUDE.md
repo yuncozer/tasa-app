@@ -282,6 +282,21 @@ vive aquí.
 - **Una `fallida` se puede reintentar o eliminar desde la cola**; una
   `publicando` no. Esa puede haber llegado a Meta, y borrar la fila perdería el
   único rastro de qué salió y qué no.
+- **A una `pendiente` se le puede cambiar la hora sin rehacer el post**
+  (`reprogramarPublicacion`). Solo se mueve `publicar_en`: el payload se congeló
+  al programar y sigue valiendo, así que no hay que volver a materializar nada.
+  El `estado=eq.pendiente` del filtro cumple aquí el mismo papel que en
+  `reclamarVencida` —viaja al `WHERE` del `UPDATE`—: si el worker reclamó la
+  fila mientras se elegía la hora nueva, el `PATCH` no encuentra nada y contesta
+  409 en vez de moverle la hora a algo que ya está saliendo. Una `fallida` no se
+  reprograma: para esa está "Publicar ahora".
+- **Cada fila de la cola muestra un fragmento de su título**
+  (`resumenPublicacion`). Dos posts programados con pocos minutos de diferencia
+  se veían idénticos —solo su hora—, y cancelar o mover el equivocado era
+  cuestión de suerte. El `reel` es el único que no tiene título propio: se
+  identifica por la primera línea de su caption. El recorte a 60 caracteres
+  acota lo que viaja al navegador, no lo que se ve: de ajustar al ancho se
+  encarga `truncate`, y por eso no hay un número de caracteres en la interfaz.
 - **El video se calienta al programar** (`calentarVideo`, en
   `lib/publish-news.ts`). La marca del video es una transformación por URL: la
   primera petición transcodifica el clip entero. Si esa espera cae dentro de la

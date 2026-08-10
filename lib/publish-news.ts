@@ -256,6 +256,40 @@ export type PublicacionPayload =
   | { tipo: "reel"; videoPublicId: string; caption: string; fuente?: string };
 
 /**
+ * Cuánto del título se guarda para la cola. No es el ancho de la pantalla —de
+ * recortar lo que no quepa ya se encarga el CSS—, sino el tope de lo que viaja
+ * al navegador: lo justo para distinguir dos posts, sin arrastrar el titular
+ * entero ni el caption a una lista que solo sirve para identificarlos.
+ */
+const LARGO_RESUMEN = 60;
+
+/**
+ * Con qué nombre aparece una publicación en la cola.
+ *
+ * Sin esto, dos posts programados con pocos minutos de diferencia se ven
+ * exactamente igual —solo su hora— y no hay forma de saber cuál se está
+ * cancelando o reprogramando.
+ *
+ * El `reel` no tiene título: es lo único que se identifica por su caption, del
+ * que se toma la primera línea, que es donde va el titular en las plantillas
+ * del proyecto. El `articulo` no debería llegar aquí —`materializarParaProgramar`
+ * lo convierte en `manual` al programarlo— pero se contempla igual, con su URL,
+ * para que un payload viejo en la cola no salga sin nombre.
+ */
+export function resumenPublicacion(payload: PublicacionPayload): string {
+  const bruto =
+    payload.tipo === "manual" || payload.tipo === "carrusel"
+      ? payload.datos.title
+      : payload.tipo === "reel"
+        ? (payload.caption.split("\n").find((linea) => linea.trim()) ?? "")
+        : (payload.caption ?? payload.url);
+
+  const limpio = bruto.replace(/\s+/g, " ").trim();
+  if (!limpio) return "Sin título";
+  return limpio.length > LARGO_RESUMEN ? `${limpio.slice(0, LARGO_RESUMEN).trimEnd()}…` : limpio;
+}
+
+/**
  * Lo que se le va a entregar a Meta, ya resuelto: URLs definitivas y caption.
  * Es todo el trabajo previo a hablar con Instagram —scrapear, firmar la
  * imagen, componer la marca del video— y va aparte porque la cola de

@@ -6,6 +6,7 @@ import { Logo } from "@/components/Logo";
 import { PublicarPanel } from "@/components/PublicarPanel";
 import { COOKIE_SESION, esSesionValida } from "@/lib/admin-session";
 import { listarProgramadas } from "@/lib/programadas";
+import { resumenPublicacion } from "@/lib/publish-news";
 
 export const metadata: Metadata = {
   title: "Publicar noticia — La Tasa",
@@ -28,6 +29,9 @@ async function leerCola(): Promise<ProgramadaVista[]> {
       publicarEn: p.publicar_en,
       estado: p.estado,
       error: p.error,
+      // El payload entero no baja al navegador: de él solo interesa con qué
+      // nombre se reconoce la fila.
+      resumen: resumenPublicacion(p.payload),
     }));
   } catch {
     return [];
