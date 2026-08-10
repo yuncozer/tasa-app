@@ -223,7 +223,7 @@ function transformacionMarca(formato: FormatoVideo, fuente?: string) {
     { ...LIENZO[formato], crop: "pad", background: "#0b1120" },
     // { overlay: SELLO_PUBLIC_ID, width: 800, crop: "scale", opacity: 20 },
     // { flags: "layer_apply", gravity: "north_west", x: 150, y: 200 },
-    { overlay: SELLO_PUBLIC_ID, width: 800, crop: "scale", opacity: 20 },
+    { overlay: SELLO_PUBLIC_ID, width: 800, crop: "scale", opacity: 10 },
     { flags: "layer_apply", gravity: "north_west", x: 150, y: 800 },
     // { overlay: SELLO_PUBLIC_ID, width: 800, crop: "scale", opacity: 20 },
     // { flags: "layer_apply", gravity: "north_west", x: 150, y: 1400 },
