@@ -2,25 +2,39 @@ import { buildNewsCaption } from "@/lib/caption";
 import type { ElementoCarrusel } from "@/lib/instagram";
 import { publishCarousel, publishDailyPost, publishReel } from "@/lib/instagram";
 import { signNewsImageParams } from "@/lib/news-signature";
+import type { FormatoVideo } from "@/lib/providers/cloudinary";
 import { limpiarFuente, subirDesdeUrl, urlImagen, urlVideoConMarca } from "@/lib/providers/cloudinary";
 import type { ArticleData } from "@/lib/providers/news";
 import { fetchArticle } from "@/lib/providers/news";
 import { esUrlValida } from "@/lib/validar-url";
 
+/** Proporción del post/carrusel: la elige el usuario solo cuando el primer elemento es un video. */
+export type ProporcionCarrusel = "1:1" | "4:5";
+
 /**
  * Arma la URL firmada de `instagram-post-news`. El título es opcional: las
  * diapositivas secundarias de un carrusel no lo llevan (ni la fecha), porque
  * repetirlo en cada una no aporta nada y le quita sitio a la foto.
+ *
+ * `proporcion` siempre viaja en el conjunto firmado (con `"1:1"` por
+ * defecto): no hay URLs firmadas persistidas en ningún sitio, así que
+ * agregar esta clave no rompe compatibilidad con nada ya generado.
  */
-function armarUrlImagenFirmada(params: { title?: string; image: string; source: string }): string {
+function armarUrlImagenFirmada(params: {
+  title?: string;
+  image: string;
+  source: string;
+  proporcion?: ProporcionCarrusel;
+}): string {
   const siteUrl = process.env.SITE_URL;
   if (!siteUrl) throw new Error("Falta configurar SITE_URL");
 
+  const proporcion = params.proporcion ?? "1:1";
   // Sin título, la clave se omite del todo en vez de ir vacía: la ruta firma
   // exactamente los parámetros que recibe, y un `title=` de más no cuadraría.
   const firmados: Record<string, string> = params.title
-    ? { title: params.title, image: params.image, source: params.source }
-    : { image: params.image, source: params.source };
+    ? { title: params.title, image: params.image, source: params.source, proporcion }
+    : { image: params.image, source: params.source, proporcion };
 
   const sig = signNewsImageParams(firmados);
   const url = new URL(`${siteUrl}/api/og/instagram-post-news`);
@@ -143,38 +157,61 @@ export type ElementoCarruselEntrada =
   | { tipo: "video"; publicId: string; fuente?: string };
 
 /**
- * De dónde sale la imagen principal del carrusel. Se resuelve en el servidor
- * y no se acepta una URL de imagen suelta del navegador: así la foto que se
- * enmarca sigue viniendo del artículo real o de Cloudinary, igual que en el
- * post de una sola imagen.
+ * De dónde sale el elemento principal del carrusel. Se resuelve en el
+ * servidor y no se acepta una URL suelta del navegador: así el material que
+ * se enmarca sigue viniendo del artículo real o de Cloudinary, igual que en
+ * el post de una sola imagen.
+ *
+ * `video` solo lo produce el modo "Noticia propia": un video como principal
+ * no lleva título superpuesto (a diferencia de las dos variantes de
+ * imagen), sale igual que un video "extra" — sellos y franja de fuente
+ * opcional —, y es lo que obliga a elegir proporción 1:1 o 4:5 en vez de
+ * asumir siempre 1:1.
  */
 export type PrincipalCarrusel =
   | { tipo: "articulo"; url: string }
-  | { tipo: "subida"; publicId: string };
+  | { tipo: "subida"; publicId: string }
+  | { tipo: "video"; publicId: string; fuente?: string };
 
 export interface CarruselEntrada {
-  /** Título y fuente del marco de marca, comunes a todas las imágenes. */
-  title: string;
+  /** Fuente del marco de marca, común a todas las imágenes (incluida la principal, si es imagen). */
   sourceHost: string;
+  /** Título del marco: solo se usa (y solo se pide) cuando el principal es una imagen. */
+  title?: string;
   /**
-   * Imagen que va siempre de primera: es la que da identidad al post y, por
-   * cómo funciona Instagram, la que fija el formato de todo el carrusel.
+   * Elemento que va siempre de primero: es el que da identidad al post y,
+   * por cómo funciona Instagram, el que fija el formato de todo el carrusel.
    */
   principal: PrincipalCarrusel;
   /** Lo que el usuario añadió después, en el orden en que lo ordenó. */
   elementos: ElementoCarruselEntrada[];
+  /**
+   * Proporción de todo el carrusel. Solo importa cuando el principal es un
+   * video (con imagen, siempre es `"1:1"`, el único formato que usa la
+   * plantilla de marco). Por defecto `"1:1"` para no romper filas ya
+   * programadas que no la traían.
+   */
+  proporcion?: ProporcionCarrusel;
 }
 
-/** Valida el origen de la imagen principal tal como llega del navegador. */
+/** Valida el origen del elemento principal tal como llega del navegador. */
 export function leerPrincipalCarrusel(valor: unknown): PrincipalCarrusel | null {
-  const item = valor as { tipo?: unknown; url?: unknown; publicId?: unknown } | null;
+  const item = valor as { tipo?: unknown; url?: unknown; publicId?: unknown; fuente?: unknown } | null;
   if (item?.tipo === "articulo" && esUrlValida(item.url as string)) {
     return { tipo: "articulo", url: item.url as string };
   }
   if (item?.tipo === "subida" && typeof item.publicId === "string" && item.publicId) {
     return { tipo: "subida", publicId: item.publicId };
   }
+  if (item?.tipo === "video" && typeof item.publicId === "string" && item.publicId) {
+    return { tipo: "video", publicId: item.publicId, fuente: limpiarFuente(item.fuente) };
+  }
   return null;
+}
+
+/** Valida la proporción tal como llega del navegador o de la base de datos. */
+export function leerProporcionCarrusel(valor: unknown): ProporcionCarrusel {
+  return valor === "4:5" ? "4:5" : "1:1";
 }
 
 /**
@@ -200,34 +237,47 @@ export function leerElementosCarrusel(valor: unknown): ElementoCarruselEntrada[]
   return elementos;
 }
 
+/** Formato de video de Cloudinary que corresponde a cada proporción de carrusel. */
+function formatoDeProporcion(proporcion: ProporcionCarrusel): FormatoVideo {
+  return proporcion === "4:5" ? "carrusel-4-5" : "carrusel";
+}
+
 /**
  * Arma las URLs finales del carrusel. Cada imagen pasa por la misma plantilla
  * firmada (`instagram-post-news`) que la imagen principal de una noticia:
  * nunca se publica una imagen cruda del usuario sin el marco de La Tasa.
  */
 async function buildCarousel(datos: CarruselEntrada): Promise<ElementoCarrusel[]> {
+  const proporcion = datos.proporcion ?? "1:1";
+  const formato = formatoDeProporcion(proporcion);
+
   /** Sin `title`, el marco sale sin titular ni fecha: es la variante secundaria. */
   const enmarcar = (image: string, title?: string) =>
-    armarUrlImagenFirmada({ title, image, source: datos.sourceHost });
-
-  const principal =
-    datos.principal.tipo === "subida"
-      ? urlImagen(datos.principal.publicId)
-      : (await fetchArticle(datos.principal.url)).imageUrl;
+    armarUrlImagenFirmada({ title, image, source: datos.sourceHost, proporcion });
 
   const extras = await Promise.all(
     datos.elementos.map(async (elemento): Promise<ElementoCarrusel> => {
       if (elemento.tipo === "video") {
-        return {
-          tipo: "video",
-          url: await urlVideoConMarca(elemento.publicId, "carrusel", elemento.fuente),
-        };
+        return { tipo: "video", url: await urlVideoConMarca(elemento.publicId, formato, elemento.fuente) };
       }
       return { tipo: "imagen", url: enmarcar(urlImagen(elemento.publicId)) };
     }),
   );
 
-  return [{ tipo: "imagen", url: enmarcar(principal, datos.title) }, ...extras];
+  if (datos.principal.tipo === "video") {
+    const principal: ElementoCarrusel = {
+      tipo: "video",
+      url: await urlVideoConMarca(datos.principal.publicId, formato, datos.principal.fuente),
+    };
+    return [principal, ...extras];
+  }
+
+  const imagenPrincipal =
+    datos.principal.tipo === "subida"
+      ? urlImagen(datos.principal.publicId)
+      : (await fetchArticle(datos.principal.url)).imageUrl;
+
+  return [{ tipo: "imagen", url: enmarcar(imagenPrincipal, datos.title) }, ...extras];
 }
 
 /** Vista previa del carrusel: las URLs reales que se publicarían, sin publicar. */
@@ -263,6 +313,11 @@ export type PublicacionPayload =
  */
 const LARGO_RESUMEN = 60;
 
+/** Primera línea no vacía de un caption, donde va el titular en las plantillas del proyecto. */
+function primeraLinea(caption: string): string {
+  return caption.split("\n").find((linea) => linea.trim()) ?? "";
+}
+
 /**
  * Con qué nombre aparece una publicación en la cola.
  *
@@ -271,18 +326,21 @@ const LARGO_RESUMEN = 60;
  * cancelando o reprogramando.
  *
  * El `reel` no tiene título: es lo único que se identifica por su caption, del
- * que se toma la primera línea, que es donde va el titular en las plantillas
- * del proyecto. El `articulo` no debería llegar aquí —`materializarParaProgramar`
- * lo convierte en `manual` al programarlo— pero se contempla igual, con su URL,
- * para que un payload viejo en la cola no salga sin nombre.
+ * que se toma la primera línea. Un `carrusel` con principal de video tampoco
+ * lo tiene —mismo motivo—, así que cae al mismo recurso. El `articulo` no
+ * debería llegar aquí —`materializarParaProgramar` lo convierte en `manual`
+ * al programarlo— pero se contempla igual, con su URL, para que un payload
+ * viejo en la cola no salga sin nombre.
  */
 export function resumenPublicacion(payload: PublicacionPayload): string {
   const bruto =
-    payload.tipo === "manual" || payload.tipo === "carrusel"
+    payload.tipo === "manual"
       ? payload.datos.title
-      : payload.tipo === "reel"
-        ? (payload.caption.split("\n").find((linea) => linea.trim()) ?? "")
-        : (payload.caption ?? payload.url);
+      : payload.tipo === "carrusel"
+        ? (payload.datos.title ?? primeraLinea(payload.caption))
+        : payload.tipo === "reel"
+          ? primeraLinea(payload.caption)
+          : (payload.caption ?? payload.url);
 
   const limpio = bruto.replace(/\s+/g, " ").trim();
   if (!limpio) return "Sin título";
@@ -375,8 +433,16 @@ export function leerPublicacionPayload(valor: unknown): PublicacionPayload | nul
     const sourceHost = texto(d?.sourceHost);
     const principal = leerPrincipalCarrusel(d?.principal);
     const elementos = leerElementosCarrusel(d?.elementos);
-    if (!caption || !title || !sourceHost || !principal || !elementos) return null;
-    return { tipo: "carrusel", datos: { title, sourceHost, principal, elementos }, caption };
+    const proporcion = leerProporcionCarrusel(d?.proporcion);
+    // El título solo hace falta cuando el principal es una imagen: un video
+    // principal no lo imprime en ningún sitio.
+    if (!caption || !sourceHost || !principal || !elementos) return null;
+    if (principal.tipo !== "video" && !title) return null;
+    return {
+      tipo: "carrusel",
+      datos: { title: title || undefined, sourceHost, principal, elementos, proporcion },
+      caption,
+    };
   }
 
   if (p?.tipo === "reel") {
@@ -450,13 +516,21 @@ export async function materializarParaProgramar(
  * optimización, no un requisito, y no debe impedir que se programe el post.
  */
 async function calentarVideo(payload: PublicacionPayload): Promise<void> {
-  const videos =
+  const videos: Promise<string>[] =
     payload.tipo === "reel"
       ? [urlVideoConMarca(payload.videoPublicId, "reel", payload.fuente)]
       : payload.tipo === "carrusel"
-        ? payload.datos.elementos
-            .filter((e) => e.tipo === "video")
-            .map((e) => urlVideoConMarca(e.publicId, "carrusel", e.fuente))
+        ? (() => {
+            const formato: FormatoVideo = formatoDeProporcion(payload.datos.proporcion ?? "1:1");
+            const principal =
+              payload.datos.principal.tipo === "video"
+                ? [urlVideoConMarca(payload.datos.principal.publicId, formato, payload.datos.principal.fuente)]
+                : [];
+            const extras = payload.datos.elementos
+              .filter((e) => e.tipo === "video")
+              .map((e) => urlVideoConMarca(e.publicId, formato, e.fuente));
+            return [...principal, ...extras];
+          })()
         : [];
 
   await Promise.allSettled(

@@ -15,7 +15,15 @@ import { verifyNewsImageParams } from "@/lib/news-signature";
  */
 export const runtime = "nodejs";
 
-const SIZE = { width: 1080, height: 1080 };
+/**
+ * Ancho fijo en 1080; el alto varía con la proporción del carrusel. `"4:5"`
+ * solo lo produce un carrusel cuyo primer elemento es un video (nunca lleva
+ * `title`, así que la rama `ALTO_FOTO.principal` no necesita una variante 4:5).
+ */
+const SIZE: Record<"1:1" | "4:5", { width: number; height: number }> = {
+  "1:1": { width: 1080, height: 1080 },
+  "4:5": { width: 1080, height: 1350 },
+};
 const TIMEOUT_MS = 12_000;
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 
@@ -48,23 +56,31 @@ async function descargarImagenComoPng(url: string): Promise<string> {
 /**
  * Alto de la foto dentro del marco. En las diapositivas secundarias no hay
  * titular debajo, así que ese espacio se lo queda la imagen en vez de dejar
- * un hueco.
+ * un hueco. En 4:5 el lienzo crece 270 px respecto de 1:1, y ese sobrante
+ * también se lo queda la foto: `title` y `"4:5"` nunca coexisten (el
+ * principal-video que dispara el 4:5 jamás lleva título).
  */
-const ALTO_FOTO = { principal: 560, secundaria: 700 };
+const ALTO_FOTO = { principal: 560, secundaria: 700, secundariaAncha: 970 };
 
 function Portada({
   title,
   source,
   imageDataUri,
   icons,
+  proporcion,
 }: {
   /** Ausente en las diapositivas secundarias de un carrusel. */
   title?: string;
   source: string;
   imageDataUri: string;
   icons: { instagram: string; browser: string };
+  proporcion: "1:1" | "4:5";
 }) {
-  const altoFoto = title ? ALTO_FOTO.principal : ALTO_FOTO.secundaria;
+  const altoFoto = title
+    ? ALTO_FOTO.principal
+    : proporcion === "4:5"
+      ? ALTO_FOTO.secundariaAncha
+      : ALTO_FOTO.secundaria;
 
   return (
     <div
@@ -119,6 +135,7 @@ export async function GET(request: NextRequest) {
   const image = params.get("image");
   const source = params.get("source");
   const sig = params.get("sig");
+  const proporcion = params.get("proporcion") === "4:5" ? "4:5" : "1:1";
 
   if (!image || !source || !sig) {
     return new Response("Faltan parámetros", { status: 400 });
@@ -127,10 +144,13 @@ export async function GET(request: NextRequest) {
   /**
    * El título sólo viaja en la diapositiva principal; en las secundarias de
    * un carrusel no se repite. La firma se calcula sobre exactamente los
-   * parámetros presentes, así que quitar o añadir `title` a una URL ya
-   * firmada la invalida — no hay forma de colar un titular ajeno.
+   * parámetros presentes, así que quitar o añadir `title` (o cambiar
+   * `proporcion`) a una URL ya firmada la invalida — no hay forma de colar
+   * un titular ajeno ni de estirar un lienzo sin permiso.
    */
-  const firmados: Record<string, string> = title ? { title, image, source } : { image, source };
+  const firmados: Record<string, string> = title
+    ? { title, image, source, proporcion }
+    : { image, source, proporcion };
   if (!verifyNewsImageParams(firmados, sig)) {
     return new Response("Firma inválida", { status: 403 });
   }
@@ -157,10 +177,11 @@ export async function GET(request: NextRequest) {
         source={source}
         imageDataUri={imageDataUri}
         icons={{ instagram: instagramIcon, browser: browserIcon }}
+        proporcion={proporcion}
       />
     ),
     {
-      ...SIZE,
+      ...SIZE[proporcion],
       fonts: [
         { name: "Geist", data: geistRegular, weight: 400, style: "normal" },
         { name: "Geist", data: geistBold, weight: 700, style: "normal" },

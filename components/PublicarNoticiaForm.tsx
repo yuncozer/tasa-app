@@ -1,17 +1,21 @@
 "use client";
 
 import { useState } from "react";
-import type { ElementoCarruselEntrada, PublicacionPayload } from "@/lib/publish-news";
+import type { ElementoCarruselEntrada, ProporcionCarrusel, PublicacionPayload } from "@/lib/publish-news";
 import { BarraProgreso } from "@/components/BarraProgreso";
 import { ProgramarPublicacion } from "@/components/ProgramarPublicacion";
 import { subirMediaConProgreso, type FaseSubida } from "@/lib/subida";
 
 interface Preview {
+  /** Vacío cuando el principal es un video: no lleva título superpuesto. */
   title: string;
   sourceHost: string;
   caption: string;
   imageUrl: string;
 }
+
+/** Tipo de elemento principal en "Noticia propia". Con video no hay título superpuesto. */
+type PrincipalTipo = "imagen" | "video";
 
 interface Diapositiva {
   tipo: "imagen" | "video";
@@ -63,8 +67,15 @@ function textoDeSubida({ que, fase }: Subida): string {
   return que === "video" ? "Procesando el video y aplicando la marca…" : "Procesando la imagen…";
 }
 
-/** Origen de la imagen principal, resuelto en el servidor (ver `lib/publish-news.ts`). */
-type Principal = { tipo: "subida"; publicId: string } | { tipo: "articulo"; url: string };
+/**
+ * Origen del elemento principal, resuelto en el servidor (ver
+ * `lib/publish-news.ts`). `video` solo sale del modo "Noticia propia": no
+ * lleva título superpuesto, a diferencia de las otras dos variantes.
+ */
+type Principal =
+  | { tipo: "subida"; publicId: string }
+  | { tipo: "articulo"; url: string }
+  | { tipo: "video"; publicId: string; fuente?: string };
 
 type Estado =
   | { paso: "inicial" }
@@ -116,6 +127,14 @@ export function PublicarNoticiaForm({ onProgramada }: { onProgramada: () => void
   const [imagenPublicId, setImagenPublicId] = useState<string | undefined>();
   /** Miniatura local de la foto principal, para verla al instante sin esperar al servidor. */
   const [fotoPrincipal, setFotoPrincipal] = useState<string | undefined>();
+  /** Solo aplica al modo "manual": si el principal es una imagen o un video propio. */
+  const [principalTipo, setPrincipalTipo] = useState<PrincipalTipo>("imagen");
+  const [videoPrincipalPublicId, setVideoPrincipalPublicId] = useState<string | undefined>();
+  const [videoPrincipal, setVideoPrincipal] = useState<string | undefined>();
+  /** Igual que en `Extra.fuente`: `undefined` es "sin franja", `""` es "pedida pero en blanco". */
+  const [fuenteVideoPrincipal, setFuenteVideoPrincipal] = useState<string | undefined>();
+  /** Proporción del carrusel; solo se elige cuando el principal es un video. */
+  const [proporcion, setProporcion] = useState<ProporcionCarrusel>("1:1");
   const [subida, setSubida] = useState<Subida | null>(null);
   const [extras, setExtras] = useState<Extra[]>([]);
   const [diapositivas, setDiapositivas] = useState<Diapositiva[] | null>(null);
@@ -132,19 +151,36 @@ export function PublicarNoticiaForm({ onProgramada }: { onProgramada: () => void
   const cargandoPreview = estado.paso === "cargando-preview";
   const publicando = estado.paso === "publicando";
   const preview = "preview" in estado ? estado.preview : null;
-  const esCarrusel = extras.length > 0;
+  /**
+   * Un video principal siempre es un carrusel: no hay ruta para publicarlo
+   * solo (Meta exige 2-10 elementos), así que necesita al menos un extra.
+   */
+  const principalEsVideo = modo === "manual" && principalTipo === "video";
+  const esCarrusel = extras.length > 0 || principalEsVideo;
   const totalElementos = extras.length + 1;
   const lleno = totalElementos >= MAX_ELEMENTOS;
+  /** Un carrusel necesita 2-10 elementos: con video principal y sin extras aún no alcanza. */
+  const faltanElementos = principalEsVideo && extras.length === 0;
 
-  /** Origen de la imagen principal: la subida manda sobre la scrapeada. */
-  const principal: Principal = imagenPublicId
-    ? { tipo: "subida", publicId: imagenPublicId }
-    : { tipo: "articulo", url };
+  /** Origen del elemento principal: video propio, imagen subida, o la del artículo. */
+  const principal: Principal = principalEsVideo
+    ? { tipo: "video", publicId: videoPrincipalPublicId ?? "", fuente: fuenteVideoPrincipal }
+    : imagenPublicId
+      ? { tipo: "subida", publicId: imagenPublicId }
+      : { tipo: "articulo", url };
 
   /** Sustituye la miniatura local liberando la anterior, que si no queda colgada en memoria. */
   function ponerFotoPrincipal(archivo: File | undefined) {
     setFotoPrincipal((previa) => {
       if (previa) URL.revokeObjectURL(previa);
+      return archivo ? URL.createObjectURL(archivo) : undefined;
+    });
+  }
+
+  /** Igual que `ponerFotoPrincipal`, pero para la miniatura del video principal. */
+  function ponerVideoPrincipal(archivo: File | undefined) {
+    setVideoPrincipal((previo) => {
+      if (previo) URL.revokeObjectURL(previo);
       return archivo ? URL.createObjectURL(archivo) : undefined;
     });
   }
@@ -156,6 +192,11 @@ export function PublicarNoticiaForm({ onProgramada }: { onProgramada: () => void
     setCaption("");
     setImagenPublicId(undefined);
     ponerFotoPrincipal(undefined);
+    setPrincipalTipo("imagen");
+    setVideoPrincipalPublicId(undefined);
+    ponerVideoPrincipal(undefined);
+    setFuenteVideoPrincipal(undefined);
+    setProporcion("1:1");
     setExtras([]);
     setDiapositivas(null);
     setDesactualizado(false);
@@ -205,10 +246,11 @@ export function PublicarNoticiaForm({ onProgramada }: { onProgramada: () => void
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          title: previewActual.title,
+          title: previewActual.title || undefined,
           sourceHost: previewActual.sourceHost,
           principal: principalActual,
           elementos: aElementos(lista),
+          proporcion,
         }),
       });
       if (!response.ok) {
@@ -225,6 +267,18 @@ export function PublicarNoticiaForm({ onProgramada }: { onProgramada: () => void
   async function verVistaPrevia() {
     setEstado({ paso: "cargando-preview" });
     try {
+      // Con un video principal no hay imagen que enmarcar con título: se arma
+      // la vista previa en el propio navegador, sin pasar por la ruta que
+      // compone la plantilla Satori. El carrusel (incluido el video) lo
+      // resuelve `refrescarCarrusel` más abajo, igual que con imagen.
+      if (principalEsVideo) {
+        const datos: Preview = { title: "", sourceHost: sourceHost.trim(), caption, imageUrl: "" };
+        setDesactualizado(false);
+        setEstado({ paso: "preview", preview: datos });
+        await refrescarCarrusel(extras, principal, datos);
+        return;
+      }
+
       const endpoint = modo === "url" ? "/api/admin/preview-noticia" : "/api/admin/preview-noticia-manual";
       const body =
         modo === "url" ? { url, imagenPublicId } : { title, sourceHost, caption, imagenPublicId };
@@ -288,6 +342,40 @@ export function PublicarNoticiaForm({ onProgramada }: { onProgramada: () => void
     }
   }
 
+  /** Sustituye el video principal. Si ya hay vista previa, refresca el carrusel con el nuevo. */
+  async function subirVideoPrincipal(archivo: File) {
+    setSubida({ origen: "principal", que: "video", fase: { tipo: "enviando", porcentaje: 0 } });
+    try {
+      const publicId = await subirMediaConProgreso(archivo, "video", (fase) =>
+        setSubida({ origen: "principal", que: "video", fase }),
+      );
+      setVideoPrincipalPublicId(publicId);
+      ponerVideoPrincipal(archivo);
+      if (preview) {
+        await refrescarCarrusel(extras, { tipo: "video", publicId, fuente: fuenteVideoPrincipal }, preview);
+      }
+    } catch (error) {
+      setEstado({
+        paso: "error",
+        mensaje: error instanceof Error ? error.message : "No se pudo subir el video",
+      });
+    } finally {
+      setSubida(null);
+    }
+  }
+
+  /** Quita el video principal para poder subir otro. */
+  function quitarVideoPrincipal() {
+    setVideoPrincipalPublicId(undefined);
+    ponerVideoPrincipal(undefined);
+    setEstado({ paso: "inicial" });
+  }
+
+  /** Igual que `cambiarFuenteExtra`, pero para el video principal. */
+  function cambiarFuenteVideoPrincipal(fuente: string | undefined) {
+    editarCampoDelMarco(() => setFuenteVideoPrincipal(fuente));
+  }
+
   /** Aplica una lista nueva de elementos y regenera la vista previa con ella. */
   function aplicarExtras(lista: Extra[]) {
     setExtras(lista);
@@ -349,16 +437,19 @@ export function PublicarNoticiaForm({ onProgramada }: { onProgramada: () => void
     if (!caption.trim()) return null;
 
     if (esCarrusel) {
+      if (faltanElementos) return null;
       const title = datos?.title ?? "";
       const sourceHost = datos?.sourceHost ?? "";
-      if (!title || !sourceHost) return null;
+      // El título solo hace falta cuando el principal es una imagen.
+      if (!sourceHost || (principal.tipo !== "video" && !title)) return null;
       return {
         tipo: "carrusel",
         datos: {
-          title,
+          title: title || undefined,
           sourceHost,
           principal,
           elementos: aElementos(extras),
+          proporcion,
         },
         caption,
       };
@@ -384,11 +475,12 @@ export function PublicarNoticiaForm({ onProgramada }: { onProgramada: () => void
 
       const body = esCarrusel
         ? {
-            title: datos.title,
+            title: datos.title || undefined,
             sourceHost: datos.sourceHost,
             caption,
             principal,
             elementos: aElementos(extras),
+            proporcion,
           }
         : modo === "url"
           ? { url, caption, imagenPublicId }
@@ -413,10 +505,15 @@ export function PublicarNoticiaForm({ onProgramada }: { onProgramada: () => void
   /**
    * El título y la fuente se imprimen sobre la foto, así que se piden antes
    * de subirla: evita elegir una imagen y descubrir después que el texto no
-   * encaja con ella.
+   * encaja con ella. Con un video principal no hay título que imprimir, así
+   * que solo se exige la fuente.
    */
-  const datosDelMarcoListos = Boolean(title.trim() && sourceHost.trim());
-  const manualListo = Boolean(datosDelMarcoListos && caption.trim() && imagenPublicId);
+  const datosDelMarcoListos = principalEsVideo
+    ? Boolean(sourceHost.trim())
+    : Boolean(title.trim() && sourceHost.trim());
+  const manualListo = Boolean(
+    datosDelMarcoListos && caption.trim() && (principalEsVideo ? videoPrincipalPublicId : imagenPublicId),
+  );
   const puedeVerVistaPrevia = modo === "url" ? Boolean(url) : manualListo;
 
   return (
@@ -471,17 +568,41 @@ export function PublicarNoticiaForm({ onProgramada }: { onProgramada: () => void
       ) : (
         <div className="flex flex-col gap-4">
           <div className="flex flex-col gap-1">
-            <label htmlFor="titulo-manual" className="text-sm font-semibold uppercase tracking-wide text-muted">
-              Título
-            </label>
-            <input
-              id="titulo-manual"
-              type="text"
-              value={title}
-              onChange={(e) => editarCampoDelMarco(() => setTitle(e.target.value))}
-              className="rounded-xl border border-border-soft bg-surface-strong px-4 py-3 text-base text-foreground outline-none"
-            />
+            <span className="text-sm font-semibold uppercase tracking-wide text-muted">Elemento principal</span>
+            <div className="flex gap-2" role="tablist" aria-label="Tipo de elemento principal">
+              {(["imagen", "video"] as const).map((opcion) => (
+                <button
+                  key={opcion}
+                  type="button"
+                  role="tab"
+                  aria-selected={principalTipo === opcion}
+                  onClick={() => setPrincipalTipo(opcion)}
+                  className={`flex-1 rounded-xl border px-3 py-2 text-sm font-semibold transition active:scale-95 ${
+                    principalTipo === opcion
+                      ? "border-accent bg-accent/15 text-accent"
+                      : "border-border-soft bg-surface text-muted"
+                  }`}
+                >
+                  {opcion === "imagen" ? "Imagen" : "Video"}
+                </button>
+              ))}
+            </div>
           </div>
+
+          {principalTipo === "imagen" && (
+            <div className="flex flex-col gap-1">
+              <label htmlFor="titulo-manual" className="text-sm font-semibold uppercase tracking-wide text-muted">
+                Título
+              </label>
+              <input
+                id="titulo-manual"
+                type="text"
+                value={title}
+                onChange={(e) => editarCampoDelMarco(() => setTitle(e.target.value))}
+                className="rounded-xl border border-border-soft bg-surface-strong px-4 py-3 text-base text-foreground outline-none"
+              />
+            </div>
+          )}
           <div className="flex flex-col gap-1">
             <label htmlFor="fuente-manual" className="text-sm font-semibold uppercase tracking-wide text-muted">
               Fuente
@@ -507,55 +628,163 @@ export function PublicarNoticiaForm({ onProgramada }: { onProgramada: () => void
               className="whitespace-pre-wrap rounded-xl border border-border-soft bg-surface-strong px-4 py-3 text-sm text-foreground outline-none"
             />
           </div>
-          <div className="flex flex-col gap-2">
-            <span className="text-sm font-semibold uppercase tracking-wide text-muted">Imagen</span>
 
-            {fotoPrincipal && (
-              <div className="flex items-center gap-3 rounded-xl border border-border-soft bg-surface-strong px-3 py-3">
-                {/* eslint-disable-next-line @next/next/no-img-element -- previsualización local del archivo elegido. */}
-                <img
-                  src={fotoPrincipal}
-                  alt=""
-                  className="h-20 w-20 shrink-0 rounded-xl border border-border-soft object-cover"
-                />
-                <span className="flex-1 text-sm text-foreground">Foto cargada</span>
-                <button
-                  type="button"
-                  onClick={quitarFotoPrincipal}
-                  aria-label="Quitar la foto"
-                  className="shrink-0 rounded-full border border-border-soft px-3 py-1 text-xs font-medium text-muted transition active:scale-95"
-                >
-                  ✕
-                </button>
-              </div>
-            )}
+          {principalTipo === "imagen" ? (
+            <div className="flex flex-col gap-2">
+              <span className="text-sm font-semibold uppercase tracking-wide text-muted">Imagen</span>
 
-            {datosDelMarcoListos ? (
-              <>
-                <label className={claseSelector("px-4 py-4", subiendo)}>
-                  {fotoPrincipal ? "Cambiar la foto" : "Elegir imagen"}
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    disabled={subiendo}
-                    onChange={(e) => {
-                      const archivo = e.target.files?.[0];
-                      if (archivo) void reemplazarImagenPrincipal(archivo);
-                      e.target.value = "";
-                    }}
+              {fotoPrincipal && (
+                <div className="flex items-center gap-3 rounded-xl border border-border-soft bg-surface-strong px-3 py-3">
+                  {/* eslint-disable-next-line @next/next/no-img-element -- previsualización local del archivo elegido. */}
+                  <img
+                    src={fotoPrincipal}
+                    alt=""
+                    className="h-20 w-20 shrink-0 rounded-xl border border-border-soft object-cover"
                   />
-                </label>
-                {subida?.origen === "principal" && (
-                  <BarraProgreso fase={subida.fase} etiqueta={textoDeSubida(subida)} />
-                )}
-              </>
-            ) : (
-              <p className="rounded-xl border border-border-soft bg-surface-strong px-4 py-3 text-xs text-muted">
-                Escribe primero el título y la fuente: van impresos sobre esta foto.
+                  <span className="flex-1 text-sm text-foreground">Foto cargada</span>
+                  <button
+                    type="button"
+                    onClick={quitarFotoPrincipal}
+                    aria-label="Quitar la foto"
+                    className="shrink-0 rounded-full border border-border-soft px-3 py-1 text-xs font-medium text-muted transition active:scale-95"
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
+
+              {datosDelMarcoListos ? (
+                <>
+                  <label className={claseSelector("px-4 py-4", subiendo)}>
+                    {fotoPrincipal ? "Cambiar la foto" : "Elegir imagen"}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      disabled={subiendo}
+                      onChange={(e) => {
+                        const archivo = e.target.files?.[0];
+                        if (archivo) void reemplazarImagenPrincipal(archivo);
+                        e.target.value = "";
+                      }}
+                    />
+                  </label>
+                  {subida?.origen === "principal" && (
+                    <BarraProgreso fase={subida.fase} etiqueta={textoDeSubida(subida)} />
+                  )}
+                </>
+              ) : (
+                <p className="rounded-xl border border-border-soft bg-surface-strong px-4 py-3 text-xs text-muted">
+                  Escribe primero el título y la fuente: van impresos sobre esta foto.
+                </p>
+              )}
+            </div>
+          ) : (
+            <div className="flex flex-col gap-2">
+              <span className="text-sm font-semibold uppercase tracking-wide text-muted">Video</span>
+              <p className="text-xs text-muted">
+                Un video principal no lleva título ni fecha impresos, solo los sellos de marca. Instagram exige
+                mínimo dos elementos en el carrusel: agrega al menos una imagen o video más abajo.
               </p>
-            )}
-          </div>
+
+              <div className="flex flex-col gap-1">
+                <span className="text-xs font-semibold uppercase tracking-wide text-muted">Proporción</span>
+                <div className="flex gap-2" role="tablist" aria-label="Proporción del carrusel">
+                  {(["1:1", "4:5"] as const).map((opcion) => (
+                    <button
+                      key={opcion}
+                      type="button"
+                      role="tab"
+                      aria-selected={proporcion === opcion}
+                      onClick={() => setProporcion(opcion)}
+                      className={`flex-1 rounded-xl border px-3 py-2 text-sm font-semibold transition active:scale-95 ${
+                        proporcion === opcion
+                          ? "border-accent bg-accent/15 text-accent"
+                          : "border-border-soft bg-surface text-muted"
+                      }`}
+                    >
+                      {opcion}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {videoPrincipal && (
+                <div className="flex items-center gap-3 rounded-xl border border-border-soft bg-surface-strong px-3 py-3">
+                  <video
+                    src={videoPrincipal}
+                    controls
+                    className="h-20 w-20 shrink-0 rounded-xl border border-border-soft object-cover"
+                  />
+                  <span className="flex-1 text-sm text-foreground">Video cargado</span>
+                  <button
+                    type="button"
+                    onClick={quitarVideoPrincipal}
+                    aria-label="Quitar el video"
+                    className="shrink-0 rounded-full border border-border-soft px-3 py-1 text-xs font-medium text-muted transition active:scale-95"
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
+
+              {datosDelMarcoListos ? (
+                <>
+                  <label className={claseSelector("px-4 py-4", subiendo)}>
+                    {videoPrincipal ? "Cambiar el video" : "Elegir video"}
+                    <input
+                      type="file"
+                      accept="video/*"
+                      className="hidden"
+                      disabled={subiendo}
+                      onChange={(e) => {
+                        const archivo = e.target.files?.[0];
+                        if (archivo) void subirVideoPrincipal(archivo);
+                        e.target.value = "";
+                      }}
+                    />
+                  </label>
+                  {subida?.origen === "principal" && (
+                    <BarraProgreso fase={subida.fase} etiqueta={textoDeSubida(subida)} />
+                  )}
+
+                  {videoPrincipalPublicId && (
+                    <div className="flex flex-col gap-2">
+                      <button
+                        type="button"
+                        aria-pressed={fuenteVideoPrincipal !== undefined}
+                        onClick={() =>
+                          cambiarFuenteVideoPrincipal(fuenteVideoPrincipal === undefined ? "" : undefined)
+                        }
+                        disabled={publicando}
+                        className={`rounded-xl border px-3 py-2 text-xs font-semibold transition active:scale-95 disabled:opacity-50 ${
+                          fuenteVideoPrincipal !== undefined
+                            ? "border-accent bg-accent/15 text-accent"
+                            : "border-border-soft bg-surface text-muted"
+                        }`}
+                      >
+                        Acreditar la fuente en el video
+                      </button>
+
+                      {fuenteVideoPrincipal !== undefined && (
+                        <input
+                          value={fuenteVideoPrincipal}
+                          onChange={(e) => cambiarFuenteVideoPrincipal(e.target.value)}
+                          placeholder="lapatilla.com"
+                          aria-label="Fuente del video principal"
+                          className="rounded-xl border border-border-soft bg-surface px-4 py-3 text-base text-foreground outline-none"
+                        />
+                      )}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <p className="rounded-xl border border-border-soft bg-surface-strong px-4 py-3 text-xs text-muted">
+                  Escribe primero la fuente.
+                </p>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -594,7 +823,11 @@ export function PublicarNoticiaForm({ onProgramada }: { onProgramada: () => void
                 Carrusel · <span className="tabular">{totalElementos}</span> de{" "}
                 <span className="tabular">{MAX_ELEMENTOS}</span>
               </span>
-              {diapositivas ? (
+              {faltanElementos ? (
+                <p className="rounded-xl border border-warning/40 bg-warning/5 px-4 py-3 text-xs text-warning">
+                  Instagram exige al menos dos elementos en un carrusel: agrega una imagen o video más abajo.
+                </p>
+              ) : diapositivas ? (
                 <ul className="flex gap-2 overflow-x-auto pb-1">
                   {diapositivas.map((diapositiva, indice) => (
                     <li key={`${diapositiva.url}-${indice}`} className="shrink-0">
@@ -808,7 +1041,7 @@ export function PublicarNoticiaForm({ onProgramada }: { onProgramada: () => void
             <button
               type="button"
               onClick={() => setEstado({ paso: "confirmar", preview })}
-              disabled={publicando || subiendo || desactualizado}
+              disabled={publicando || subiendo || desactualizado || faltanElementos}
               className="rounded-xl border border-warning bg-warning/15 px-4 py-3 text-base font-semibold text-warning transition active:scale-95 disabled:opacity-50"
             >
               {publicando ? "Publicando…" : esCarrusel ? "Publicar carrusel" : "Publicar"}
@@ -817,7 +1050,7 @@ export function PublicarNoticiaForm({ onProgramada }: { onProgramada: () => void
 
           <ProgramarPublicacion
             payload={construirPayload(preview)}
-            deshabilitado={publicando || subiendo || desactualizado}
+            deshabilitado={publicando || subiendo || desactualizado || faltanElementos}
             onProgramada={onProgramada}
           />
         </div>
