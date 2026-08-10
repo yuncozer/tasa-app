@@ -2,19 +2,31 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { formatClock, formatDate } from "@/lib/format";
+import { formatClock, formatDate, horaCaracasDesdeIso, isoDesdeHoraCaracas } from "@/lib/format";
 
 export interface ProgramadaVista {
   id: string;
   publicarEn: string;
   estado: "pendiente" | "publicando" | "publicada" | "fallida";
   error: string | null;
+  /** Con qué nombre se reconoce la fila (ver `resumenPublicacion`). */
+  resumen: string;
 }
 
 /**
  * La cola de publicaciones que todavía no han salido, con su hora y los
  * botones para manejarlas. Sin esto, equivocarse de hora no tendría arreglo
  * desde el teléfono.
+ *
+ * Cada fila lleva debajo de la hora un fragmento de su título: dos posts
+ * programados con pocos minutos de diferencia se veían idénticos, y cancelar o
+ * mover el equivocado era cuestión de suerte. Se recorta con `truncate` en vez
+ * de a un número fijo de caracteres — así aprovecha el ancho que haya.
+ *
+ * A una `pendiente` se le puede cambiar la hora sin rehacer el post: el
+ * contenido se congeló al programarlo y sigue valiendo, así que lo único que se
+ * mueve es cuándo sale. El editor se abre con la hora que ya tenía, porque lo
+ * habitual es corregirla, no escribirla de cero.
  *
  * Las ya publicadas no se listan —su confirmación es el post en Instagram—,
  * pero las fallidas sí, con el motivo: es la única forma de enterarse de que
@@ -37,6 +49,39 @@ export function ColaProgramadas({ programadas }: { programadas: ProgramadaVista[
   const [error, setError] = useState<string | null>(null);
   /** Qué fila se está publicando ahora mismo desde aquí, y en qué va. */
   const [enCurso, setEnCurso] = useState<{ id: string; texto: string } | null>(null);
+  /**
+   * Qué fila se está reprogramando y con qué hora. Solo una a la vez: el editor
+   * se abre en su propia fila y con la hora que ya tenía, que es lo que se suele
+   * querer corregir —mover media hora, no escribir la fecha de cero—.
+   */
+  const [editando, setEditando] = useState<{ id: string; cuando: string } | null>(null);
+
+  async function cambiarHora() {
+    if (!editando) return;
+    const publicarEn = isoDesdeHoraCaracas(editando.cuando);
+    if (!publicarEn) {
+      setError("Esa fecha no es válida");
+      return;
+    }
+
+    try {
+      const response = await fetch("/api/admin/programadas", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: editando.id, publicarEn }),
+      });
+      if (!response.ok) {
+        const body = await response.json().catch(() => null);
+        setError(body?.error ?? `Error ${response.status}`);
+      } else {
+        setError(null);
+        setEditando(null);
+      }
+    } catch {
+      setError("No se pudo conectar con el servidor");
+    }
+    router.refresh();
+  }
 
   async function eliminar(id: string) {
     try {
@@ -109,50 +154,105 @@ export function ColaProgramadas({ programadas }: { programadas: ProgramadaVista[
       {programadas.length > 0 && (
         <ul className="divide-y divide-border-soft overflow-hidden rounded-2xl border border-border-soft bg-surface">
           {programadas.map((programada) => (
-            <li key={programada.id} className="flex items-center justify-between gap-3 px-4 py-3">
-              <div className="flex min-w-0 flex-col gap-1">
-                <span className="tabular text-sm font-medium">
-                  {formatDate(programada.publicarEn)} · {formatClock(programada.publicarEn)}
-                </span>
-                {/* Una pendiente no lleva segunda línea: su fecha y su hora ya
-                    lo dicen todo. `formatRelative` no vale aquí — está hecho
-                    para la fecha valor de una tasa y diría "vigente hoy". */}
-                {enCurso?.id === programada.id ? (
-                  <span className="text-xs text-accent">{enCurso.texto}</span>
-                ) : programada.estado === "fallida" ? (
-                  <span className="text-xs text-warning">No salió: {programada.error ?? "error desconocido"}</span>
-                ) : programada.estado === "publicando" ? (
-                  <span className="text-xs text-warning">Publicándose ahora mismo</span>
-                ) : null}
+            <li key={programada.id} className="flex flex-col gap-2 px-4 py-3">
+              {/* `flex-wrap` + la fecha sin partir: en un teléfono, tres
+                  píldoras junto a la hora no caben en una línea, y antes lo que
+                  cedía era la fecha, que se rompía en dos. Ahora se mantiene
+                  entera y son los botones los que bajan.
+                  El `min-w-48` es lo que provoca ese salto: sin un mínimo, la
+                  columna se encoge por debajo de la fecha y, al no poder
+                  partirla, esta se sale de su caja por debajo de los botones. */}
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex min-w-48 flex-1 flex-col gap-1">
+                  <span className="tabular whitespace-nowrap text-sm font-medium">
+                    {formatDate(programada.publicarEn)} · {formatClock(programada.publicarEn)}
+                  </span>
+                  {/* Con qué post se corresponde la hora. Va en una sola línea y
+                      recortado por CSS: a igual hora, dos filas se distinguen
+                      por aquí, y el titular entero no cabe en un teléfono. */}
+                  <span className="truncate text-xs text-muted">{programada.resumen}</span>
+                  {/* `formatRelative` no vale aquí — está hecho para la fecha
+                      valor de una tasa y diría "vigente hoy". */}
+                  {enCurso?.id === programada.id ? (
+                    <span className="text-xs text-accent">{enCurso.texto}</span>
+                  ) : programada.estado === "fallida" ? (
+                    <span className="text-xs text-warning">No salió: {programada.error ?? "error desconocido"}</span>
+                  ) : programada.estado === "publicando" ? (
+                    <span className="text-xs text-warning">Publicándose ahora mismo</span>
+                  ) : null}
+                </div>
+
+                {enCurso?.id !== programada.id && (
+                  <div className="flex shrink-0 items-center gap-2">
+                    {programada.estado === "fallida" && (
+                      <button
+                        type="button"
+                        onClick={() => void publicarAhora(programada.id)}
+                        disabled={enCurso !== null}
+                        className="rounded-full border border-accent/40 px-3 py-1 text-xs font-medium text-accent transition active:scale-95 disabled:opacity-40"
+                      >
+                        Publicar ahora
+                      </button>
+                    )}
+                    {/* Solo una `pendiente`: una `publicando` puede estar ya en
+                        manos de Meta, y a una `fallida` moverle la hora no la
+                        devuelve a la cola — para esa está "Publicar ahora". */}
+                    {programada.estado === "pendiente" && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setEditando(
+                            editando?.id === programada.id
+                              ? null
+                              : { id: programada.id, cuando: horaCaracasDesdeIso(programada.publicarEn) },
+                          )
+                        }
+                        disabled={enCurso !== null}
+                        aria-expanded={editando?.id === programada.id}
+                        className="rounded-full border border-border-soft px-3 py-1 text-xs font-medium text-muted transition active:scale-95 disabled:opacity-40"
+                      >
+                        {editando?.id === programada.id ? "Cerrar" : "Cambiar hora"}
+                      </button>
+                    )}
+                    {(programada.estado === "pendiente" || programada.estado === "fallida") && (
+                      <button
+                        type="button"
+                        onClick={() => void eliminar(programada.id)}
+                        disabled={enCurso !== null}
+                        aria-label={
+                          programada.estado === "fallida"
+                            ? "Quitar esta publicación de la cola"
+                            : "Cancelar esta publicación programada"
+                        }
+                        className="rounded-full border border-border-soft px-3 py-1 text-xs font-medium text-muted transition active:scale-95 disabled:opacity-40"
+                      >
+                        {programada.estado === "fallida" ? "Eliminar" : "Cancelar"}
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
 
-              {enCurso?.id !== programada.id && (
-                <div className="flex shrink-0 items-center gap-2">
-                  {programada.estado === "fallida" && (
-                    <button
-                      type="button"
-                      onClick={() => void publicarAhora(programada.id)}
-                      disabled={enCurso !== null}
-                      className="rounded-full border border-accent/40 px-3 py-1 text-xs font-medium text-accent transition active:scale-95 disabled:opacity-40"
-                    >
-                      Publicar ahora
-                    </button>
-                  )}
-                  {(programada.estado === "pendiente" || programada.estado === "fallida") && (
-                    <button
-                      type="button"
-                      onClick={() => void eliminar(programada.id)}
-                      disabled={enCurso !== null}
-                      aria-label={
-                        programada.estado === "fallida"
-                          ? "Quitar esta publicación de la cola"
-                          : "Cancelar esta publicación programada"
-                      }
-                      className="rounded-full border border-border-soft px-3 py-1 text-xs font-medium text-muted transition active:scale-95 disabled:opacity-40"
-                    >
-                      {programada.estado === "fallida" ? "Eliminar" : "Cancelar"}
-                    </button>
-                  )}
+              {editando?.id === programada.id && (
+                <div className="flex flex-col gap-2">
+                  <label htmlFor={`hora-${programada.id}`} className="text-xs text-muted">
+                    Nueva hora, en hora de Venezuela
+                  </label>
+                  <input
+                    id={`hora-${programada.id}`}
+                    type="datetime-local"
+                    value={editando.cuando}
+                    min={horaCaracasDesdeIso(new Date().toISOString())}
+                    onChange={(e) => setEditando({ id: programada.id, cuando: e.target.value })}
+                    className="tabular rounded-xl border border-border-soft bg-surface-strong px-4 py-3 text-base text-foreground outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => void cambiarHora()}
+                    className="rounded-xl border border-accent/40 bg-accent/10 px-4 py-3 text-sm font-semibold text-accent transition active:scale-95"
+                  >
+                    Guardar la hora
+                  </button>
                 </div>
               )}
             </li>

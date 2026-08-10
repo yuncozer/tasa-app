@@ -128,6 +128,30 @@ export async function cancelarProgramada(id: string): Promise<boolean> {
 }
 
 /**
+ * Cambia la hora de una publicación que todavía no ha salido.
+ *
+ * Solo sobre una `pendiente`, y ese filtro no es cosmético: viaja al `WHERE`
+ * del `UPDATE`, así que si el worker ya la reclamó entre que se pintó la lista
+ * y se tocó el botón, el `PATCH` no encuentra fila y devuelve `false` en vez de
+ * moverle la hora a algo que está saliendo en ese momento.
+ *
+ * El payload no se toca: ya se congeló al programar y sigue siendo válido —lo
+ * que cambia es cuándo sale, no qué sale—. Y como se reprograma hacia el
+ * futuro, la fila vuelve a quedar fuera del alcance de `reclamarVencida()` sin
+ * necesidad de tocar nada más.
+ */
+export async function reprogramarPublicacion(id: string, publicarEn: string): Promise<boolean> {
+  const filas = await rest<Programada[]>(
+    `?id=eq.${encodeURIComponent(id)}&estado=eq.pendiente`,
+    {
+      method: "PATCH",
+      body: JSON.stringify({ publicar_en: publicarEn, actualizada_en: new Date().toISOString() }),
+    },
+  );
+  return filas.length > 0;
+}
+
+/**
  * Toma una publicación vencida y la marca como `publicando` de forma atómica.
  *
  * El `estado=eq.pendiente` del filtro es lo importante: PostgREST lo traduce a
