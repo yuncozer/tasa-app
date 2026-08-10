@@ -1,7 +1,6 @@
 import type { NextRequest } from "next/server";
 import { ImageResponse } from "next/og";
 import sharp from "sharp";
-import { formatDate } from "@/lib/format";
 import { AVISO_NOTICIA, COLOR, Encabezado, Pie, leerFontBuffer, leerSvgComoDataUri } from "@/lib/og-shared";
 import { verifyNewsImageParams } from "@/lib/news-signature";
 
@@ -57,15 +56,12 @@ function Portada({
   title,
   source,
   imageDataUri,
-  fecha,
   icons,
 }: {
   /** Ausente en las diapositivas secundarias de un carrusel. */
   title?: string;
   source: string;
   imageDataUri: string;
-  /** Ausente en las diapositivas secundarias de un carrusel. */
-  fecha?: string;
   icons: { instagram: string; browser: string };
 }) {
   const altoFoto = title ? ALTO_FOTO.principal : ALTO_FOTO.secundaria;
@@ -85,8 +81,7 @@ function Portada({
     >
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
         <Encabezado subtitulo="Noticias" />
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 10, marginTop: 15 }}>
-          {fecha ? <span style={{ fontSize: 32, color: COLOR.foreground, fontWeight: 700 }}>{fecha}</span> : null}
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", marginTop: 15 }}>
           <span style={{ fontSize: 24, color: COLOR.muted, fontWeight: 700 }}>{`@latasa.online`}</span>
         </div>
       </div>
@@ -140,8 +135,6 @@ export async function GET(request: NextRequest) {
     return new Response("Firma inválida", { status: 403 });
   }
 
-  const ahora = new Date().toISOString();
-
   let imageDataUri: string;
   try {
     imageDataUri = await descargarImagenComoPng(image);
@@ -163,7 +156,6 @@ export async function GET(request: NextRequest) {
         title={title ?? undefined}
         source={source}
         imageDataUri={imageDataUri}
-        fecha={title ? formatDate(ahora) : undefined}
         icons={{ instagram: instagramIcon, browser: browserIcon }}
       />
     ),
