@@ -3,15 +3,17 @@
 import { useState } from "react";
 import type { PublicacionPayload } from "@/lib/publish-news";
 import { BarraProgreso } from "@/components/BarraProgreso";
+import type { Cintillo } from "@/components/ControlCintillo";
+import { ControlCintillo } from "@/components/ControlCintillo";
 import { ProgramarPublicacion } from "@/components/ProgramarPublicacion";
 import { subirMediaConProgreso, type FaseSubida } from "@/lib/subida";
 
 type Estado =
   | { paso: "inicial" }
   | { paso: "subiendo"; fase: FaseSubida }
-  | { paso: "preview"; videoUrl: string; videoPublicId: string }
-  | { paso: "confirmar"; videoUrl: string; videoPublicId: string }
-  | { paso: "publicando"; videoUrl: string; videoPublicId: string }
+  | { paso: "preview"; videoUrl: string; descargaUrl: string; videoPublicId: string }
+  | { paso: "confirmar"; videoUrl: string; descargaUrl: string; videoPublicId: string }
+  | { paso: "publicando"; videoUrl: string; descargaUrl: string; videoPublicId: string }
   | { paso: "publicado"; mediaId: string }
   | { paso: "error"; mensaje: string };
 
@@ -37,6 +39,9 @@ export function PublicarVideoForm({ onProgramada }: { onProgramada: () => void }
    * lo que permite avisar de que lo que se ve ya no es lo que se publicaría.
    */
   const [fuenteAplicada, setFuenteAplicada] = useState("");
+  const [cintillo, setCintillo] = useState<Cintillo | undefined>();
+  /** El cintillo horneado en la URL que se está mirando, para detectar cambios. */
+  const [cintilloAplicado, setCintilloAplicado] = useState<Cintillo | undefined>();
   const [refrescando, setRefrescando] = useState(false);
   const [estado, setEstado] = useState<Estado>({ paso: "inicial" });
 
@@ -49,15 +54,21 @@ export function PublicarVideoForm({ onProgramada }: { onProgramada: () => void }
     const preview = await fetch("/api/admin/preview-video", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ videoPublicId, fuente: fuenteDeseada }),
+      body: JSON.stringify({
+        videoPublicId,
+        fuente: fuenteDeseada,
+        titulo: cintillo?.titulo,
+        segundos: cintillo?.segundos,
+      }),
     });
     if (!preview.ok) {
       setEstado({ paso: "error", mensaje: await leerError(preview) });
       return;
     }
-    const { videoUrl } = (await preview.json()) as { videoUrl: string };
+    const { videoUrl, descargaUrl } = (await preview.json()) as { videoUrl: string; descargaUrl: string };
     setFuenteAplicada(fuenteDeseada);
-    setEstado({ paso: "preview", videoUrl, videoPublicId });
+    setCintilloAplicado(cintillo);
+    setEstado({ paso: "preview", videoUrl, descargaUrl, videoPublicId });
   }
 
   async function subirVideo(archivo: File) {
@@ -92,12 +103,18 @@ export function PublicarVideoForm({ onProgramada }: { onProgramada: () => void }
 
   async function publicar(videoPublicId: string) {
     if (!("videoUrl" in estado)) return;
-    setEstado({ paso: "publicando", videoUrl: estado.videoUrl, videoPublicId });
+    setEstado({ paso: "publicando", videoUrl: estado.videoUrl, descargaUrl: estado.descargaUrl, videoPublicId });
     try {
       const response = await fetch("/api/admin/publish-video", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ videoPublicId, caption, fuente: fuenteAplicada }),
+        body: JSON.stringify({
+        videoPublicId,
+        caption,
+        fuente: fuenteAplicada,
+        titulo: cintilloAplicado?.titulo,
+        segundos: cintilloAplicado?.segundos,
+      }),
       });
       if (!response.ok) {
         setEstado({ paso: "error", mensaje: await leerError(response) });
@@ -112,7 +129,10 @@ export function PublicarVideoForm({ onProgramada }: { onProgramada: () => void }
 
   const conVideo = "videoUrl" in estado ? estado : null;
   /** Lo que se ve dejó de ser lo que se publicaría: hay que regenerar la URL. */
-  const desactualizado = conVideo !== null && fuenteDeseada !== fuenteAplicada;
+  const desactualizado =
+    conVideo !== null &&
+    (fuenteDeseada !== fuenteAplicada ||
+      JSON.stringify(cintillo ?? null) !== JSON.stringify(cintilloAplicado ?? null));
 
   return (
     <div className="flex flex-col gap-5 rounded-2xl border border-border-soft bg-surface px-4 py-4">
@@ -170,6 +190,18 @@ export function PublicarVideoForm({ onProgramada }: { onProgramada: () => void }
         <div className="flex flex-col gap-4">
           <video src={conVideo.videoUrl} controls className="w-full rounded-2xl border border-border-soft" />
 
+          {/* Enlace y no botón con `fetch`: la URL ya viene con `fl_attachment`
+              de Cloudinary, que responde con `Content-Disposition: attachment`.
+              El atributo `download` de HTML no bastaría, porque se ignora entre
+              orígenes distintos y el video lo sirve Cloudinary. */}
+          <a
+            href={conVideo.descargaUrl}
+            download
+            className="rounded-xl border border-border-soft px-4 py-3 text-center text-sm font-semibold text-muted transition active:scale-95"
+          >
+            Descargar el video
+          </a>
+
           <div className="flex flex-col gap-2">
             <button
               type="button"
@@ -194,12 +226,19 @@ export function PublicarVideoForm({ onProgramada }: { onProgramada: () => void }
                 className="rounded-xl border border-border-soft bg-surface-strong px-4 py-3 text-base text-foreground outline-none"
               />
             )}
+
+            <ControlCintillo
+              idPrefijo="cintillo-reel"
+              valor={cintillo}
+              onCambiar={setCintillo}
+              deshabilitado={publicando}
+            />
           </div>
 
           {desactualizado && (
             <div className="flex flex-col gap-2 rounded-2xl border border-warning/40 bg-warning/5 px-4 py-3">
               <p className="text-sm text-warning">
-                Cambiaste la fuente: el video de arriba ya no es el que se publicaría.
+                Cambiaste la fuente o el cintillo: el video de arriba ya no es el que se publicaría.
               </p>
               <button
                 type="button"
@@ -239,7 +278,12 @@ export function PublicarVideoForm({ onProgramada }: { onProgramada: () => void }
                 </button>
                 <button
                   type="button"
-                  onClick={() => setEstado({ paso: "preview", videoUrl: conVideo.videoUrl, videoPublicId: conVideo.videoPublicId })}
+                  onClick={() => setEstado({
+                      paso: "preview",
+                      videoUrl: conVideo.videoUrl,
+                      descargaUrl: conVideo.descargaUrl,
+                      videoPublicId: conVideo.videoPublicId,
+                    })}
                   className="flex-1 rounded-xl border border-border-soft bg-surface-strong px-4 py-3 text-sm font-semibold text-muted transition active:scale-95"
                 >
                   Cancelar
@@ -249,7 +293,12 @@ export function PublicarVideoForm({ onProgramada }: { onProgramada: () => void }
           ) : (
             <button
               type="button"
-              onClick={() => setEstado({ paso: "confirmar", videoUrl: conVideo.videoUrl, videoPublicId: conVideo.videoPublicId })}
+              onClick={() => setEstado({
+                  paso: "confirmar",
+                  videoUrl: conVideo.videoUrl,
+                  descargaUrl: conVideo.descargaUrl,
+                  videoPublicId: conVideo.videoPublicId,
+                })}
               disabled={!caption.trim() || publicando || desactualizado || refrescando}
               className="rounded-xl border border-warning bg-warning/15 px-4 py-3 text-base font-semibold text-warning transition active:scale-95 disabled:opacity-50"
             >
@@ -265,6 +314,8 @@ export function PublicarVideoForm({ onProgramada }: { onProgramada: () => void }
                     videoPublicId: conVideo.videoPublicId,
                     caption,
                     fuente: fuenteAplicada || undefined,
+                    titulo: cintilloAplicado?.titulo || undefined,
+                    segundos: cintilloAplicado?.segundos,
                   } satisfies PublicacionPayload)
                 : null
             }

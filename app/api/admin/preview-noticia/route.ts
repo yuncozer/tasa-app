@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 import { apiError, apiJson } from "@/lib/api";
 import { COOKIE_SESION, esSesionValida } from "@/lib/admin-session";
-import { previewNewsPost } from "@/lib/publish-news";
+import { previewNewsPost, urlDescargaImagen } from "@/lib/publish-news";
 import { esUrlValida } from "@/lib/validar-url";
 
 /**
@@ -26,7 +26,16 @@ export async function POST(request: NextRequest) {
 
   try {
     const { article, caption, imageUrl } = await previewNewsPost(url, imagenPropiaPublicId);
-    return apiJson({ title: article.title, sourceHost: article.sourceHost, caption, imageUrl }, { cachear: false });
+    return apiJson(
+      {
+        title: article.title,
+        sourceHost: article.sourceHost,
+        caption,
+        imageUrl,
+        descargaUrl: urlDescargaImagen(imageUrl),
+      },
+      { cachear: false },
+    );
   } catch (error) {
     return apiError("No se pudo generar la vista previa del artículo", error);
   }

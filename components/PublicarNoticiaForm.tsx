@@ -3,6 +3,8 @@
 import { useState } from "react";
 import type { ElementoCarruselEntrada, ProporcionCarrusel, PublicacionPayload } from "@/lib/publish-news";
 import { BarraProgreso } from "@/components/BarraProgreso";
+import type { Cintillo } from "@/components/ControlCintillo";
+import { ControlCintillo } from "@/components/ControlCintillo";
 import { ProgramarPublicacion } from "@/components/ProgramarPublicacion";
 import { subirMediaConProgreso, type FaseSubida } from "@/lib/subida";
 
@@ -12,6 +14,8 @@ interface Preview {
   sourceHost: string;
   caption: string;
   imageUrl: string;
+  /** La misma imagen, pero que el navegador guarda en vez de abrir. */
+  descargaUrl: string;
 }
 
 /** Tipo de elemento principal en "Noticia propia". Con video no hay título superpuesto. */
@@ -20,6 +24,8 @@ type PrincipalTipo = "imagen" | "video";
 interface Diapositiva {
   tipo: "imagen" | "video";
   url: string;
+  /** La misma pieza, pero que el navegador guarda en vez de abrir. */
+  descargaUrl: string;
 }
 
 /** Un elemento que el usuario sumó al carrusel, aún sin enmarcar. */
@@ -35,6 +41,8 @@ interface Extra {
    * escribir", que es lo que distingue la casilla activada de la apagada.
    */
   fuente?: string;
+  /** Cintillo de este clip. Se decide por video, no para todo el post. */
+  cintillo?: Cintillo;
 }
 
 type Modo = "url" | "manual";
@@ -75,7 +83,7 @@ function textoDeSubida({ que, fase }: Subida): string {
 type Principal =
   | { tipo: "subida"; publicId: string }
   | { tipo: "articulo"; url: string }
-  | { tipo: "video"; publicId: string; fuente?: string };
+  | { tipo: "video"; publicId: string; fuente?: string; titulo?: string; segundos?: number };
 
 type Estado =
   | { paso: "inicial" }
@@ -89,6 +97,28 @@ type Estado =
 /** Tope de Meta para un carrusel, contando la imagen principal. */
 const MAX_ELEMENTOS = 10;
 
+/**
+ * Descarga lo que se está viendo. Es un enlace y no un botón con `fetch`
+ * porque el servidor ya devuelve la pieza con `Content-Disposition:
+ * attachment` —la imagen por cabecera, el video por `fl_attachment` de
+ * Cloudinary—, y así funciona igual en iOS, donde el atributo `download` no
+ * es fiable.
+ */
+function BotonDescargar({ url, ancho }: { url: string; ancho?: boolean }) {
+  if (!url) return null;
+  return (
+    <a
+      href={url}
+      download
+      className={`rounded-full border border-border-soft px-3 py-1 text-center text-xs font-medium text-muted transition active:scale-95 ${
+        ancho ? "" : "w-40"
+      }`}
+    >
+      Descargar
+    </a>
+  );
+}
+
 async function leerError(response: Response): Promise<string> {
   const body = await response.json().catch(() => null);
   return body?.error ? `${body.error}${body.detail ? `: ${body.detail}` : ""}` : `Error ${response.status}`;
@@ -101,8 +131,10 @@ async function leerError(response: Response): Promise<string> {
  * revisado.
  */
 function aElementos(lista: Extra[]): ElementoCarruselEntrada[] {
-  return lista.map(({ tipo, publicId, fuente }) =>
-    tipo === "video" ? { tipo, publicId, fuente } : { tipo, publicId },
+  return lista.map(({ tipo, publicId, fuente, cintillo }) =>
+    tipo === "video"
+      ? { tipo, publicId, fuente, titulo: cintillo?.titulo, segundos: cintillo?.segundos }
+      : { tipo, publicId },
   );
 }
 
@@ -133,6 +165,7 @@ export function PublicarNoticiaForm({ onProgramada }: { onProgramada: () => void
   const [videoPrincipal, setVideoPrincipal] = useState<string | undefined>();
   /** Igual que en `Extra.fuente`: `undefined` es "sin franja", `""` es "pedida pero en blanco". */
   const [fuenteVideoPrincipal, setFuenteVideoPrincipal] = useState<string | undefined>();
+  const [cintilloVideoPrincipal, setCintilloVideoPrincipal] = useState<Cintillo | undefined>();
   /** Proporción del carrusel; solo se elige cuando el principal es un video. */
   const [proporcion, setProporcion] = useState<ProporcionCarrusel>("1:1");
   const [subida, setSubida] = useState<Subida | null>(null);
@@ -164,7 +197,13 @@ export function PublicarNoticiaForm({ onProgramada }: { onProgramada: () => void
 
   /** Origen del elemento principal: video propio, imagen subida, o la del artículo. */
   const principal: Principal = principalEsVideo
-    ? { tipo: "video", publicId: videoPrincipalPublicId ?? "", fuente: fuenteVideoPrincipal }
+    ? {
+        tipo: "video",
+        publicId: videoPrincipalPublicId ?? "",
+        fuente: fuenteVideoPrincipal,
+        titulo: cintilloVideoPrincipal?.titulo,
+        segundos: cintilloVideoPrincipal?.segundos,
+      }
     : imagenPublicId
       ? { tipo: "subida", publicId: imagenPublicId }
       : { tipo: "articulo", url };
@@ -272,7 +311,9 @@ export function PublicarNoticiaForm({ onProgramada }: { onProgramada: () => void
       // compone la plantilla Satori. El carrusel (incluido el video) lo
       // resuelve `refrescarCarrusel` más abajo, igual que con imagen.
       if (principalEsVideo) {
-        const datos: Preview = { title: "", sourceHost: sourceHost.trim(), caption, imageUrl: "" };
+        // Sin imagen principal tampoco hay nada que descargar aquí: las descargas
+        // del carrusel van por diapositiva.
+        const datos: Preview = { title: "", sourceHost: sourceHost.trim(), caption, imageUrl: "", descargaUrl: "" };
         setDesactualizado(false);
         setEstado({ paso: "preview", preview: datos });
         await refrescarCarrusel(extras, principal, datos);
@@ -352,7 +393,17 @@ export function PublicarNoticiaForm({ onProgramada }: { onProgramada: () => void
       setVideoPrincipalPublicId(publicId);
       ponerVideoPrincipal(archivo);
       if (preview) {
-        await refrescarCarrusel(extras, { tipo: "video", publicId, fuente: fuenteVideoPrincipal }, preview);
+        await refrescarCarrusel(
+          extras,
+          {
+            tipo: "video",
+            publicId,
+            fuente: fuenteVideoPrincipal,
+            titulo: cintilloVideoPrincipal?.titulo,
+            segundos: cintilloVideoPrincipal?.segundos,
+          },
+          preview,
+        );
       }
     } catch (error) {
       setEstado({
@@ -374,6 +425,22 @@ export function PublicarNoticiaForm({ onProgramada }: { onProgramada: () => void
   /** Igual que `cambiarFuenteExtra`, pero para el video principal. */
   function cambiarFuenteVideoPrincipal(fuente: string | undefined) {
     editarCampoDelMarco(() => setFuenteVideoPrincipal(fuente));
+  }
+
+  /**
+   * Cintillo del video principal. Como el crédito, no regenera la vista previa
+   * en cada tecla: la marca la compone Cloudinary al pedir la URL, así que se
+   * marca desactualizada y el usuario pulsa el botón cuando termina.
+   */
+  function cambiarCintilloVideoPrincipal(cintillo: Cintillo | undefined) {
+    editarCampoDelMarco(() => setCintilloVideoPrincipal(cintillo));
+  }
+
+  /** Igual, para un video del carrusel: el cintillo se decide por clip. */
+  function cambiarCintilloExtra(clave: string, cintillo: Cintillo | undefined) {
+    editarCampoDelMarco(() => {
+      setExtras(extras.map((extra) => (extra.clave === clave ? { ...extra, cintillo } : extra)));
+    });
   }
 
   /** Aplica una lista nueva de elementos y regenera la vista previa con ella. */
@@ -775,6 +842,15 @@ export function PublicarNoticiaForm({ onProgramada }: { onProgramada: () => void
                           className="rounded-xl border border-border-soft bg-surface px-4 py-3 text-base text-foreground outline-none"
                         />
                       )}
+
+                      {/* Un video principal no lleva el titular del marco, así
+                          que el cintillo es la única forma de titularlo. */}
+                      <ControlCintillo
+                        idPrefijo="cintillo-principal"
+                        valor={cintilloVideoPrincipal}
+                        onCambiar={cambiarCintilloVideoPrincipal}
+                        deshabilitado={publicando}
+                      />
                     </div>
                   )}
                 </>
@@ -830,7 +906,7 @@ export function PublicarNoticiaForm({ onProgramada }: { onProgramada: () => void
               ) : diapositivas ? (
                 <ul className="flex gap-2 overflow-x-auto pb-1">
                   {diapositivas.map((diapositiva, indice) => (
-                    <li key={`${diapositiva.url}-${indice}`} className="shrink-0">
+                    <li key={`${diapositiva.url}-${indice}`} className="flex shrink-0 flex-col gap-1">
                       {diapositiva.tipo === "video" ? (
                         <video
                           src={diapositiva.url}
@@ -845,6 +921,7 @@ export function PublicarNoticiaForm({ onProgramada }: { onProgramada: () => void
                           className="h-40 w-40 rounded-xl border border-border-soft object-cover"
                         />
                       )}
+                      <BotonDescargar url={diapositiva.descargaUrl} />
                     </li>
                   ))}
                 </ul>
@@ -853,8 +930,11 @@ export function PublicarNoticiaForm({ onProgramada }: { onProgramada: () => void
               )}
             </div>
           ) : (
-            // eslint-disable-next-line @next/next/no-img-element -- imagen generada dinámicamente, no un asset estático.
-            <img src={preview.imageUrl} alt="" className="w-full rounded-2xl border border-border-soft" />
+            <div className="flex flex-col gap-2">
+              {/* eslint-disable-next-line @next/next/no-img-element -- imagen generada dinámicamente, no un asset estático. */}
+              <img src={preview.imageUrl} alt="" className="w-full rounded-2xl border border-border-soft" />
+              <BotonDescargar url={preview.descargaUrl} ancho />
+            </div>
           )}
 
           {modo === "url" && (
@@ -990,6 +1070,13 @@ export function PublicarNoticiaForm({ onProgramada }: { onProgramada: () => void
                             className="rounded-xl border border-border-soft bg-surface px-4 py-3 text-base text-foreground outline-none"
                           />
                         )}
+
+                        <ControlCintillo
+                          idPrefijo={`cintillo-${extra.clave}`}
+                          valor={extra.cintillo}
+                          onCambiar={(cintillo) => cambiarCintilloExtra(extra.clave, cintillo)}
+                          deshabilitado={publicando}
+                        />
                       </div>
                     )}
                   </li>
