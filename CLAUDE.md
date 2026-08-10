@@ -394,9 +394,14 @@ nada, porque determina el encuadre.
   pantalla. La interfaz lo marca como desactualizado y bloquea publicar hasta
   regenerar, en vez de bloquear los campos: obligar a borrar y resubir la foto
   por corregir una tilde cuesta una subida entera desde el teléfono.
-- Las **diapositivas secundarias** van sin titular ni fecha, y la foto se
-  queda ese espacio (`ALTO_FOTO` en la plantilla). Repetir el titular en cada
-  una no aporta y le quita sitio a la imagen.
+- Las **diapositivas secundarias** van sin titular, y la foto se queda ese
+  espacio (`ALTO_FOTO` en la plantilla). Repetir el titular en cada una no
+  aporta y le quita sitio a la imagen.
+- El marco de noticias **no lleva fecha**. La llevaba arriba a la derecha, pero
+  una noticia no caduca a la misma hora que una tasa: fecharla la deja vieja en
+  el perfil al día siguiente, y la fecha del artículo ya va en el caption. Los
+  posts diarios de tasas sí la conservan —ahí el dato *es* del día y la hora—,
+  y viven en rutas aparte (`instagram-post`, `instagram-post-pesos`).
 
 Instagram impone dos reglas que explican el resto del diseño:
 
