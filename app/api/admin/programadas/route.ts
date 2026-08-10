@@ -4,8 +4,10 @@ import { COOKIE_SESION, esSesionValida } from "@/lib/admin-session";
 import { cancelarProgramada } from "@/lib/programadas";
 
 /**
- * Cancela una publicación de la cola que todavía no ha salido. Sin esto, un
- * error en la hora no tendría arreglo desde el teléfono.
+ * Quita una publicación de la cola: una `pendiente` que ya no se quiere, o una
+ * `fallida` que ya se leyó y estorba. Sin esto, un error en la hora no tendría
+ * arreglo desde el teléfono, y una fallida se quedaría en la lista para
+ * siempre.
  *
  * No hay `GET`: la lista la lee la propia página en el servidor
  * (`app/admin/noticia/page.tsx`), y tras cancelar basta con `router.refresh()`.
@@ -21,14 +23,14 @@ export async function DELETE(request: NextRequest) {
   if (!id) return apiError("Falta el id", undefined, 400);
 
   try {
-    const cancelada = await cancelarProgramada(id);
-    if (!cancelada) {
+    const borrada = await cancelarProgramada(id);
+    if (!borrada) {
       // O ya salió, o el worker la tiene entre manos: en ninguno de los dos
-      // casos se puede deshacer desde aquí.
-      return apiError("Esa publicación ya no se puede cancelar", undefined, 409);
+      // casos conviene perder la fila, que es el único rastro de qué pasó.
+      return apiError("Esa publicación ya no se puede quitar de la cola", undefined, 409);
     }
     return apiJson({ ok: true }, { cachear: false });
   } catch (error) {
-    return apiError("No se pudo cancelar la publicación", error);
+    return apiError("No se pudo quitar la publicación de la cola", error);
   }
 }

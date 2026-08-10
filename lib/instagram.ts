@@ -67,34 +67,53 @@ async function crearContenedor(params: Record<string, string>, queHace: string):
 }
 
 /**
- * Espera a que Meta termine de procesar un contenedor antes de publicarlo.
+ * Un solo sondeo del estado de un contenedor, sin esperas.
  *
  * Es el paso intermedio que documenta Meta —crear, sondear `status_code` hasta
  * `FINISHED`, publicar— y saltárselo es exactamente lo que devuelve el error
  * 9007 ("Media ID is not available"). El reintento corto de
  * `publicarContenedor` alcanza para una imagen suelta, pero no para un video
  * ni para el padre de un carrusel que lleva uno.
+ *
+ * Va suelta, sin el bucle, porque la cola de programadas sondea **una vez por
+ * disparo del cron** y guarda el avance en la fila: un bucle que espera
+ * minutos no cabe en el tope de una función serverless, que es exactamente lo
+ * que dejó una publicación colgada en `publicando`.
  */
-async function esperarContenedorListo(containerId: string, queEs: string): Promise<void> {
+export type EstadoContenedor = "listo" | "procesando";
+
+export async function estadoContenedor(containerId: string, queEs: string): Promise<EstadoContenedor> {
   const { accessToken } = credenciales();
   const url = new URL(`${GRAPH_BASE}/${containerId}`);
   url.searchParams.set("fields", "status_code");
   url.searchParams.set("access_token", accessToken);
 
+  const res = await fetch(url);
+  const body = await res.json();
+  if (!res.ok) throw new InstagramApiError(`No se pudo consultar el estado de ${queEs}`, body);
+
+  // Si Meta no sirve el campo, se sigue adelante en vez de esperar en balde:
+  // queda el reintento ante el 9007, que es como funcionaba antes de existir
+  // este sondeo. Esperar los tres minutos completos para acabar fallando
+  // sería peor que intentar publicar.
+  if (body.status_code === undefined) return "listo";
+  if (body.status_code === "FINISHED" || body.status_code === "PUBLISHED") return "listo";
+  if (body.status_code === "ERROR") throw new Error(`Instagram no pudo procesar ${queEs}`);
+  if (body.status_code === "EXPIRED") throw new Error(`El contenedor de ${queEs} caducó sin publicarse`);
+  return "procesando";
+}
+
+/**
+ * Espera a que Meta termine de procesar un contenedor, sondeando en bucle.
+ *
+ * La usan los caminos que publican de un tirón dentro de una sola petición
+ * (el post diario y el botón inmediato de `/admin`). La cola de programadas
+ * **no** la usa: ahí cada disparo sondea una vez con `estadoContenedor()` y
+ * deja constancia de por dónde iba.
+ */
+async function esperarContenedorListo(containerId: string, queEs: string): Promise<void> {
   for (let intento = 1; intento <= POLL_MAX_INTENTOS; intento++) {
-    const res = await fetch(url);
-    const body = await res.json();
-    if (!res.ok) throw new InstagramApiError(`No se pudo consultar el estado de ${queEs}`, body);
-
-    // Si Meta no sirve el campo, se sigue adelante en vez de esperar en balde:
-    // queda el reintento ante el 9007, que es como funcionaba antes de existir
-    // este sondeo. Esperar los tres minutos completos para acabar fallando
-    // sería peor que intentar publicar.
-    if (body.status_code === undefined) return;
-    if (body.status_code === "FINISHED" || body.status_code === "PUBLISHED") return;
-    if (body.status_code === "ERROR") throw new Error(`Instagram no pudo procesar ${queEs}`);
-    if (body.status_code === "EXPIRED") throw new Error(`El contenedor de ${queEs} caducó sin publicarse`);
-
+    if ((await estadoContenedor(containerId, queEs)) === "listo") return;
     await new Promise((resolve) => setTimeout(resolve, POLL_INTERVALO_MS));
   }
 
@@ -105,7 +124,7 @@ function esMediaNoLista(body: GraphErrorBody): boolean {
   return body.error?.code === MEDIA_NOT_READY_CODE;
 }
 
-async function publicarContenedor(containerId: string): Promise<string> {
+export async function publicarContenedor(containerId: string): Promise<string> {
   const { accountId, accessToken } = credenciales();
   const url = new URL(`${GRAPH_BASE}/${accountId}/media_publish`);
   url.searchParams.set("creation_id", containerId);
@@ -127,15 +146,29 @@ async function publicarContenedor(containerId: string): Promise<string> {
   throw new Error("No se pudo publicar el contenedor tras varios reintentos");
 }
 
+/**
+ * Contenedores por tipo de post. Se exportan sueltos porque la cola de
+ * programadas los llama por separado —crear en un disparo, sondear en el
+ * siguiente— mientras que las funciones de más abajo los encadenan de un
+ * tirón para quien publica con el navegador esperando.
+ */
+export function crearContenedorImagen(imageUrl: string, caption: string): Promise<string> {
+  return crearContenedor({ image_url: imageUrl, caption }, "el contenedor de media");
+}
+
+export function crearContenedorReel(videoUrl: string, caption: string): Promise<string> {
+  return crearContenedor(
+    { media_type: "REELS", video_url: videoUrl, caption },
+    "el contenedor del Reel",
+  );
+}
+
 /** Publica un post de una sola imagen: crea el contenedor y lo publica. */
 export async function publishDailyPost(
   imageUrl: string,
   caption: string,
 ): Promise<{ mediaId: string }> {
-  const containerId = await crearContenedor(
-    { image_url: imageUrl, caption },
-    "el contenedor de media",
-  );
+  const containerId = await crearContenedorImagen(imageUrl, caption);
   const mediaId = await publicarContenedor(containerId);
   return { mediaId };
 }
@@ -147,10 +180,7 @@ export async function publishDailyPost(
  * el reintento corto de `publicarContenedor` no alcanza para video.
  */
 export async function publishReel(videoUrl: string, caption: string): Promise<{ mediaId: string }> {
-  const containerId = await crearContenedor(
-    { media_type: "REELS", video_url: videoUrl, caption },
-    "el contenedor del Reel",
-  );
+  const containerId = await crearContenedorReel(videoUrl, caption);
   await esperarContenedorListo(containerId, "el Reel");
   const mediaId = await publicarContenedor(containerId);
   return { mediaId };
@@ -179,15 +209,12 @@ export const MAX_ELEMENTOS_CARRUSEL = 10;
  * Reels de los carruseles, y por eso un video publicado por aquí no aparece
  * en la pestaña de Reels — para eso está `publishReel`.
  */
-export async function publishCarousel(
-  elementos: ElementoCarrusel[],
-  caption: string,
-): Promise<{ mediaId: string }> {
+export function crearHijosCarrusel(elementos: ElementoCarrusel[]): Promise<string[]> {
   if (elementos.length < 2 || elementos.length > MAX_ELEMENTOS_CARRUSEL) {
     throw new Error(`Un carrusel de Instagram lleva entre 2 y ${MAX_ELEMENTOS_CARRUSEL} elementos`);
   }
 
-  const hijos = await Promise.all(
+  return Promise.all(
     elementos.map((elemento) =>
       crearContenedor(
         elemento.tipo === "video"
@@ -197,6 +224,20 @@ export async function publishCarousel(
       ),
     ),
   );
+}
+
+export function crearPadreCarrusel(hijos: string[], caption: string): Promise<string> {
+  return crearContenedor(
+    { media_type: "CAROUSEL", children: hijos.join(","), caption },
+    "el contenedor del carrusel",
+  );
+}
+
+export async function publishCarousel(
+  elementos: ElementoCarrusel[],
+  caption: string,
+): Promise<{ mediaId: string }> {
+  const hijos = await crearHijosCarrusel(elementos);
 
   // Si el padre se arma antes de que Meta termine de procesar un video, lo rechaza.
   await Promise.all(
@@ -205,10 +246,7 @@ export async function publishCarousel(
       .map((id) => esperarContenedorListo(id, "un video del carrusel")),
   );
 
-  const padre = await crearContenedor(
-    { media_type: "CAROUSEL", children: hijos.join(","), caption },
-    "el contenedor del carrusel",
-  );
+  const padre = await crearPadreCarrusel(hijos, caption);
 
   // El padre también se procesa, y con un video dentro tarda bastante más que
   // los pocos segundos que cubre el reintento de `publicarContenedor`. Sin esta

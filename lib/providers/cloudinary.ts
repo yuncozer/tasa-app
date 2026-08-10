@@ -63,6 +63,53 @@ export interface MediaSubido {
   bytes: number;
 }
 
+/**
+ * Permiso de subida directa desde el navegador a Cloudinary.
+ *
+ * Las credenciales no viajan enteras: sale la `api_key` (que es pública por
+ * diseño) y una firma de un solo uso calculada con el secreto, que se queda
+ * aquí. Sin `timestamp` reciente y firma válida, Cloudinary rechaza la subida.
+ */
+export interface PermisoSubida {
+  cloudName: string;
+  apiKey: string;
+  timestamp: number;
+  signature: string;
+  maxBytes: number;
+}
+
+/**
+ * Firma una subida directa navegador → Cloudinary.
+ *
+ * El archivo ya no pasa por nuestro servidor, y no es una optimización sino la
+ * única forma de que entre: en Vercel el cuerpo de una petición a una función
+ * tiene un tope de ~4,5 MB, así que un video de 18 MB moría con un 413 de la
+ * plataforma antes de llegar a ningún código nuestro.
+ *
+ * Se firma **solo** el `timestamp`. La firma de Cloudinary cubre exactamente
+ * los parámetros incluidos, de modo que dejar fuera todo lo demás implica que
+ * el navegador tampoco puede añadir ninguno: cualquier parámetro extra invalida
+ * la firma. El `resource_type` no se firma porque viaja en la ruta, no en el
+ * cuerpo.
+ *
+ * El tope de tamaño se devuelve en vez de duplicarse en el cliente: al no ver
+ * ya el archivo, el servidor no puede medirlo, pero sigue siendo quien decide
+ * cuál es el límite.
+ */
+export function firmarSubidaDirecta(): PermisoSubida {
+  // `configurar()` es lo que garantiza que las tres variables existen.
+  const client = configurar();
+  const timestamp = Math.round(Date.now() / 1000);
+
+  return {
+    cloudName: process.env.CLOUDINARY_CLOUD_NAME!,
+    apiKey: process.env.CLOUDINARY_API_KEY!,
+    timestamp,
+    signature: client.utils.api_sign_request({ timestamp }, process.env.CLOUDINARY_API_SECRET!),
+    maxBytes: MAX_BYTES,
+  };
+}
+
 /** Sube un video o imagen propios (sin marca todavía) y valida el tamaño. */
 export async function subirMedia(buffer: Buffer, resourceType: "image" | "video"): Promise<MediaSubido> {
   if (buffer.byteLength > MAX_BYTES) {

@@ -227,7 +227,9 @@ vive aquí.
 - **Los tres disparos están en cron-job.org**, no en `vercel.json`, que quedó sin
   `crons`. El motivo no es el número de slots del plan Hobby sino la frecuencia:
   ahí **cada cron solo se ejecuta una vez al día**, lo que no sirve para mirar
-  una cola cada diez minutos. Y de paso se arregló algo que pasaba
+  una cola cada pocos minutos. El de la cola va **cada 2 minutos**, no cada
+  diez: con la publicación repartida en fases (ver más abajo), un intervalo
+  largo multiplicaría la espera por el número de fases. Y de paso se arregló algo que pasaba
   desapercibido: los crons de Hobby disparan "dentro de la hora", así que el
   post de tasas de las 9:00 podía salir a las 9:50. Si los devuelves a
   `vercel.json`, las programadas dejan de salir.
@@ -247,10 +249,45 @@ vive aquí.
   filtro se traduce en un `WHERE` sobre el `UPDATE`: si dos disparos se
   solapan, solo uno se lleva la fila. Sin esa condición el modo de fallo es un
   post duplicado en la cuenta real, que no se deshace. Por lo mismo,
-  cron-job.org va **sin reintentos automáticos** y no hay rescate automático de
-  las que se quedan en `publicando`: si una ejecución muere después de que Meta
-  aceptara el post, reintentarla lo duplicaría. Se quedan visibles en la cola
-  para decidirlas a mano.
+  cron-job.org va **sin reintentos automáticos**: el reintento vive en la
+  propia cola, que sí sabe por dónde iba.
+- **La publicación va por fases, y no de un tirón.** Un carrusel con video no
+  cabe en una sola petición: Meta procesa cada contenedor de forma asíncrona y
+  hay que sondearlo, lo que puede llevar minutos, mientras que una función de
+  Vercel muere al minuto y cron-job.org da por fallida cualquier respuesta que
+  pase de 30 segundos. Verificado en producción: una programada de las 9:30 con
+  imagen + video murió a mitad, y como el `catch` del route nunca llegó a
+  correr, `cerrarProgramada()` tampoco: la fila se quedó en `publicando` sin
+  publicarse y sin poder reintentarse.
+
+  Ahora `avanzarPublicacion()` (`lib/worker-programadas.ts`) hace un trozo
+  acotado —20 s de presupuesto— y **anota la fase en la fila**
+  (`creando → esperando_hijos → esperando_padre → publicando_meta`), de modo
+  que el disparo siguiente retoma donde se quedó. Al terminar el turno suelta
+  la fila (`liberarProgramada`) para que la retomen enseguida; el margen de
+  abandono de 90 s es solo para las ejecuciones que mueren sin soltarla.
+
+  No subas el presupuesto pensando que así termina antes: lo que lo limita no
+  es nuestro código sino los 30 s que espera cron-job.org por una respuesta.
+- **`publicando_meta` es la única fase que no se retoma sola.** Es el
+  `media_publish`, el único paso irreversible: crear contenedores o sondear
+  estados se puede repetir sin consecuencias —un contenedor de más caduca
+  solo—, pero reintentar la publicación podría duplicar el post. Las que mueran
+  ahí se quedan visibles en la cola para decidirlas a mano, que es el lado
+  seguro del error.
+- **El botón "Publicar ahora" y el cron son el mismo worker**, por el mismo
+  motivo que `ejecutarPublicacion()`. El botón tampoco publica de una sola
+  llamada: pide un paso, muestra la fase en lenguaje llano y vuelve a pedir
+  otro. Si se cierra el navegador a mitad, el cron la termina igual.
+- **Una `fallida` se puede reintentar o eliminar desde la cola**; una
+  `publicando` no. Esa puede haber llegado a Meta, y borrar la fila perdería el
+  único rastro de qué salió y qué no.
+- **El video se calienta al programar** (`calentarVideo`, en
+  `lib/publish-news.ts`). La marca del video es una transformación por URL: la
+  primera petición transcodifica el clip entero. Si esa espera cae dentro de la
+  publicación se le suma al procesamiento de Meta, así que se paga por
+  adelantado, al programar, donde no hay prisa. Si falla, se ignora: es una
+  optimización, no un requisito.
 - La tabla lleva **RLS activada y ninguna política**, así que solo la
   `service_role` la ve. El navegador nunca habla con Supabase: todo pasa por
   las rutas `/api/admin/*`, que ya exigen la cookie de sesión.
@@ -357,9 +394,14 @@ nada, porque determina el encuadre.
   pantalla. La interfaz lo marca como desactualizado y bloquea publicar hasta
   regenerar, en vez de bloquear los campos: obligar a borrar y resubir la foto
   por corregir una tilde cuesta una subida entera desde el teléfono.
-- Las **diapositivas secundarias** van sin titular ni fecha, y la foto se
-  queda ese espacio (`ALTO_FOTO` en la plantilla). Repetir el titular en cada
-  una no aporta y le quita sitio a la imagen.
+- Las **diapositivas secundarias** van sin titular, y la foto se queda ese
+  espacio (`ALTO_FOTO` en la plantilla). Repetir el titular en cada una no
+  aporta y le quita sitio a la imagen.
+- El marco de noticias **no lleva fecha**. La llevaba arriba a la derecha, pero
+  una noticia no caduca a la misma hora que una tasa: fecharla la deja vieja en
+  el perfil al día siguiente, y la fecha del artículo ya va en el caption. Los
+  posts diarios de tasas sí la conservan —ahí el dato *es* del día y la hora—,
+  y viven en rutas aparte (`instagram-post`, `instagram-post-pesos`).
 
 Instagram impone dos reglas que explican el resto del diseño:
 
@@ -405,24 +447,43 @@ barra con porcentaje, pero **solo en el tramo que de verdad se puede medir**.
   es la única razón por la que ahí se usa la API vieja en vez de `fetch()`:
   `fetch()` no emite progreso de subida. El resto del proyecto sigue con
   `fetch()`, que no tiene nada que medir.
-- Ese porcentaje cubre el viaje **del teléfono a nuestro servidor**. Lo que
-  sigue —servidor → Cloudinary y, en el video, la marca— es una petición
-  abierta de la que el navegador no recibe ningún avance. Al terminar el envío
-  (`upload.onload`) la barra pasa a indeterminada y el texto dice qué está
-  pasando. No lo cambies a estimar un porcentaje hasta 100: sería un número
-  inventado, y en un video pesado se quedaría clavado en 95 % un buen rato.
+- Ese porcentaje cubre el viaje **del teléfono a Cloudinary**. Lo que sigue
+  —Cloudinary procesando el archivo antes de responder— es una espera de la que
+  el navegador no recibe ningún avance. Al terminar el envío (`upload.onload`)
+  la barra pasa a indeterminada y el texto dice qué está pasando. No lo cambies
+  a estimar un porcentaje hasta 100: sería un número inventado, y en un video
+  pesado se quedaría clavado en 95 % un buen rato.
 - `Subida.origen` en `PublicarNoticiaForm` existe para pintar la barra **debajo
   del control que se tocó**: esa pantalla tiene tres sitios desde donde subir, y
   una barra suelta no dice cuál de ellos está trabajando.
-- Los errores de subida ahora muestran el mensaje del servidor (p. ej. el tope
-  de 100 MB de `subirMedia`) en vez de un "no se pudo subir" genérico: el
-  motivo es lo que le dice al admin si reintentar o cambiar el archivo.
+- Los errores de subida muestran el mensaje que devuelve quien falló (el tope de
+  tamaño, o el `error.message` de Cloudinary) en vez de un "no se pudo subir"
+  genérico: el motivo es lo que le dice al admin si reintentar o cambiar el
+  archivo.
 
-Aparte, en Vercel el cuerpo de una petición a una función tiene un tope de unos
-4,5 MB, así que un video grande falla en `/api/admin/subir-media` por debajo de
-los 100 MB que valida Cloudinary. La barra lo vuelve visible antes —se ve llegar
-al final y luego el error— pero no lo resuelve; resolverlo sería subir desde el
-navegador directo a Cloudinary con una firma emitida por el servidor.
+### El archivo va directo del navegador a Cloudinary
+
+En Vercel el cuerpo de una petición a una función tiene un tope de unos 4,5 MB.
+Mientras el archivo pasaba por `/api/admin/subir-media`, cualquier video de
+teléfono lo superaba —18 MB para 1:17 a 720p, verificado— y la plataforma
+respondía **413 antes de ejecutar una línea de código nuestro**: ni siquiera
+llegaba a correr la validación de 100 MB de `subirMedia`, así que el admin veía
+la barra llegar al final y luego un error sin explicación.
+
+Por eso esa ruta ya no existe y el archivo sube **directo a Cloudinary**, que
+acepta hasta el tope real. Nuestro servidor sigue siendo quien autoriza:
+
+- `/api/admin/firmar-subida` comprueba la cookie de sesión y devuelve una firma
+  de un solo uso (`firmarSubidaDirecta`). `CLOUDINARY_API_SECRET` nunca llega al
+  navegador; la `api_key` sí, que es pública por diseño.
+- Se firma **solo el `timestamp`**. La firma de Cloudinary cubre exactamente los
+  parámetros incluidos, así que dejar fuera todo lo demás es lo que impide que
+  el navegador añada ninguno: cualquier parámetro extra la invalida. No le
+  agregues campos "por comodidad" sin entender que amplías lo que un cliente
+  puede pedir. El `resource_type` no se firma porque viaja en la ruta.
+- El tope de tamaño lo sigue decidiendo el servidor —viaja en el permiso— pero
+  lo aplica el navegador: al no ver ya el archivo, el servidor no puede medirlo.
+  No lo dupliques como constante en el cliente.
 
 ### El video se marca en Cloudinary, no en el servidor
 
