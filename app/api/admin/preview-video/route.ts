@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 import { apiError, apiJson } from "@/lib/api";
 import { COOKIE_SESION, esSesionValida } from "@/lib/admin-session";
-import { previewNewsVideoPost } from "@/lib/publish-news";
+import { leerMarcaVideo, previewNewsVideoPost } from "@/lib/publish-news";
 
 /** Vista previa del video propio ya con la franja de marca de Cloudinary. */
 export const runtime = "nodejs";
@@ -17,10 +17,8 @@ export async function POST(request: NextRequest) {
     return apiError("Falta videoPublicId", undefined, 400);
   }
 
-  const fuente = typeof body?.fuente === "string" ? body.fuente : undefined;
-
   try {
-    const { videoUrl } = await previewNewsVideoPost(videoPublicId, fuente);
+    const { videoUrl } = await previewNewsVideoPost(videoPublicId, leerMarcaVideo(body));
     return apiJson({ videoUrl }, { cachear: false });
   } catch (error) {
     return apiError("No se pudo generar la vista previa del video", error);

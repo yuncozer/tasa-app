@@ -129,6 +129,22 @@ function Portada({
   );
 }
 
+/**
+ * Nombre con el que se guarda la imagen al descargarla. Se deriva del titular
+ * para que varias diapositivas no acaben todas como "descarga (1).png" en la
+ * carpeta del teléfono.
+ */
+function nombreDeArchivo(title: string | null): string {
+  const base = (title ?? "la-tasa")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .toLowerCase()
+    .slice(0, 40);
+  return `${base || "la-tasa"}.png`;
+}
+
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;
   const title = params.get("title");
@@ -170,7 +186,7 @@ export async function GET(request: NextRequest) {
     leerSvgComoDataUri("browser-icon.svg"),
   ]);
 
-  return new ImageResponse(
+  const imagen = new ImageResponse(
     (
       <Portada
         title={title ?? undefined}
@@ -188,4 +204,20 @@ export async function GET(request: NextRequest) {
       ],
     },
   );
+
+  if (!params.has("descargar")) return imagen;
+
+  /**
+   * Descarga desde la vista previa de `/admin/noticia`. Va por cabecera y no
+   * con el atributo `download` de HTML porque en iOS ese atributo es poco
+   * fiable, y el admin trabaja desde el teléfono.
+   *
+   * `descargar` **no entra en el conjunto firmado** —arriba se reconstruye
+   * leyendo claves conocidas por nombre—, así que añadirlo no invalida la
+   * firma. Tampoco amplía nada: solo cambia una cabecera, la imagen que se
+   * genera es exactamente la misma.
+   */
+  const cabeceras = new Headers(imagen.headers);
+  cabeceras.set("Content-Disposition", `attachment; filename="${nombreDeArchivo(title)}"`);
+  return new Response(imagen.body, { status: imagen.status, headers: cabeceras });
 }

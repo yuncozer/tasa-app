@@ -2,8 +2,15 @@ import { buildNewsCaption } from "@/lib/caption";
 import type { ElementoCarrusel } from "@/lib/instagram";
 import { publishCarousel, publishDailyPost, publishReel } from "@/lib/instagram";
 import { signNewsImageParams } from "@/lib/news-signature";
-import type { FormatoVideo } from "@/lib/providers/cloudinary";
-import { limpiarFuente, subirDesdeUrl, urlImagen, urlVideoConMarca } from "@/lib/providers/cloudinary";
+import { recortarTitulo } from "@/lib/og-cintillo";
+import type { FormatoVideo, MarcaVideo } from "@/lib/providers/cloudinary";
+import {
+  limpiarFuente,
+  subirDesdeUrl,
+  urlDescargaVideo,
+  urlImagen,
+  urlVideoConMarca,
+} from "@/lib/providers/cloudinary";
 import type { ArticleData } from "@/lib/providers/news";
 import { fetchArticle } from "@/lib/providers/news";
 import { esUrlValida } from "@/lib/validar-url";
@@ -121,25 +128,28 @@ export async function publishManualNewsPost(datos: NoticiaManual): Promise<{ med
 }
 
 /**
- * Video propio con la franja de marca superpuesta, publicado como Reel: va
- * solo y en 9:16, que es lo único que entra en la pestaña de Reels. Para
- * acompañarlo de imágenes en un mismo post está el carrusel de más abajo,
- * donde el mismo video se reencuadra a 1:1 y deja de ser un Reel.
+ * Video propio con la marca superpuesta, publicado como Reel: va solo y en
+ * 9:16, que es lo único que entra en la pestaña de Reels. Para acompañarlo de
+ * imágenes en un mismo post está el carrusel de más abajo, donde el mismo
+ * video se reencuadra y deja de ser un Reel.
  */
 export async function previewNewsVideoPost(
   videoPublicId: string,
-  fuente?: string,
-): Promise<{ videoUrl: string }> {
-  const videoUrl = await urlVideoConMarca(videoPublicId, "reel", fuente);
-  return { videoUrl };
+  marca: MarcaVideo = {},
+): Promise<{ videoUrl: string; descargaUrl: string }> {
+  const [videoUrl, descargaUrl] = await Promise.all([
+    urlVideoConMarca(videoPublicId, "reel", marca),
+    urlDescargaVideo(videoPublicId, "reel", marca),
+  ]);
+  return { videoUrl, descargaUrl };
 }
 
 export async function publishNewsVideoPost(
   videoPublicId: string,
   caption: string,
-  fuente?: string,
+  marca: MarcaVideo = {},
 ): Promise<{ mediaId: string }> {
-  const { videoUrl } = await previewNewsVideoPost(videoPublicId, fuente);
+  const { videoUrl } = await previewNewsVideoPost(videoPublicId, marca);
   return publishReel(videoUrl, caption);
 }
 
@@ -147,14 +157,16 @@ export async function publishNewsVideoPost(
  * Elementos que el usuario compone en `/admin/noticia` para un carrusel, en
  * el orden en que los ordenó. Las imágenes se identifican por su `public_id`
  * de Cloudinary y se envuelven en la plantilla de marca; el video se
- * reencuadra a 1:1.
+ * reencuadra al formato del carrusel.
  *
- * El crédito del video es suyo y no el `sourceHost` del post: un clip prestado
- * no tiene por qué venir del mismo portal que la noticia que acompaña.
+ * El video lleva su propia `MarcaVideo`: el cintillo se decide **por clip**,
+ * no para todo el post, y su crédito es suyo y no el `sourceHost` del post —
+ * un clip prestado no tiene por qué venir del mismo portal que la noticia que
+ * acompaña.
  */
 export type ElementoCarruselEntrada =
   | { tipo: "imagen"; publicId: string }
-  | { tipo: "video"; publicId: string; fuente?: string };
+  | ({ tipo: "video"; publicId: string } & MarcaVideo);
 
 /**
  * De dónde sale el elemento principal del carrusel. Se resuelve en el
@@ -162,16 +174,16 @@ export type ElementoCarruselEntrada =
  * se enmarca sigue viniendo del artículo real o de Cloudinary, igual que en
  * el post de una sola imagen.
  *
- * `video` solo lo produce el modo "Noticia propia": un video como principal
- * no lleva título superpuesto (a diferencia de las dos variantes de
- * imagen), sale igual que un video "extra" — sellos y franja de fuente
- * opcional —, y es lo que obliga a elegir proporción 1:1 o 4:5 en vez de
- * asumir siempre 1:1.
+ * `video` solo lo produce el modo "Noticia propia". No usa el `title` del
+ * marco —ese lo compone la plantilla de imagen, y aquí no hay imagen que
+ * enmarcar—, pero sí puede llevar titular propio en su cintillo, que es la
+ * única forma de titular un video. Es también lo que obliga a elegir
+ * proporción 1:1 o 4:5 en vez de asumir siempre 1:1.
  */
 export type PrincipalCarrusel =
   | { tipo: "articulo"; url: string }
   | { tipo: "subida"; publicId: string }
-  | { tipo: "video"; publicId: string; fuente?: string };
+  | ({ tipo: "video"; publicId: string } & MarcaVideo);
 
 export interface CarruselEntrada {
   /** Fuente del marco de marca, común a todas las imágenes (incluida la principal, si es imagen). */
@@ -204,7 +216,7 @@ export function leerPrincipalCarrusel(valor: unknown): PrincipalCarrusel | null 
     return { tipo: "subida", publicId: item.publicId };
   }
   if (item?.tipo === "video" && typeof item.publicId === "string" && item.publicId) {
-    return { tipo: "video", publicId: item.publicId, fuente: limpiarFuente(item.fuente) };
+    return { tipo: "video", publicId: item.publicId, ...leerMarcaVideo(item) };
   }
   return null;
 }
@@ -212,6 +224,29 @@ export function leerPrincipalCarrusel(valor: unknown): PrincipalCarrusel | null 
 /** Valida la proporción tal como llega del navegador o de la base de datos. */
 export function leerProporcionCarrusel(valor: unknown): ProporcionCarrusel {
   return valor === "4:5" ? "4:5" : "1:1";
+}
+
+/** Tope de la ventana del cintillo: más allá dura de hecho todo el clip. */
+const MAX_SEGUNDOS_CINTILLO = 60;
+
+/**
+ * Valida el cintillo de un video tal como llega del navegador o de la cola.
+ *
+ * Los tres campos son opcionales, y tienen que serlo: en la cola hay posts
+ * programados antes de que el cintillo existiera, cuyo payload solo trae
+ * `fuente`. Sin título ni fuente el video sale solo con el sello, que es
+ * exactamente como salía entonces.
+ */
+export function leerMarcaVideo(valor: unknown): MarcaVideo {
+  const item = valor as { titulo?: unknown; fuente?: unknown; segundos?: unknown } | null;
+
+  const titulo = typeof item?.titulo === "string" ? recortarTitulo(item.titulo) : "";
+  const segundos =
+    typeof item?.segundos === "number" && Number.isFinite(item.segundos) && item.segundos > 0
+      ? Math.min(Math.round(item.segundos), MAX_SEGUNDOS_CINTILLO)
+      : undefined;
+
+  return { titulo: titulo || undefined, fuente: limpiarFuente(item?.fuente), segundos };
 }
 
 /**
@@ -228,11 +263,9 @@ export function leerElementosCarrusel(valor: unknown): ElementoCarruselEntrada[]
     if ((tipo !== "imagen" && tipo !== "video") || typeof publicId !== "string" || !publicId) {
       return null;
     }
-    // `fuente` se copia a mano porque este lector reconstruye el objeto: lo que
+    // La marca se copia a mano porque este lector reconstruye el objeto: lo que
     // no se nombre aquí desaparece al programar el post.
-    elementos.push(
-      tipo === "video" ? { tipo, publicId, fuente: limpiarFuente(item?.fuente) } : { tipo, publicId },
-    );
+    elementos.push(tipo === "video" ? { tipo, publicId, ...leerMarcaVideo(item) } : { tipo, publicId });
   }
   return elementos;
 }
@@ -258,7 +291,7 @@ async function buildCarousel(datos: CarruselEntrada): Promise<ElementoCarrusel[]
   const extras = await Promise.all(
     datos.elementos.map(async (elemento): Promise<ElementoCarrusel> => {
       if (elemento.tipo === "video") {
-        return { tipo: "video", url: await urlVideoConMarca(elemento.publicId, formato, elemento.fuente) };
+        return { tipo: "video", url: await urlVideoConMarca(elemento.publicId, formato, elemento) };
       }
       return { tipo: "imagen", url: enmarcar(urlImagen(elemento.publicId)) };
     }),
@@ -267,7 +300,7 @@ async function buildCarousel(datos: CarruselEntrada): Promise<ElementoCarrusel[]
   if (datos.principal.tipo === "video") {
     const principal: ElementoCarrusel = {
       tipo: "video",
-      url: await urlVideoConMarca(datos.principal.publicId, formato, datos.principal.fuente),
+      url: await urlVideoConMarca(datos.principal.publicId, formato, datos.principal),
     };
     return [principal, ...extras];
   }
@@ -281,8 +314,47 @@ async function buildCarousel(datos: CarruselEntrada): Promise<ElementoCarrusel[]
 }
 
 /** Vista previa del carrusel: las URLs reales que se publicarían, sin publicar. */
-export async function previewCarouselPost(datos: CarruselEntrada): Promise<{ elementos: ElementoCarrusel[] }> {
-  return { elementos: await buildCarousel(datos) };
+/**
+ * Una diapositiva tal como la muestra `/admin/noticia`: además de la URL que
+ * se publicaría, la que el navegador **guarda** en vez de abrir.
+ *
+ * La descarga se resuelve en el servidor y no concatenando en el cliente
+ * porque las dos mitades no se piden igual: la imagen es nuestra y le basta
+ * una cabecera, mientras que el video lo sirve Cloudinary y necesita
+ * `fl_attachment` dentro de la propia transformación.
+ */
+export interface DiapositivaPrevia extends ElementoCarrusel {
+  descargaUrl: string;
+}
+
+export async function previewCarouselPost(datos: CarruselEntrada): Promise<{ elementos: DiapositivaPrevia[] }> {
+  const elementos = await buildCarousel(datos);
+  const formato = formatoDeProporcion(datos.proporcion ?? "1:1");
+
+  // Mismo orden que arma `buildCarousel`: el principal primero, luego los
+  // extras. Es lo que permite recuperar de qué `publicId` salió cada video.
+  const origenes: Array<PrincipalCarrusel | ElementoCarruselEntrada> = [datos.principal, ...datos.elementos];
+
+  return {
+    elementos: await Promise.all(
+      elementos.map(async (elemento, indice): Promise<DiapositivaPrevia> => {
+        const origen = origenes[indice];
+        if (elemento.tipo === "video" && origen?.tipo === "video") {
+          return { ...elemento, descargaUrl: await urlDescargaVideo(origen.publicId, formato, origen) };
+        }
+        return { ...elemento, descargaUrl: urlDescargaImagen(elemento.url) };
+      }),
+    ),
+  };
+}
+
+/**
+ * La misma imagen de la plantilla, pero que el navegador guarda. El parámetro
+ * queda fuera del conjunto firmado (la ruta reconstruye la firma leyendo
+ * claves conocidas por nombre), así que no invalida nada.
+ */
+export function urlDescargaImagen(url: string): string {
+  return `${url}&descargar=1`;
 }
 
 export async function publishNewsCarouselPost(
@@ -303,7 +375,7 @@ export type PublicacionPayload =
   | { tipo: "articulo"; url: string; caption?: string; imagenPublicId?: string }
   | { tipo: "manual"; datos: NoticiaManual }
   | { tipo: "carrusel"; datos: CarruselEntrada; caption: string }
-  | { tipo: "reel"; videoPublicId: string; caption: string; fuente?: string };
+  | ({ tipo: "reel"; videoPublicId: string; caption: string } & MarcaVideo);
 
 /**
  * Cuánto del título se guarda para la cola. No es el ancho de la pantalla —de
@@ -370,7 +442,7 @@ export async function prepararPublicacion(payload: PublicacionPayload): Promise<
     case "carrusel":
       return { tipo: "carrusel", elementos: await buildCarousel(payload.datos), caption: payload.caption };
     case "reel": {
-      const { videoUrl } = await previewNewsVideoPost(payload.videoPublicId, payload.fuente);
+      const { videoUrl } = await previewNewsVideoPost(payload.videoPublicId, payload);
       return { tipo: "reel", videoUrl, caption: payload.caption };
     }
   }
@@ -446,13 +518,14 @@ export function leerPublicacionPayload(valor: unknown): PublicacionPayload | nul
   }
 
   if (p?.tipo === "reel") {
-    const d = p as { videoPublicId?: unknown; caption?: unknown; fuente?: unknown };
+    const d = p as { videoPublicId?: unknown; caption?: unknown };
     const videoPublicId = texto(d.videoPublicId);
     const caption = texto(d.caption);
     if (!videoPublicId || !caption) return null;
-    // Opcional a propósito: las filas programadas antes de que existiera el
-    // crédito no lo traen y tienen que seguir publicándose.
-    return { tipo: "reel", videoPublicId, caption, fuente: limpiarFuente(d.fuente) };
+    // La marca va opcional a propósito: las filas programadas antes de que
+    // existieran el crédito y el cintillo no los traen y tienen que seguir
+    // publicándose igual.
+    return { tipo: "reel", videoPublicId, caption, ...leerMarcaVideo(p) };
   }
 
   return null;
@@ -518,17 +591,17 @@ export async function materializarParaProgramar(
 async function calentarVideo(payload: PublicacionPayload): Promise<void> {
   const videos: Promise<string>[] =
     payload.tipo === "reel"
-      ? [urlVideoConMarca(payload.videoPublicId, "reel", payload.fuente)]
+      ? [urlVideoConMarca(payload.videoPublicId, "reel", payload)]
       : payload.tipo === "carrusel"
         ? (() => {
             const formato: FormatoVideo = formatoDeProporcion(payload.datos.proporcion ?? "1:1");
             const principal =
               payload.datos.principal.tipo === "video"
-                ? [urlVideoConMarca(payload.datos.principal.publicId, formato, payload.datos.principal.fuente)]
+                ? [urlVideoConMarca(payload.datos.principal.publicId, formato, payload.datos.principal)]
                 : [];
             const extras = payload.datos.elementos
               .filter((e) => e.tipo === "video")
-              .map((e) => urlVideoConMarca(e.publicId, formato, e.fuente));
+              .map((e) => urlVideoConMarca(e.publicId, formato, e));
             return [...principal, ...extras];
           })()
         : [];

@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 import { apiError, apiJson } from "@/lib/api";
 import { COOKIE_SESION, esSesionValida } from "@/lib/admin-session";
-import { previewManualNewsPost } from "@/lib/publish-news";
+import { previewManualNewsPost, urlDescargaImagen } from "@/lib/publish-news";
 
 /**
  * Vista previa de una noticia de autoría propia (sin URL de artículo): el
@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const { imageUrl } = previewManualNewsPost({ title, sourceHost, caption, imagenPublicId });
-    return apiJson({ title, sourceHost, caption, imageUrl }, { cachear: false });
+    return apiJson({ title, sourceHost, caption, imageUrl, descargaUrl: urlDescargaImagen(imageUrl) }, { cachear: false });
   } catch (error) {
     return apiError("No se pudo generar la vista previa", error);
   }

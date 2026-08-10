@@ -1,6 +1,9 @@
+import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { v2 as cloudinary, type UploadApiResponse } from "cloudinary";
+import type { DatosCintillo } from "@/lib/og-cintillo";
+import { VERSION_CINTILLO, generarCintillo } from "@/lib/og-cintillo";
 
 /**
  * Cloudinary hospeda lo que el usuario sube en `/admin/noticia` (imagen o
@@ -144,27 +147,21 @@ export async function subirDesdeUrl(url: string): Promise<string> {
 
 const SELLO_PUBLIC_ID = "LaTasa_sello_transparencia_ch26p5";
 
-/**
- * La franja de texto ya no lleva la marca —de eso se encargan los sellos
- * superpuestos, que van en todo video—, sino el crédito de quien grabó el
- * clip. El prefijo lo pone el código y no el usuario: así todos los posts lo
- * dicen igual y no se cuela un video acreditado a medias.
- */
-const PREFIJO_FUENTE = "Fuente: ";
-
-/** Tope de caracteres del crédito: más largo no entra a lo ancho del lienzo. */
+/** Tope de caracteres del crédito: más largo no entra a lo ancho del cintillo. */
 const MAX_FUENTE = 48;
 
 /**
- * Normaliza el crédito tal como se teclea en `/admin/noticia`. El texto viaja
- * dentro del **path** de la URL de Cloudinary, así que los caracteres que ahí
- * son separadores (`,` entre parámetros, `/` entre componentes) partirían la
- * transformación en vez de dibujarse; se sustituyen en lugar de rechazarse
- * para no bloquear la publicación por un nombre con coma.
+ * Normaliza el crédito tal como se teclea en `/admin/noticia`.
+ *
+ * La sustitución de `,` `/` `%` `#` `?` viene de cuando el texto viajaba dentro
+ * del **path** de la URL de Cloudinary, donde esos caracteres son separadores y
+ * partían la transformación. Hoy el crédito se dibuja en el PNG del cintillo y
+ * ya no toca ninguna URL, pero se conserva como saneado: no cuesta nada y
+ * mantiene los créditos cortos y uniformes.
  *
  * Devuelve `undefined` cuando no queda nada que pintar, de modo que "activada
- * pero en blanco" se comporte igual que "desactivada" y no salga una franja
- * que solo diga `Fuente:`.
+ * pero en blanco" se comporte igual que "desactivada" y no salga una banda que
+ * solo diga `Fuente:`.
  */
 export function limpiarFuente(valor: unknown): string | undefined {
   if (typeof valor !== "string") return undefined;
@@ -175,6 +172,36 @@ export function limpiarFuente(valor: unknown): string | undefined {
     .slice(0, MAX_FUENTE)
     .trim();
   return limpio || undefined;
+}
+
+/**
+ * Sube el cintillo de un video y devuelve su `public_id`, generándolo solo la
+ * primera vez.
+ *
+ * Mismo patrón que `asegurarLogo()`, pero con un `public_id` derivado del
+ * contenido en vez de fijo: el mismo titular y la misma fuente dan el mismo
+ * identificador, así que reabrir la vista previa no vuelve a generar ni a
+ * subir nada. Sin eso, cada pulsación de "Actualizar vista previa" dejaría un
+ * asset nuevo en una cuenta con 25 créditos al mes.
+ *
+ * `VERSION_CINTILLO` entra en el hash a propósito: si se cambia el diseño de
+ * la plantilla sin subirla, los videos seguirían sirviendo el PNG viejo que ya
+ * está cacheado con ese identificador.
+ */
+async function asegurarCintillo(datos: DatosCintillo): Promise<string> {
+  const huella = createHash("sha256")
+    .update(JSON.stringify({ ...datos, v: VERSION_CINTILLO }))
+    .digest("base64url")
+    .slice(0, 16);
+  const publicId = `cintillo_${huella}`;
+
+  const client = configurar();
+  try {
+    await client.api.resource(publicId, { resource_type: "image" });
+  } catch {
+    await subirBuffer(await generarCintillo(datos), "image", publicId);
+  }
+  return publicId;
 }
 
 /**
@@ -206,20 +233,55 @@ function yDelSello(altoLienzo: number): number {
 }
 
 /**
- * Encuadre + sellos de marca, y abajo la franja con el crédito de la fuente
- * **solo si se pidió uno**: el material propio no tiene a quién acreditar y una
- * franja vacía solo le quita sitio al video. Sin `so_`/`eo_` en la
- * transformación, Cloudinary aplica los overlays a toda la duración del clip
- * por defecto.
+ * Margen del cintillo respecto al borde inferior, proporcional por el mismo
+ * motivo que `yDelSello`: un literal pensado para los 1920 px de un Reel se
+ * descuadra en un lienzo de 1080 o 1350.
+ */
+function yDelCintillo(altoLienzo: number): number {
+  return Math.round(altoLienzo * (150 / 1920));
+}
+
+/**
+ * Lo que se le superpone a un video: el cintillo de noticiero y por cuánto
+ * tiempo. Va agrupado en vez de como parámetros sueltos porque lo arrastran
+ * cuatro puntos de llamada distintos (el principal del carrusel, cada extra,
+ * el Reel y `calentarVideo`).
+ */
+export interface MarcaVideo {
+  /** Titular del cintillo. Sin él —y sin `fuente`— no se superpone ninguna banda. */
+  titulo?: string;
+  /** Crédito de quien grabó el clip. Solo sale si se pide. */
+  fuente?: string;
+  /** Segundos que dura el cintillo en pantalla. Sin valor, dura todo el clip. */
+  segundos?: number;
+}
+
+/** ¿Hay algo que pintar? Sin título ni fuente, el video va solo con los sellos. */
+function llevaCintillo(marca: MarcaVideo): boolean {
+  return Boolean(marca.titulo?.trim() || limpiarFuente(marca.fuente));
+}
+
+/**
+ * Encuadre + sello de marca y, abajo, el cintillo de noticiero **si se pidió**:
+ * el material propio sin titular ni crédito no tiene nada que anunciar, y una
+ * banda vacía solo le quita sitio al video.
  *
- * Dos detalles que costó encontrar y conviene no deshacer:
+ * El cintillo entra como **una sola capa ya compuesta** (ver `lib/og-cintillo.tsx`).
+ * Antes el crédito se pintaba con el motor de texto de Cloudinary, en Arial y
+ * con el texto viajando dentro del path de la URL; se retiró a propósito, y no
+ * conviene reintroducirlo: un titular real lleva comas, que ahí separan
+ * parámetros.
+ *
+ * Tres detalles que costó encontrar y conviene no deshacer:
  *
  * - La posición va en el componente de `layer_apply`, **no** junto al overlay:
  *   puesta junto al overlay, Cloudinary la ignora en silencio y centra ambas
  *   capas encima del video (verificado en vivo).
  * - El encuadre va **primero**, antes de las capas. Al revés, los tamaños del
- *   logo y del texto se calculan contra el lienzo original y quedan
+ *   logo y del cintillo se calculan contra el lienzo original y quedan
  *   descuadrados al escalar.
+ * - Sin `so_`/`eo_`, Cloudinary aplica el overlay a toda la duración del clip.
+ *   `segundos` es lo que lo acota para que el cintillo entre y salga.
  *
  * Se encaja con `pad` y no con `fill`: recortar perdería los bordes del
  * encuadre original del video, que es contenido que el usuario grabó.
@@ -228,50 +290,83 @@ function yDelSello(altoLienzo: number): number {
  * el que se revisa la marca: si divergieran, lo revisado dejaría de ser lo
  * publicado.
  */
-function transformacionMarca(formato: FormatoVideo, fuente?: string) {
-  const credito = limpiarFuente(fuente);
-
+function transformacionMarca(
+  formato: FormatoVideo,
+  cintilloPublicId?: string,
+  segundos?: number,
+) {
   return [
     { ...LIENZO[formato], crop: "pad", background: "#0b1120" },
-    // { overlay: SELLO_PUBLIC_ID, width: 800, crop: "scale", opacity: 20 },
-    // { flags: "layer_apply", gravity: "north_west", x: 150, y: 200 },
     { overlay: SELLO_PUBLIC_ID, width: 800, crop: "scale", opacity: 10 },
     { flags: "layer_apply", gravity: "north_west", x: 150, y: yDelSello(LIENZO[formato].height) },
-    // { overlay: SELLO_PUBLIC_ID, width: 800, crop: "scale", opacity: 20 },
-    // { flags: "layer_apply", gravity: "north_west", x: 150, y: 1400 },
-    ...(credito
+    ...(cintilloPublicId
       ? [
+          { overlay: cintilloPublicId, width: LIENZO[formato].width, crop: "scale" },
           {
-            overlay: {
-              font_family: "Arial",
-              font_size: 38,
-              font_weight: "bold",
-              text: `${PREFIJO_FUENTE}${credito}`,
-            },
-            color: "#f8f9fa",
-            background: "#0b1120",
+            flags: "layer_apply",
+            gravity: "south",
+            y: yDelCintillo(LIENZO[formato].height),
+            // Acotar la capa en el tiempo es lo que hace que el cintillo entre
+            // y salga como en un noticiero, en vez de quedarse todo el clip.
+            ...(segundos ? { start_offset: "0", end_offset: String(segundos) } : {}),
           },
-          { flags: "layer_apply", gravity: "south", y: 150 },
         ]
       : []),
   ];
 }
 
 /**
- * URL pública del video ya marcado. `fuente` es opcional: sin ella el video
- * sale solo con los sellos, que es el caso del material propio.
+ * Resuelve el cintillo de un video: `undefined` cuando no lleva ninguno.
+ * Aparte de `transformacionMarca` porque generar el PNG es asíncrono y la
+ * transformación no puede serlo.
+ */
+async function cintilloDe(marca: MarcaVideo): Promise<string | undefined> {
+  return llevaCintillo(marca)
+    ? asegurarCintillo({ titulo: marca.titulo?.trim() || undefined, fuente: limpiarFuente(marca.fuente) })
+    : undefined;
+}
+
+/**
+ * URL pública del video ya marcado. Sin `titulo` ni `fuente`, el video sale
+ * solo con el sello, que es el caso del material propio sin acreditar.
  */
 export async function urlVideoConMarca(
   publicId: string,
   formato: FormatoVideo,
-  fuente?: string,
+  marca: MarcaVideo = {},
 ): Promise<string> {
   await asegurarLogo();
+  const cintillo = await cintilloDe(marca);
   const client = configurar();
   return client.url(publicId, {
     resource_type: "video",
     secure: true,
-    transformation: transformacionMarca(formato, fuente),
+    transformation: transformacionMarca(formato, cintillo, marca.segundos),
+  });
+}
+
+/**
+ * La misma URL, pero que el navegador descarga en vez de reproducir.
+ *
+ * El atributo `download` de HTML no sirve aquí: se ignora en recursos de otro
+ * origen, y el video lo sirve Cloudinary. `fl_attachment` hace que responda
+ * con `Content-Disposition: attachment`, que sí funciona entre orígenes.
+ *
+ * Reutiliza `transformacionMarca()` a propósito: lo que se descarga tiene que
+ * ser exactamente lo que se publicaría, no el original sin marcar.
+ */
+export async function urlDescargaVideo(
+  publicId: string,
+  formato: FormatoVideo,
+  marca: MarcaVideo = {},
+): Promise<string> {
+  await asegurarLogo();
+  const cintillo = await cintilloDe(marca);
+  const client = configurar();
+  return client.url(publicId, {
+    resource_type: "video",
+    secure: true,
+    transformation: [...transformacionMarca(formato, cintillo, marca.segundos), { flags: "attachment" }],
   });
 }
 
@@ -284,16 +379,18 @@ export async function urlVideoConMarca(
 export async function urlFotogramaConMarca(
   publicId: string,
   formato: FormatoVideo,
-  opciones: { segundo?: number; fuente?: string } = {},
+  opciones: { segundo?: number } & MarcaVideo = {},
 ): Promise<string> {
   await asegurarLogo();
+  const { segundo, ...marca } = opciones;
+  const cintillo = await cintilloDe(marca);
   const client = configurar();
   return client.url(publicId, {
     resource_type: "video",
     secure: true,
     format: "jpg",
-    start_offset: String(opciones.segundo ?? 0),
-    transformation: transformacionMarca(formato, opciones.fuente),
+    start_offset: String(segundo ?? 0),
+    transformation: transformacionMarca(formato, cintillo, marca.segundos),
   });
 }
 

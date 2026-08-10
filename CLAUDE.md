@@ -523,25 +523,21 @@ Vive en `lib/providers/cloudinary.ts`, con tres detalles que costó encontrar:
 - Se encaja con `pad` y no con `fill`: recortar perdería los bordes del
   encuadre que grabó el usuario.
 
-La marca de identidad son los **sellos** superpuestos, que van en todo video.
-La franja de texto de abajo es otra cosa: es el **crédito de la fuente**, y por
-eso es opcional — el material propio no tiene a quién acreditar y una franja
-vacía solo le quita sitio al video. Cuando no se pide, `transformacionMarca()`
-no añade ni el `overlay` de texto ni su `layer_apply`.
+La marca de identidad es el **sello** superpuesto, que va en todo video. La
+banda de abajo es otra cosa: es el **cintillo**, y es opcional — ver la sección
+siguiente.
 
-- El prefijo `Fuente: ` lo pone el código (`PREFIJO_FUENTE`), no el usuario:
-  así todos los posts lo dicen igual y no se cuela uno acreditado a medias.
 - La fuente del video es un campo **aparte del `sourceHost`** que llena el
   marco de las imágenes, y en un carrusel va por elemento: un clip prestado no
   tiene por qué venir del mismo portal que la noticia que acompaña.
-- El texto pasa por `limpiarFuente()` antes de entrar en la URL. No es
-  cosmética: viaja dentro del **path** de Cloudinary, donde `,` separa
-  parámetros y `/` separa componentes, así que sin sustituirlos un nombre con
-  coma partiría la transformación en vez de dibujarse. Se sustituyen y no se
-  rechazan para no bloquear la publicación por un detalle de puntuación.
+- El texto pasa por `limpiarFuente()`, que sustituye `,` `/` `%` `#` `?`. Eso
+  viene de cuando el crédito viajaba dentro del **path** de Cloudinary, donde
+  esos caracteres son separadores y partían la transformación. Hoy se dibuja en
+  el PNG del cintillo y ya no toca ninguna URL, pero se conserva como saneado y
+  tope de longitud.
 - Devuelve `undefined` cuando no queda nada, de modo que "casilla activada pero
   campo en blanco" se comporte igual que "desactivada". Sin eso saldría una
-  franja que solo dice `Fuente:`.
+  banda que solo dice `Fuente:`.
 - En la interfaz, editar la fuente **no** regenera el video en pantalla: la
   marca la compone Cloudinary al pedir la URL. Se marca la previa como
   desactualizada y se bloquea publicar hasta pulsar "Actualizar vista previa",
@@ -551,6 +547,80 @@ no añade ni el `overlay` de texto ni su `layer_apply`.
 Las credenciales (`CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`,
 `CLOUDINARY_API_SECRET`) nunca llegan al navegador: la subida pasa por
 `app/api/admin/subir-media`, protegido por la cookie de sesión de `/admin`.
+
+### El cintillo se compone con Satori, no con el motor de texto de Cloudinary
+
+La banda inferior de los videos —marca, titular y, si se acredita, la fuente—
+se genera como un **PNG transparente con `ImageResponse`** (`lib/og-cintillo.tsx`)
+y Cloudinary solo la superpone como **una capa ya compuesta**. Es el mismo
+mecanismo que ya usaba el sello, así que no es técnica nueva: lo que cambió es
+que el PNG se genera por post en vez de ser fijo.
+
+Antes el crédito lo pintaba el motor de texto de Cloudinary. Se retiró a
+propósito y no conviene reintroducirlo, por tres motivos que se pagaron:
+
+- La única tipografía a mano era **Arial**, que no es la del proyecto. El
+  cintillo usa Geist, la misma de las imágenes.
+- El texto viajaba **dentro del path** de la URL, donde `,` separa parámetros y
+  `/` separa componentes. Un titular real lleva comas: `limpiarFuente()` existe
+  solo por eso. Ahora el texto no toca ninguna URL.
+- Un cintillo son varios elementos, y ahí cada uno es un `overlay` más un
+  `fl_layer_apply` colocado a mano en píxeles, **sin ajuste de línea**. Aquí es
+  flexbox.
+
+Lo que hay que respetar:
+
+- **El contenedor raíz no lleva `backgroundColor`.** De ahí sale la
+  transparencia (verificado: `hasAlpha`, `isOpaque: false`). Si alguien le pone
+  un fondo, el cintillo tapa el video entero.
+- **Dos variantes**: con título (banda alta) y sin título (banda baja, solo el
+  crédito). La segunda es la que cubre el caso "acredito la fuente pero no
+  quiero cintillo", y es la razón de que no quede ni un texto en Arial. Sin
+  título y sin fuente no se superpone ninguna banda.
+- **El cintillo se decide por video, no por post**: cada clip de un carrusel y
+  el Reel llevan su propia `MarcaVideo` (`titulo`, `fuente`, `segundos`). Los
+  tres campos son opcionales porque en la cola hay posts programados antes de
+  que el cintillo existiera.
+- **Un video principal solo puede titularse así.** El `title` del marco lo
+  compone la plantilla de imagen, y con un video principal no hay imagen que
+  enmarcar; el cintillo es la única vía.
+- `asegurarCintillo()` sube el PNG con un **`public_id` derivado del contenido**
+  (patrón de `asegurarLogo()`, pero por hash). El mismo titular da el mismo
+  identificador, así que reabrir la vista previa no vuelve a generar nada — sin
+  eso, cada "Actualizar vista previa" dejaría un asset más en una cuenta de 25
+  créditos al mes. **`VERSION_CINTILLO` entra en el hash**: si cambias el diseño
+  y no la subes, los videos siguen sirviendo el PNG viejo ya cacheado.
+- `MAX_TITULO` recorta por caracteres y no con `line-clamp`, que Satori no
+  implementa: sin tope, un titular largo empuja la caja y se sale del lienzo.
+- El margen inferior se calcula **proporcional a la altura del lienzo**
+  (`yDelCintillo`), por el mismo motivo que `yDelSello`: los tres formatos
+  comparten anchura pero no altura. Un mismo PNG sirve para los tres.
+- `segundos` acota la capa con `start_offset`/`end_offset` para que el cintillo
+  entre y salga. Sin ellos, Cloudinary la aplica a todo el clip.
+
+### La vista previa se puede descargar, y cada mitad por su lado
+
+Desde `/admin/noticia` se puede bajar al equipo lo que se está viendo. **El
+atributo `download` de HTML no basta**: se ignora en recursos de otro origen, y
+los videos los sirve Cloudinary.
+
+- **Video**: `urlDescargaVideo()` añade `fl_attachment` a la transformación, y
+  Cloudinary responde con `Content-Disposition: attachment`. Reutiliza
+  `transformacionMarca()` a propósito — lo que se descarga tiene que ser lo que
+  se publicaría, no el original sin marcar.
+- **Imagen**: `?descargar=1` en `instagram-post-news`, que responde con la misma
+  cabecera. Va por cabecera y no con `download` porque en iOS ese atributo es
+  poco fiable, y el admin trabaja desde el teléfono.
+
+`descargar` **no invalida la firma HMAC**, aunque lo parezca: la ruta
+reconstruye el conjunto firmado leyendo claves conocidas por nombre, así que un
+parámetro de más no entra en `firmados`. Verificado en vivo: con `descargar=1`
+la imagen sigue dando 200, y manipular el título sigue dando 403. Solo cambia
+una cabecera — la imagen generada es idéntica.
+
+La URL de descarga la resuelve **el servidor** y baja con la vista previa
+(`DiapositivaPrevia.descargaUrl`), en vez de componerla el navegador: las dos
+mitades no se piden igual, y el cliente no tiene por qué saber cuál es cuál.
 
 ### `/admin` usa su propia contraseña, no `CRON_SECRET`
 
@@ -626,7 +696,7 @@ las variantes que le correspondan:
 
 ```bash
 npx tsx scripts/preview-marca.ts foto.jpg   # principal (con titular) y secundaria de carrusel
-npx tsx scripts/preview-marca.ts clip.mp4   # carrusel 1:1 y Reel 9:16, cada uno con su fotograma
+npx tsx scripts/preview-marca.ts clip.mp4   # carrusel 1:1, 4:5 y Reel 9:16, cada uno con su fotograma
 npx tsx scripts/preview-marca.ts --public-id <id> --tipo video   # reusa lo ya subido
 ```
 
@@ -634,8 +704,9 @@ npx tsx scripts/preview-marca.ts --public-id <id> --tipo video   # reusa lo ya s
 | --- | --- | --- |
 | Imagen principal de post | Satori, con titular y fecha | `app/api/og/instagram-post-news/route.tsx`, `lib/og-shared.ts` |
 | Imagen secundaria de carrusel | Satori, sin titular (`ALTO_FOTO.secundaria`) | los mismos |
-| Video en carrusel (1:1) | Cloudinary, transformación por URL | `lib/providers/cloudinary.ts` |
+| Video en carrusel (1:1 y 4:5) | Cloudinary, transformación por URL | `lib/providers/cloudinary.ts` |
 | Video como Reel (9:16) | Cloudinary, misma cadena, otro lienzo | el mismo |
+| Cintillo del video | Satori, PNG transparente sobre la capa | `lib/og-cintillo.tsx` |
 
 Al iterar, las dos mitades se comportan distinto y conviene saberlo:
 

@@ -138,21 +138,24 @@ function mostrarImagen(publicId: string, opciones: Opciones): void {
 async function mostrarVideo(publicId: string, opciones: Opciones): Promise<void> {
   const formatos: Array<{ formato: FormatoVideo; titulo: string }> = [
     { formato: "carrusel", titulo: "Video como elemento de carrusel (1:1)" },
+    { formato: "carrusel-4-5", titulo: "Video como elemento de carrusel (4:5)" },
     { formato: "reel", titulo: "Video como Reel (9:16)" },
   ];
 
+  // El cintillo se pide con `--titulo`, igual que el titular del marco en las
+  // imágenes: con `--titulo ""` sale la banda baja de solo crédito, y sin
+  // ninguno de los dos el video va únicamente con el sello.
+  const marca = { titulo: opciones.titulo || undefined, fuente: opciones.fuente || undefined };
+
   for (const { formato, titulo } of formatos) {
     bloque(titulo, [
-      `Video:     ${await urlVideoConMarca(publicId, formato, opciones.fuente)}`,
-      `Fotograma: ${await urlFotogramaConMarca(publicId, formato, {
-        segundo: opciones.segundo,
-        fuente: opciones.fuente,
-      })}`,
+      `Video:     ${await urlVideoConMarca(publicId, formato, marca)}`,
+      `Fotograma: ${await urlFotogramaConMarca(publicId, formato, { segundo: opciones.segundo, ...marca })}`,
     ]);
   }
 
-  if (opciones.fuente) {
-    console.log('Con `--fuente ""` se ve la variante sin franja, que es la de material propio.');
+  if (opciones.fuente || opciones.titulo) {
+    console.log('Con `--titulo "" --fuente ""` se ve la variante sin cintillo, la de material propio.');
   }
 
   console.log("Revisa el fotograma antes que el video: es inmediato y deja algo que comparar.");
