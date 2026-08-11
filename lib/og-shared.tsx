@@ -8,6 +8,21 @@ import path from "node:path";
  * leer `globals.css`/Tailwind porque Satori no interpreta CSS ni clases.
  */
 
+/**
+ * Cuánto se meten hacia dentro el encabezado y las filas de tasas, por encima
+ * del relleno del lienzo.
+ *
+ * No es holgura estética: WhatsApp y la cuadrícula del perfil de Instagram
+ * recortan la imagen por los lados, y con el contenido pegado al borde se
+ * comían justo el dato — «ar BCV» en vez de «Dólar BCV», «757,5» en vez de
+ * «757,54» (visto en vivo). El pie no lo usa a propósito: el aviso legal puede
+ * seguir aprovechando todo el ancho porque no es lo que se lee de un vistazo.
+ *
+ * Vive aquí, y no en cada plantilla, porque las dos diapositivas del post
+ * diario tienen que moverse juntas o el carrusel queda descuadrado.
+ */
+export const AIRE_LATERAL = 40;
+
 export const COLOR = {
   background: "#0b1120",
   surface: "#131c2f",
