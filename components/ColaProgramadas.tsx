@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import type { PublicacionPayload } from "@/lib/publish-news";
 import { formatClock, formatDate, horaCaracasDesdeIso, isoDesdeHoraCaracas } from "@/lib/format";
 
 export interface ProgramadaVista {
@@ -43,8 +44,18 @@ export interface ProgramadaVista {
  * `router.refresh()`. Leerla con `setState` dentro de un efecto es lo que
  * dispara el linter de React, y el proyecto ya evita ese patrón en otros
  * sitios.
+ *
+ * "Editar" es la excepción a "solo se actúa": pide el payload completo de la
+ * fila (la lista solo trae el `resumen`) y lo sube al padre, que es quien
+ * decide qué formulario reabrir con ese contenido.
  */
-export function ColaProgramadas({ programadas }: { programadas: ProgramadaVista[] }) {
+export function ColaProgramadas({
+  programadas,
+  onEditar,
+}: {
+  programadas: ProgramadaVista[];
+  onEditar: (datos: { id: string; payload: PublicacionPayload; publicarEn: string }) => void;
+}) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   /** Qué fila se está publicando ahora mismo desde aquí, y en qué va. */
@@ -81,6 +92,21 @@ export function ColaProgramadas({ programadas }: { programadas: ProgramadaVista[
       setError("No se pudo conectar con el servidor");
     }
     router.refresh();
+  }
+
+  async function editar(id: string) {
+    setError(null);
+    try {
+      const response = await fetch(`/api/admin/programadas/${id}`);
+      const body = await response.json().catch(() => null);
+      if (!response.ok) {
+        setError(body?.error ?? `Error ${response.status}`);
+        return;
+      }
+      onEditar(body as { id: string; payload: PublicacionPayload; publicarEn: string });
+    } catch {
+      setError("No se pudo conectar con el servidor");
+    }
   }
 
   async function eliminar(id: string) {
@@ -198,21 +224,31 @@ export function ColaProgramadas({ programadas }: { programadas: ProgramadaVista[
                         manos de Meta, y a una `fallida` moverle la hora no la
                         devuelve a la cola — para esa está "Publicar ahora". */}
                     {programada.estado === "pendiente" && (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setEditando(
-                            editando?.id === programada.id
-                              ? null
-                              : { id: programada.id, cuando: horaCaracasDesdeIso(programada.publicarEn) },
-                          )
-                        }
-                        disabled={enCurso !== null}
-                        aria-expanded={editando?.id === programada.id}
-                        className="rounded-full border border-border-soft px-3 py-1 text-xs font-medium text-muted transition active:scale-95 disabled:opacity-40"
-                      >
-                        {editando?.id === programada.id ? "Cerrar" : "Cambiar hora"}
-                      </button>
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => void editar(programada.id)}
+                          disabled={enCurso !== null}
+                          className="rounded-full border border-border-soft px-3 py-1 text-xs font-medium text-muted transition active:scale-95 disabled:opacity-40"
+                        >
+                          Editar
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setEditando(
+                              editando?.id === programada.id
+                                ? null
+                                : { id: programada.id, cuando: horaCaracasDesdeIso(programada.publicarEn) },
+                            )
+                          }
+                          disabled={enCurso !== null}
+                          aria-expanded={editando?.id === programada.id}
+                          className="rounded-full border border-border-soft px-3 py-1 text-xs font-medium text-muted transition active:scale-95 disabled:opacity-40"
+                        >
+                          {editando?.id === programada.id ? "Cerrar" : "Cambiar hora"}
+                        </button>
+                      </>
                     )}
                     {(programada.estado === "pendiente" || programada.estado === "fallida") && (
                       <button

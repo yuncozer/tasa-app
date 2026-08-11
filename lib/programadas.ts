@@ -152,6 +152,34 @@ export async function reprogramarPublicacion(id: string, publicarEn: string): Pr
 }
 
 /**
+ * Cambia el contenido, la hora, o ambos, de una publicación que todavía no ha
+ * salido.
+ *
+ * Mismo guardián que `reprogramarPublicacion`: solo sobre una `pendiente`, y
+ * el filtro viaja al `WHERE` del `UPDATE`, así que si el worker ya la reclamó
+ * entre que se abrió el formulario de edición y se guardó, el `PATCH` no
+ * encuentra fila y devuelve `false` en vez de pisar algo que está saliendo en
+ * ese momento.
+ */
+export async function editarProgramada(
+  id: string,
+  cambios: { publicarEn?: string; payload?: PublicacionPayload },
+): Promise<boolean> {
+  const filas = await rest<Programada[]>(
+    `?id=eq.${encodeURIComponent(id)}&estado=eq.pendiente`,
+    {
+      method: "PATCH",
+      body: JSON.stringify({
+        ...(cambios.payload !== undefined ? { payload: cambios.payload } : {}),
+        ...(cambios.publicarEn !== undefined ? { publicar_en: cambios.publicarEn } : {}),
+        actualizada_en: new Date().toISOString(),
+      }),
+    },
+  );
+  return filas.length > 0;
+}
+
+/**
  * Toma una publicación vencida y la marca como `publicando` de forma atómica.
  *
  * El `estado=eq.pendiente` del filtro es lo importante: PostgREST lo traduce a
