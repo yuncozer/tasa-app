@@ -22,7 +22,10 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   try {
     const fila = await leerProgramada(id);
     if (!fila) return apiError("No existe esa publicación", undefined, 404);
-    if (fila.estado !== "pendiente") {
+    // Igual que `editarProgramada`: una `pendiente` sigue en cola y una
+    // `fallida` se puede corregir antes de reintentarla. Una `publicando` no
+    // se toca, puede estar en manos de Meta en este momento.
+    if (fila.estado !== "pendiente" && fila.estado !== "fallida") {
       return apiError("Esa publicación ya no se puede editar", undefined, 409);
     }
     return apiJson({ id: fila.id, publicarEn: fila.publicar_en, payload: fila.payload }, { cachear: false });

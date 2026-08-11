@@ -27,8 +27,14 @@ async function leerError(response: Response): Promise<string> {
  *
  * `edicion`, si viene, cambia el destino: en vez de crear una fila nueva
  * (`POST /api/admin/programar`), guarda los cambios sobre la fila que ya
- * existe (`PATCH /api/admin/programadas`), con la hora prellenada con la que
- * ya tenía —lo habitual es guardar sin tocarla, no reescribirla de cero.
+ * existe (`PATCH /api/admin/programadas`).
+ *
+ * La hora solo se prellena si todavía es futura: una `pendiente` siempre la
+ * tiene así, pero una `fallida` falló justo a la hora a la que estaba puesta,
+ * así que esa hora ya pasó y prellenarla solo confundiría ("¿por qué no me
+ * deja guardar si no toqué nada?"). Con el campo vacío se puede guardar solo
+ * el contenido corregido —la fila se queda `fallida`, lista para "Publicar
+ * ahora" desde la cola— o escribir una hora nueva para reprogramarla.
  */
 export function ProgramarPublicacion({
   payload,
@@ -42,22 +48,34 @@ export function ProgramarPublicacion({
   onProgramada: () => void;
   edicion?: { id: string; publicarEnInicial: string };
 }) {
-  const [cuando, setCuando] = useState(edicion ? horaCaracasDesdeIso(edicion.publicarEnInicial) : "");
+  const [cuando, setCuando] = useState(() => {
+    if (!edicion) return "";
+    const yaPaso = new Date(edicion.publicarEnInicial).getTime() <= Date.now();
+    return yaPaso ? "" : horaCaracasDesdeIso(edicion.publicarEnInicial);
+  });
   const [estado, setEstado] = useState<Estado>({ paso: "inicial" });
 
   const enviando = estado.paso === "enviando";
   const publicarEn = cuando ? isoDesdeHoraCaracas(cuando) : null;
-  const listo = Boolean(payload && publicarEn) && !deshabilitado;
+  /**
+   * En edición, dejarlo en blanco es válido —solo cambia el contenido—; si se
+   * escribe algo, tiene que ser una hora futura, pero eso lo valida el
+   * servidor (igual que en la creación, donde el `min` del input es solo una
+   * ayuda visual): comprobarlo aquí contra la hora actual haría el render
+   * impuro.
+   */
+  const listo = Boolean(payload) && (edicion ? cuando === "" || publicarEn !== null : Boolean(publicarEn)) && !deshabilitado;
 
   async function programar() {
-    if (!payload || !publicarEn) return;
+    if (!payload) return;
+    if (!edicion && !publicarEn) return;
     setEstado({ paso: "enviando" });
     try {
       const response = edicion
         ? await fetch("/api/admin/programadas", {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ id: edicion.id, publicarEn, payload }),
+            body: JSON.stringify({ id: edicion.id, payload, ...(publicarEn ? { publicarEn } : {}) }),
           })
         : await fetch("/api/admin/programar", {
             method: "POST",
@@ -95,7 +113,7 @@ export function ProgramarPublicacion({
       />
       <p className="text-xs text-muted">
         {edicion
-          ? "Hora de Venezuela. Puedes dejarla igual si solo cambiaste el contenido."
+          ? "Hora de Venezuela. Déjala en blanco para guardar solo el contenido, o elige una hora nueva para reprogramarla."
           : "Hora de Venezuela. Sale dentro de los diez minutos siguientes a la hora que elijas."}
       </p>
 
