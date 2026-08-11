@@ -577,6 +577,23 @@ Lo que hay que respetar:
   crédito). La segunda es la que cubre el caso "acredito la fuente pero no
   quiero cintillo", y es la razón de que no quede ni un texto en Arial. Sin
   título y sin fuente no se superpone ninguna banda.
+- **La marca va en un círculo que asoma por encima de la franja**, con el
+  `@latasa.online` debajo. El handle está ahí para que la cuenta viaje con el
+  video si alguien lo descarga y lo difunde: el sello dice "La Tasa", que es el
+  nombre del medio y no el perfil. Tiene el límite conocido de que un video sin
+  cintillo se queda sin él — se decidió así a sabiendas; si algún día pesa más
+  la atribución, el sitio es el sello.
+- **La taza se centra por su masa, no por su caja.** El dibujo es asimétrico —el
+  asa sale a la derecha, el platillo carga abajo—, así que centrado por su caja
+  se ve bajo y escorado: medido sobre el PNG, su centro de masa caía 1,9 px a la
+  izquierda y 3,7 px por debajo. `AJUSTE_LOGO` lo compensa. El efecto es que la
+  caja queda algo alta, y es inevitable: en una forma asimétrica centrar la masa
+  y centrar la caja son cosas distintas, y manda la masa.
+- **Los altos salen del contenido, no de una cifra redonda**: dos líneas de
+  titular más el crédito son ~143 px, y la franja mide 180. Llegó a medir 260 y
+  eran más de 100 px tapando video para nada. La banda baja no puede encogerse
+  en la misma proporción porque su suelo lo marca el círculo del logo más el
+  handle, no el texto.
 - **El cintillo se decide por video, no por post**: cada clip de un carrusel y
   el Reel llevan su propia `MarcaVideo` (`titulo`, `fuente`, `segundos`). Los
   tres campos son opcionales porque en la cola hay posts programados antes de
