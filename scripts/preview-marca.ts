@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { signNewsImageParams } from "../lib/news-signature";
+import type { ProporcionCarrusel } from "../lib/publish-news";
 import type { FormatoVideo } from "../lib/providers/cloudinary";
 import {
   subirMedia,
@@ -14,13 +15,16 @@ import { cargarEnvLocal } from "./_env";
  * Imprime las URLs de las cuatro piezas que la app marca, para poder tocar el
  * diseño con el resultado abierto en el navegador y sin publicar nada:
  *
- *   npx tsx scripts/preview-marca.ts foto.jpg    → imagen principal y secundaria
- *   npx tsx scripts/preview-marca.ts clip.mp4    → video en carrusel (1:1) y Reel (9:16)
+ *   npx tsx scripts/preview-marca.ts foto.jpg    → marco principal y secundario
+ *   npx tsx scripts/preview-marca.ts clip.mp4    → video en 1:1, 4:5 y Reel 9:16
  *   npx tsx scripts/preview-marca.ts --public-id <id> --tipo video
  *
- * `--fuente` alimenta las dos mitades: en las imágenes es el crédito del marco
- * y en el video, la franja inferior. Con `--fuente ""` el video sale sin
- * franja, que es como va el material propio.
+ * Opciones: `--titulo`, `--fuente`, `--proporcion 1:1|4:5`, `--segundo N`.
+ *
+ * `--titulo` y `--fuente` alimentan las dos mitades: en las imágenes son el
+ * titular y el crédito del marco; en el video, el cintillo. Con
+ * `--titulo "" --fuente ""` el video sale solo con el sello, que es como va el
+ * material propio sin acreditar.
  *
  * La marca de las imágenes la compone la plantilla de
  * `app/api/og/instagram-post-news`, así que esas dos URLs necesitan
@@ -48,6 +52,7 @@ interface Opciones {
   titulo: string;
   fuente: string;
   segundo: number;
+  proporcion: ProporcionCarrusel;
 }
 
 function leerOpciones(argv: string[]): Opciones {
@@ -55,6 +60,7 @@ function leerOpciones(argv: string[]): Opciones {
     titulo: TITULO_POR_DEFECTO,
     fuente: FUENTE_POR_DEFECTO,
     segundo: 0,
+    proporcion: "1:1",
   };
 
   for (let i = 0; i < argv.length; i += 1) {
@@ -80,6 +86,11 @@ function leerOpciones(argv: string[]): Opciones {
         opciones.fuente = valor;
         i += 1;
         break;
+      case "--proporcion":
+        if (valor !== "1:1" && valor !== "4:5") throw new Error("--proporcion acepta '1:1' o '4:5'");
+        opciones.proporcion = valor;
+        i += 1;
+        break;
       case "--segundo":
         opciones.segundo = Number(valor);
         if (!Number.isFinite(opciones.segundo)) throw new Error("--segundo acepta un número");
@@ -103,11 +114,21 @@ function tipoPorExtension(archivo: string): "imagen" | "video" {
  * Arma la URL firmada de la plantilla, igual que `armarUrlImagenFirmada()` en
  * `lib/publish-news.ts`: sin título la clave se omite del todo, porque la ruta
  * firma exactamente los parámetros que recibe.
+ *
+ * `proporcion` va **siempre**, aunque sea la de por defecto: la ruta la mete en
+ * el conjunto firmado en todos los casos, así que omitirla aquí invalidaría la
+ * firma y devolvería 403.
  */
-function urlPlantilla(params: { title?: string; image: string; source: string }): string {
+function urlPlantilla(params: {
+  title?: string;
+  image: string;
+  source: string;
+  proporcion: ProporcionCarrusel;
+}): string {
+  const { proporcion } = params;
   const firmados: Record<string, string> = params.title
-    ? { title: params.title, image: params.image, source: params.source }
-    : { image: params.image, source: params.source };
+    ? { title: params.title, image: params.image, source: params.source, proporcion }
+    : { image: params.image, source: params.source, proporcion };
 
   const url = new URL(`${BASE_LOCAL}/api/og/instagram-post-news`);
   for (const [clave, valor] of Object.entries(firmados)) url.searchParams.set(clave, valor);
@@ -125,10 +146,10 @@ function mostrarImagen(publicId: string, opciones: Opciones): void {
   const image = urlImagen(publicId);
 
   bloque("Imagen principal de post (con titular y fecha)", [
-    urlPlantilla({ title: opciones.titulo, image, source: opciones.fuente }),
+    urlPlantilla({ title: opciones.titulo, image, source: opciones.fuente, proporcion: opciones.proporcion }),
   ]);
   bloque("Imagen secundaria de carrusel (sin titular, foto más alta)", [
-    urlPlantilla({ image, source: opciones.fuente }),
+    urlPlantilla({ image, source: opciones.fuente, proporcion: opciones.proporcion }),
   ]);
   console.log("Las dos necesitan `npm run dev` levantado.");
   console.log("El marco se edita en app/api/og/instagram-post-news/route.tsx y lib/og-shared.ts;");
@@ -168,7 +189,9 @@ async function main() {
 
   const opciones = leerOpciones(process.argv.slice(2));
   if (!opciones.archivo && !opciones.publicId) {
-    console.error("Uso: npx tsx scripts/preview-marca.ts <archivo> [--titulo T] [--fuente F] [--segundo N]");
+    console.error(
+      "Uso: npx tsx scripts/preview-marca.ts <archivo> [--titulo T] [--fuente F] [--proporcion 1:1|4:5] [--segundo N]",
+    );
     console.error("     npx tsx scripts/preview-marca.ts --public-id <id> --tipo imagen|video");
     process.exit(1);
   }

@@ -699,59 +699,63 @@ desplegar a mano.
   probar también el camino de degradación, apuntando el proveedor a una URL
   inválida y confirmando que cae al respaldo.
 
-### Probar el post de noticias en local
+### Probar las marcas en local, sin publicar ni pasar por `/admin`
 
-Para ver la imagen y el caption de una noticia **sin publicar de verdad**,
-con `npm run dev` corriendo en otra terminal:
+La app marca **cinco piezas**, y todas se pueden revisar sin publicar nada. Los
+dos scripts se reparten el trabajo:
+
+| Script | Para qué | Necesita `npm run dev` |
+| --- | --- | --- |
+| `scripts/preview-noticia.ts <url>` | Un artículo real: imagen enmarcada + caption | Sí |
+| `scripts/preview-marca.ts <archivo>` | Material propio: marcos, video en sus tres lienzos, sello y cintillo | Solo para las de imagen |
 
 ```bash
+# Artículo real: imprime el caption y una URL firmada de la imagen
 npx tsx scripts/preview-noticia.ts "https://url-del-articulo"
+
+# Material propio: sube el archivo e imprime las URLs de todas sus variantes
+npx tsx scripts/preview-marca.ts foto.jpg     # marco principal y secundario
+npx tsx scripts/preview-marca.ts clip.mp4     # video en 1:1, 4:5 y Reel, con su fotograma
+
+# Opciones de preview-marca.ts
+--titulo "…"          # titular del marco (imagen) y del cintillo (video)
+--fuente "…"          # crédito del marco y del cintillo
+--proporcion 1:1|4:5  # lienzo del marco de imagen
+--segundo N           # de qué segundo se saca el fotograma del video
+--public-id <id> --tipo imagen|video   # reusa algo ya subido, sin volver a subirlo
 ```
 
-Hace `fetchArticle()` sobre esa URL real, arma el caption con
-`buildNewsCaption` y firma los parámetros de la imagen — imprime el caption
-completo y una URL local ya firmada de `/api/og/instagram-post-news` para
-pegar en el navegador y ver la imagen generada. Lee `CRON_SECRET` de
-`.env.local` para firmar (no publica nada; solo `POST /api/publish-instagram-news`
-o el botón "Publicar" de `/admin/noticia` publican de verdad).
-
-Para probar `/admin/noticia` en sí hace falta además `ADMIN_PASSWORD` en
-`.env.local`, y las tres `CLOUDINARY_*` para todo lo que suba imágenes o
-video.
-
-### Probar las marcas sin publicar ni pasar por `/admin`
-
-`preview-noticia.ts` cubre solo una de las cuatro piezas que la app marca: la
-imagen principal de un artículo scrapeado. Para las otras tres —y para probar
-con material propio en vez de con un artículo— está
-`scripts/preview-marca.ts`, que sube el archivo y devuelve las URLs de todas
-las variantes que le correspondan:
-
-```bash
-npx tsx scripts/preview-marca.ts foto.jpg   # principal (con titular) y secundaria de carrusel
-npx tsx scripts/preview-marca.ts clip.mp4   # carrusel 1:1, 4:5 y Reel 9:16, cada uno con su fotograma
-npx tsx scripts/preview-marca.ts --public-id <id> --tipo video   # reusa lo ya subido
-```
+**Qué compone cada pieza y dónde se edita:**
 
 | Pieza | Quién la compone | Dónde se edita |
 | --- | --- | --- |
-| Imagen principal de post | Satori, con titular y fecha | `app/api/og/instagram-post-news/route.tsx`, `lib/og-shared.ts` |
-| Imagen secundaria de carrusel | Satori, sin titular (`ALTO_FOTO.secundaria`) | los mismos |
-| Video en carrusel (1:1 y 4:5) | Cloudinary, transformación por URL | `lib/providers/cloudinary.ts` |
-| Video como Reel (9:16) | Cloudinary, misma cadena, otro lienzo | el mismo |
-| Cintillo del video | Satori, PNG transparente sobre la capa | `lib/og-cintillo.tsx` |
+| Marco principal de post | Satori, con titular | `app/api/og/instagram-post-news/route.tsx`, `lib/og-shared.tsx` |
+| Marco secundario de carrusel | Satori, sin titular (`ALTO_FOTO`) | los mismos |
+| Video (1:1, 4:5 y Reel 9:16) | Cloudinary, transformación por URL | `lib/providers/cloudinary.ts` |
+| Sello de marca sobre el video | Cloudinary, capa fija ya subida | el mismo (`SELLO_PUBLIC_ID`, `yDelSello`) |
+| Cintillo del video | Satori, PNG transparente que Cloudinary superpone | `lib/og-cintillo.tsx` |
 
-Al iterar, las dos mitades se comportan distinto y conviene saberlo:
+**Cómo pedir cada variante del video**, que es lo que más se confunde:
+
+- `--titulo "X" --fuente "Y"` → cintillo completo (titular + crédito).
+- `--titulo "X"` a secas → cintillo solo con titular.
+- `--titulo "" --fuente "Y"` → banda baja, solo el crédito.
+- `--titulo "" --fuente ""` → **sin cintillo**: el video sale solo con el sello,
+  que es como va el material propio sin acreditar.
+
+**Al iterar, las dos mitades se comportan distinto:**
 
 - **Imagen**: la firma cubre los parámetros, no el HTML. Editas la plantilla,
-  recargas el navegador con `npm run dev` levantado y ya — no hace falta
-  volver a correr el script. Solo hay que regenerar la URL si cambia el
-  artículo o si se añade o quita el título, porque la firma cubre exactamente
-  el conjunto de claves presentes.
-- **Video**: la transformación viaja en la URL, así que hay que volver a
-  correr el script (con `--public-id`, que no vuelve a subir el original) tras
-  cada cambio. Como la URL nueva es otra, tampoco hay caché vieja que
-  invalidar.
+  recargas el navegador y ya — no hace falta volver a correr el script. Solo hay
+  que regenerarla si cambia el artículo, o si se añade o quita el título o la
+  proporción, porque la firma cubre exactamente el conjunto de claves presentes.
+- **Video**: la transformación viaja en la URL, así que hay que volver a correr
+  el script (con `--public-id`, que no resube el original) tras cada cambio.
+  Como la URL nueva es otra, tampoco hay caché vieja que invalidar.
+- **Cintillo**: además de lo anterior, **sube `VERSION_CINTILLO`** al tocar el
+  diseño. Entra en el `public_id` del PNG, así que sin subirla Cloudinary
+  reutiliza el que ya tiene cacheado y no verás el cambio por más veces que
+  corras el script.
 
 Del video se revisa el **fotograma**, no el clip: `urlFotogramaConMarca()` pide
 un JPG sobre la misma transformación que `urlVideoConMarca()` —comparten
@@ -759,13 +763,25 @@ un JPG sobre la misma transformación que `urlVideoConMarca()` —comparten
 mirarlo es inmediato y deja algo que comparar después. Reproducir el `<video>`
 para ver si el overlay quedó bien es mucho más lento.
 
-El script necesita las tres `CLOUDINARY_*` y `CRON_SECRET` en `.env.local`, y
-correrse desde la raíz del repo (`asegurarLogo()` lee `public/icon-512.png`
-relativo al directorio de trabajo). `npm run dev` hace falta solo para las URLs
-de imagen; las de video las sirve Cloudinary. Ten en cuenta que cada corrida
-sin `--public-id` gasta almacenamiento del plan gratuito (25 créditos al mes;
-1 crédito = 1 GB de almacenamiento o de ancho de banda de video), y que los
-archivos de prueba se borran a mano desde el panel de Cloudinary.
+**Requisitos y avisos:**
+
+- Los dos scripts leen `.env.local` y **se corren desde la raíz del repo**
+  (`asegurarLogo()` lee `public/icon-512.png` relativo al directorio de trabajo).
+- `preview-noticia.ts` necesita `CRON_SECRET`. `preview-marca.ts` necesita además
+  las tres `CLOUDINARY_*`.
+- `npm run dev` hace falta **solo para las URLs de imagen**; las de video las
+  sirve Cloudinary directamente.
+- Cada corrida sin `--public-id` gasta almacenamiento del plan gratuito (25
+  créditos al mes; 1 crédito = 1 GB de almacenamiento o de ancho de banda de
+  video). Los archivos de prueba se borran a mano desde el panel de Cloudinary,
+  y ahí también se acumulan los `cintillo_` de diseños viejos.
+- Si una URL de imagen contesta **403**, el conjunto firmado y el enviado no
+  coinciden: es lo que pasaba cuando los scripts firmaban sin `proporcion`
+  después de que la ruta empezara a incluirla siempre.
+- **Ninguno de los dos publica nada.** Solo publican de verdad
+  `POST /api/publish-instagram-news` y los botones de `/admin/noticia`.
+- Para probar `/admin/noticia` en sí —y no solo el render— hace falta además
+  `ADMIN_PASSWORD` en `.env.local`.
 
 ### El entorno de desarrollo
 

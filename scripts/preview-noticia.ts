@@ -25,7 +25,14 @@ async function main() {
   }
 
   const article = await fetchArticle(url);
-  const params = { title: article.title, image: article.imageUrl, source: article.sourceHost };
+  // `proporcion` entra en el conjunto firmado aunque sea la de por defecto: la
+  // ruta la incluye siempre, así que omitirla invalidaría la firma (403).
+  const params = {
+    title: article.title,
+    image: article.imageUrl,
+    source: article.sourceHost,
+    proporcion: "1:1",
+  };
   const sig = signNewsImageParams(params);
   const qs = new URLSearchParams({ ...params, sig }).toString();
   const caption = buildNewsCaption(article);
