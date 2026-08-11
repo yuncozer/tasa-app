@@ -152,21 +152,22 @@ export async function reprogramarPublicacion(id: string, publicarEn: string): Pr
 }
 
 /**
- * Cambia el contenido, la hora, o ambos, de una publicación que todavía no ha
- * salido.
+ * Cambia el contenido, la hora, o ambos, de una publicación que todavía no se
+ * ha publicado de verdad: una `pendiente` que sigue en cola, o una `fallida`
+ * que se puede corregir antes de reintentarla —el mismo criterio que ya usaba
+ * `cancelarProgramada` para decidir qué se puede tocar sin riesgo.
  *
- * Mismo guardián que `reprogramarPublicacion`: solo sobre una `pendiente`, y
- * el filtro viaja al `WHERE` del `UPDATE`, así que si el worker ya la reclamó
- * entre que se abrió el formulario de edición y se guardó, el `PATCH` no
- * encuentra fila y devuelve `false` en vez de pisar algo que está saliendo en
- * ese momento.
+ * El filtro viaja al `WHERE` del `UPDATE`, así que si el worker reclamó la
+ * fila (la puso en `publicando`) entre que se abrió el formulario de edición y
+ * se guardó, el `PATCH` no encuentra fila y devuelve `false` en vez de pisar
+ * algo que está saliendo en ese momento.
  */
 export async function editarProgramada(
   id: string,
   cambios: { publicarEn?: string; payload?: PublicacionPayload },
 ): Promise<boolean> {
   const filas = await rest<Programada[]>(
-    `?id=eq.${encodeURIComponent(id)}&estado=eq.pendiente`,
+    `?id=eq.${encodeURIComponent(id)}&estado=in.(pendiente,fallida)`,
     {
       method: "PATCH",
       body: JSON.stringify({

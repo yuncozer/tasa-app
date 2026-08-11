@@ -220,35 +220,42 @@ export function ColaProgramadas({
                         Publicar ahora
                       </button>
                     )}
+                    {/* `pendiente` o `fallida`: ninguna de las dos está en
+                        manos de Meta ahora mismo. Reabre el mismo formulario
+                        con el contenido ya cargado — sirve tanto para
+                        corregir algo como para copiar el título o el caption
+                        y publicarlos a mano si hiciera falta. Una
+                        `publicando` no se toca: puede estar en vuelo. */}
+                    {(programada.estado === "pendiente" || programada.estado === "fallida") && (
+                      <button
+                        type="button"
+                        onClick={() => void editar(programada.id)}
+                        disabled={enCurso !== null}
+                        className="rounded-full border border-border-soft px-3 py-1 text-xs font-medium text-muted transition active:scale-95 disabled:opacity-40"
+                      >
+                        Editar
+                      </button>
+                    )}
                     {/* Solo una `pendiente`: una `publicando` puede estar ya en
-                        manos de Meta, y a una `fallida` moverle la hora no la
-                        devuelve a la cola — para esa está "Publicar ahora". */}
+                        manos de Meta, y a una `fallida` moverle solo la hora no
+                        la devuelve a la cola — para eso está "Editar", que ya
+                        deja poner una hora nueva junto con el contenido. */}
                     {programada.estado === "pendiente" && (
-                      <>
-                        <button
-                          type="button"
-                          onClick={() => void editar(programada.id)}
-                          disabled={enCurso !== null}
-                          className="rounded-full border border-border-soft px-3 py-1 text-xs font-medium text-muted transition active:scale-95 disabled:opacity-40"
-                        >
-                          Editar
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setEditando(
-                              editando?.id === programada.id
-                                ? null
-                                : { id: programada.id, cuando: horaCaracasDesdeIso(programada.publicarEn) },
-                            )
-                          }
-                          disabled={enCurso !== null}
-                          aria-expanded={editando?.id === programada.id}
-                          className="rounded-full border border-border-soft px-3 py-1 text-xs font-medium text-muted transition active:scale-95 disabled:opacity-40"
-                        >
-                          {editando?.id === programada.id ? "Cerrar" : "Cambiar hora"}
-                        </button>
-                      </>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setEditando(
+                            editando?.id === programada.id
+                              ? null
+                              : { id: programada.id, cuando: horaCaracasDesdeIso(programada.publicarEn) },
+                          )
+                        }
+                        disabled={enCurso !== null}
+                        aria-expanded={editando?.id === programada.id}
+                        className="rounded-full border border-border-soft px-3 py-1 text-xs font-medium text-muted transition active:scale-95 disabled:opacity-40"
+                      >
+                        {editando?.id === programada.id ? "Cerrar" : "Cambiar hora"}
+                      </button>
                     )}
                     {(programada.estado === "pendiente" || programada.estado === "fallida") && (
                       <button
