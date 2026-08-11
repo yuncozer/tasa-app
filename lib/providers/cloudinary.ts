@@ -417,6 +417,16 @@ async function cintilloDe(marca: MarcaVideo): Promise<string | undefined> {
 }
 
 /**
+ * Formato de salida del video entregado. Fijo a `mp4` a propósito: sin un
+ * `format` explícito, Cloudinary resuelve la extensión de la URL de forma
+ * ambigua —y `fl_attachment` la necesita para saber con qué extensión
+ * anunciar la descarga—; verificado en vivo, sin esto el navegador terminaba
+ * guardando el video como `.gif`. `urlFotogramaConMarca` y `urlImagen` ya
+ * seguían este mismo patrón (`jpg`/`png`); aquí faltaba.
+ */
+const FORMATO_VIDEO_ENTREGADO = "mp4";
+
+/**
  * URL pública del video ya marcado. Sin `titulo` ni `fuente`, el video sale
  * solo con el sello, que es el caso del material propio sin acreditar.
  */
@@ -431,6 +441,7 @@ export async function urlVideoConMarca(
   return client.url(publicId, {
     resource_type: "video",
     secure: true,
+    format: FORMATO_VIDEO_ENTREGADO,
     transformation: transformacionMarca(formato, cintillo, marca.segundos),
   });
 }
@@ -456,6 +467,7 @@ export async function urlDescargaVideo(
   return client.url(publicId, {
     resource_type: "video",
     secure: true,
+    format: FORMATO_VIDEO_ENTREGADO,
     transformation: [...transformacionMarca(formato, cintillo, marca.segundos), { flags: "attachment" }],
   });
 }
