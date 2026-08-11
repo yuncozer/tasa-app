@@ -18,8 +18,10 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const { videoUrl } = await previewNewsVideoPost(videoPublicId, leerMarcaVideo(body));
-    return apiJson({ videoUrl }, { cachear: false });
+    // `descargaUrl` va junto a `videoUrl`: es la misma pieza con `fl_attachment`,
+    // y el formulario la necesita para el botón de descarga.
+    const previa = await previewNewsVideoPost(videoPublicId, leerMarcaVideo(body));
+    return apiJson(previa, { cachear: false });
   } catch (error) {
     return apiError("No se pudo generar la vista previa del video", error);
   }

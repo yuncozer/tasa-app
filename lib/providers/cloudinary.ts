@@ -32,11 +32,12 @@ function subirBuffer(
   buffer: Buffer,
   resourceType: "image" | "video",
   publicId?: string,
+  extra: Record<string, unknown> = {},
 ): Promise<UploadApiResponse> {
   const client = configurar();
   return new Promise((resolve, reject) => {
     const stream = client.uploader.upload_stream(
-      { resource_type: resourceType, public_id: publicId },
+      { resource_type: resourceType, public_id: publicId, ...extra },
       (error, result) => {
         if (error || !result) reject(error ?? new Error("Cloudinary no devolvió resultado"));
         else resolve(result);
@@ -178,11 +179,24 @@ export function limpiarFuente(valor: unknown): string | undefined {
  * Sube el cintillo de un video y devuelve su `public_id`, generándolo solo la
  * primera vez.
  *
- * Mismo patrón que `asegurarLogo()`, pero con un `public_id` derivado del
- * contenido en vez de fijo: el mismo titular y la misma fuente dan el mismo
- * identificador, así que reabrir la vista previa no vuelve a generar ni a
- * subir nada. Sin eso, cada pulsación de "Actualizar vista previa" dejaría un
- * asset nuevo en una cuenta con 25 créditos al mes.
+ * El `public_id` se deriva del contenido: el mismo titular y la misma fuente
+ * dan el mismo identificador, así que el asset se reutiliza en vez de dejar uno
+ * nuevo por cada pulsación de "Actualizar vista previa" en una cuenta con 25
+ * créditos al mes.
+ *
+ * **Sube siempre, con `overwrite: false`.** La versión anterior seguía el
+ * patrón de `asegurarLogo()` —preguntar por el recurso y subirlo solo si la
+ * consulta fallaba— y con eso el cintillo no llegaba nunca al video: si esa
+ * consulta no lanza para un `public_id` inexistente, no se sube nada y la URL
+ * acaba apuntando a un asset fantasma. Y ahí no hay error que avise, porque
+ * Cloudinary, sobre video, **ignora en silencio** una capa que no encuentra y
+ * sirve el clip sin ella (verificado en producción: salía el sello y no el
+ * cintillo, sin ningún fallo por medio).
+ *
+ * Subir siempre elimina esa suposición: al componer la URL, el PNG está. Con
+ * `overwrite: false` una subida repetida no reemplaza nada ni gasta
+ * almacenamiento extra, y de paso vuelve inofensivo que dos llamadas
+ * concurrentes pidan el mismo cintillo a la vez.
  *
  * `VERSION_CINTILLO` entra en el hash a propósito: si se cambia el diseño de
  * la plantilla sin subirla, los videos seguirían sirviendo el PNG viejo que ya
@@ -195,12 +209,10 @@ async function asegurarCintillo(datos: DatosCintillo): Promise<string> {
     .slice(0, 16);
   const publicId = `cintillo_${huella}`;
 
-  const client = configurar();
-  try {
-    await client.api.resource(publicId, { resource_type: "image" });
-  } catch {
-    await subirBuffer(await generarCintillo(datos), "image", publicId);
-  }
+  await subirBuffer(await generarCintillo(datos), "image", publicId, {
+    overwrite: false,
+    invalidate: false,
+  });
   return publicId;
 }
 

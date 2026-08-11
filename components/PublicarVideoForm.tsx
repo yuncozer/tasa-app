@@ -11,9 +11,9 @@ import { subirMediaConProgreso, type FaseSubida } from "@/lib/subida";
 type Estado =
   | { paso: "inicial" }
   | { paso: "subiendo"; fase: FaseSubida }
-  | { paso: "preview"; videoUrl: string; descargaUrl: string; videoPublicId: string }
-  | { paso: "confirmar"; videoUrl: string; descargaUrl: string; videoPublicId: string }
-  | { paso: "publicando"; videoUrl: string; descargaUrl: string; videoPublicId: string }
+  | { paso: "preview"; videoUrl: string; descargaUrl: string; conCintillo: boolean; videoPublicId: string }
+  | { paso: "confirmar"; videoUrl: string; descargaUrl: string; conCintillo: boolean; videoPublicId: string }
+  | { paso: "publicando"; videoUrl: string; descargaUrl: string; conCintillo: boolean; videoPublicId: string }
   | { paso: "publicado"; mediaId: string }
   | { paso: "error"; mensaje: string };
 
@@ -65,10 +65,14 @@ export function PublicarVideoForm({ onProgramada }: { onProgramada: () => void }
       setEstado({ paso: "error", mensaje: await leerError(preview) });
       return;
     }
-    const { videoUrl, descargaUrl } = (await preview.json()) as { videoUrl: string; descargaUrl: string };
+    const { videoUrl, descargaUrl, conCintillo } = (await preview.json()) as {
+      videoUrl: string;
+      descargaUrl: string;
+      conCintillo: boolean;
+    };
     setFuenteAplicada(fuenteDeseada);
     setCintilloAplicado(cintillo);
-    setEstado({ paso: "preview", videoUrl, descargaUrl, videoPublicId });
+    setEstado({ paso: "preview", videoUrl, descargaUrl, conCintillo, videoPublicId });
   }
 
   async function subirVideo(archivo: File) {
@@ -103,7 +107,13 @@ export function PublicarVideoForm({ onProgramada }: { onProgramada: () => void }
 
   async function publicar(videoPublicId: string) {
     if (!("videoUrl" in estado)) return;
-    setEstado({ paso: "publicando", videoUrl: estado.videoUrl, descargaUrl: estado.descargaUrl, videoPublicId });
+    setEstado({
+      paso: "publicando",
+      videoUrl: estado.videoUrl,
+      descargaUrl: estado.descargaUrl,
+      conCintillo: estado.conCintillo,
+      videoPublicId,
+    });
     try {
       const response = await fetch("/api/admin/publish-video", {
         method: "POST",
@@ -189,6 +199,13 @@ export function PublicarVideoForm({ onProgramada }: { onProgramada: () => void }
       {conVideo && (
         <div className="flex flex-col gap-4">
           <video src={conVideo.videoUrl} controls className="w-full rounded-2xl border border-border-soft" />
+
+          {/* Qué marca lleva de verdad el video que se está viendo. Sin esto, una
+              capa que no se aplique es invisible: Cloudinary sirve el clip sin
+              ella y sin error, y se publicaría creyendo que la lleva. */}
+          <p className={`text-xs ${conVideo.conCintillo ? "text-accent" : "text-muted"}`}>
+            {conVideo.conCintillo ? "Cintillo aplicado" : "Sin cintillo: solo el sello de marca"}
+          </p>
 
           {/* Enlace y no botón con `fetch`: la URL ya viene con `fl_attachment`
               de Cloudinary, que responde con `Content-Disposition: attachment`.
@@ -282,6 +299,7 @@ export function PublicarVideoForm({ onProgramada }: { onProgramada: () => void }
                       paso: "preview",
                       videoUrl: conVideo.videoUrl,
                       descargaUrl: conVideo.descargaUrl,
+                      conCintillo: conVideo.conCintillo,
                       videoPublicId: conVideo.videoPublicId,
                     })}
                   className="flex-1 rounded-xl border border-border-soft bg-surface-strong px-4 py-3 text-sm font-semibold text-muted transition active:scale-95"
@@ -297,6 +315,7 @@ export function PublicarVideoForm({ onProgramada }: { onProgramada: () => void }
                   paso: "confirmar",
                   videoUrl: conVideo.videoUrl,
                   descargaUrl: conVideo.descargaUrl,
+                  conCintillo: conVideo.conCintillo,
                   videoPublicId: conVideo.videoPublicId,
                 })}
               disabled={!caption.trim() || publicando || desactualizado || refrescando}

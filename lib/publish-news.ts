@@ -136,12 +136,17 @@ export async function publishManualNewsPost(datos: NoticiaManual): Promise<{ med
 export async function previewNewsVideoPost(
   videoPublicId: string,
   marca: MarcaVideo = {},
-): Promise<{ videoUrl: string; descargaUrl: string }> {
-  const [videoUrl, descargaUrl] = await Promise.all([
-    urlVideoConMarca(videoPublicId, "reel", marca),
-    urlDescargaVideo(videoPublicId, "reel", marca),
-  ]);
-  return { videoUrl, descargaUrl };
+): Promise<{ videoUrl: string; descargaUrl: string; conCintillo: boolean }> {
+  // En serie y no con `Promise.all`: las dos componen el mismo cintillo, así
+  // que en paralelo lo generaban y lo subían dos veces a la vez. La segunda
+  // llamada reutiliza el PNG que dejó lista la primera.
+  const videoUrl = await urlVideoConMarca(videoPublicId, "reel", marca);
+  const descargaUrl = await urlDescargaVideo(videoPublicId, "reel", marca);
+
+  // Se declara además de las URLs porque desde el navegador no hay forma de
+  // saber si la marca llegó a aplicarse: si la capa falta, Cloudinary sirve el
+  // video sin ella y sin error, y el admin publicaría creyendo que la lleva.
+  return { videoUrl, descargaUrl, conCintillo: videoUrl.includes("l_cintillo_") };
 }
 
 export async function publishNewsVideoPost(
