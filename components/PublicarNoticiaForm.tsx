@@ -6,6 +6,7 @@ import { BarraProgreso } from "@/components/BarraProgreso";
 import type { Cintillo } from "@/components/ControlCintillo";
 import { ControlCintillo } from "@/components/ControlCintillo";
 import { ProgramarPublicacion } from "@/components/ProgramarPublicacion";
+import { SelectorMedia, type ItemMedia } from "@/components/SelectorMedia";
 import { subirMediaConProgreso, type FaseSubida } from "@/lib/subida";
 
 interface Preview {
@@ -138,6 +139,102 @@ function aElementos(lista: Extra[]): ElementoCarruselEntrada[] {
   );
 }
 
+/** Qué selector de biblioteca está abierto, si alguno. */
+type Selector = "imagen-principal" | "video-principal" | "extra-imagen" | "extra-video" | null;
+
+/** Lo que se siembra en el estado del formulario al editar una programada. */
+interface SemillaManual {
+  principalTipo: PrincipalTipo;
+  title: string;
+  sourceHost: string;
+  caption: string;
+  imagenPublicId?: string;
+  videoPrincipalPublicId?: string;
+  fuenteVideoPrincipal?: string;
+  cintilloVideoPrincipal?: Cintillo;
+  proporcion: ProporcionCarrusel;
+  extras: Extra[];
+}
+
+/**
+ * Reconstruye el estado del formulario a partir del payload guardado de una
+ * programada. `materializarParaProgramar` garantiza que lo guardado siempre
+ * es `manual` o `carrusel` (nunca `articulo`), así que solo hace falta
+ * revertir esas dos formas — nunca vuelve a scrapear nada.
+ */
+function semillaDeEdicion(payload?: PublicacionPayload): SemillaManual | null {
+  if (!payload) return null;
+
+  if (payload.tipo === "manual") {
+    return {
+      principalTipo: "imagen",
+      title: payload.datos.title,
+      sourceHost: payload.datos.sourceHost,
+      caption: payload.datos.caption,
+      imagenPublicId: payload.datos.imagenPublicId,
+      proporcion: "1:1",
+      extras: [],
+    };
+  }
+
+  if (payload.tipo === "carrusel") {
+    const principal = payload.datos.principal;
+    const base = {
+      sourceHost: payload.datos.sourceHost,
+      caption: payload.caption,
+      proporcion: payload.datos.proporcion ?? ("1:1" as ProporcionCarrusel),
+      extras: payload.datos.elementos.map(
+        (elemento, indice): Extra =>
+          elemento.tipo === "video"
+            ? {
+                clave: `${elemento.publicId}-${indice}`,
+                tipo: "video",
+                publicId: elemento.publicId,
+                fuente: elemento.fuente,
+                cintillo: elemento.titulo ? { titulo: elemento.titulo, segundos: elemento.segundos } : undefined,
+              }
+            : { clave: `${elemento.publicId}-${indice}`, tipo: "imagen", publicId: elemento.publicId },
+      ),
+    };
+
+    if (principal.tipo === "video") {
+      return {
+        ...base,
+        principalTipo: "video",
+        title: "",
+        videoPrincipalPublicId: principal.publicId,
+        fuenteVideoPrincipal: principal.fuente,
+        cintilloVideoPrincipal: principal.titulo
+          ? { titulo: principal.titulo, segundos: principal.segundos }
+          : undefined,
+      };
+    }
+
+    return {
+      ...base,
+      principalTipo: "imagen",
+      title: payload.datos.title ?? "",
+      imagenPublicId: principal.tipo === "subida" ? principal.publicId : undefined,
+    };
+  }
+
+  return null;
+}
+
+/** Botón secundario que abre el selector de recursos ya subidos a Cloudinary. */
+function BotonBiblioteca({ onClick, disabled }: { onClick: () => void; disabled?: boolean }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="rounded-xl border border-border-soft bg-surface px-4 py-3 text-sm font-semibold text-muted transition active:scale-95 disabled:opacity-50"
+    >
+      Elegir de la biblioteca
+    </button>
+  );
+}
+
 /**
  * Formulario de `/admin/noticia`: dos modos — pegar la URL de un artículo
  * (scraping automático) o escribir una noticia de autoría propia con imagen
@@ -149,28 +246,51 @@ function aElementos(lista: Extra[]): ElementoCarruselEntrada[] {
  * Instagram, fija el formato de todo el carrusel) y lo demás va detrás en el
  * orden elegido. Publicar siempre pasa por un segundo paso de confirmación —
  * es una acción externa e irreversible.
+ *
+ * `edicion`, si viene, prellena el formulario con el payload guardado de una
+ * programada `pendiente` en vez de arrancar en blanco — el padre
+ * (`PublicarPanel`) remonta el componente con una `key` distinta por fila, así
+ * que el estado inicial solo se calcula una vez por edición, sin necesidad de
+ * un efecto que lo reponga.
  */
-export function PublicarNoticiaForm({ onProgramada }: { onProgramada: () => void }) {
-  const [modo, setModo] = useState<Modo>("url");
+export function PublicarNoticiaForm({
+  onProgramada,
+  edicion,
+  onCancelarEdicion,
+}: {
+  onProgramada: () => void;
+  edicion?: { id: string; payload: PublicacionPayload; publicarEn: string };
+  onCancelarEdicion?: () => void;
+}) {
+  const semilla = semillaDeEdicion(edicion?.payload);
+  const [modo, setModo] = useState<Modo>(edicion ? "manual" : "url");
   const [url, setUrl] = useState("");
-  const [title, setTitle] = useState("");
-  const [sourceHost, setSourceHost] = useState("");
-  const [caption, setCaption] = useState("");
-  const [imagenPublicId, setImagenPublicId] = useState<string | undefined>();
+  const [title, setTitle] = useState(semilla?.title ?? "");
+  const [sourceHost, setSourceHost] = useState(semilla?.sourceHost ?? "");
+  const [caption, setCaption] = useState(semilla?.caption ?? "");
+  const [imagenPublicId, setImagenPublicId] = useState<string | undefined>(semilla?.imagenPublicId);
   /** Miniatura local de la foto principal, para verla al instante sin esperar al servidor. */
   const [fotoPrincipal, setFotoPrincipal] = useState<string | undefined>();
   /** Solo aplica al modo "manual": si el principal es una imagen o un video propio. */
-  const [principalTipo, setPrincipalTipo] = useState<PrincipalTipo>("imagen");
-  const [videoPrincipalPublicId, setVideoPrincipalPublicId] = useState<string | undefined>();
+  const [principalTipo, setPrincipalTipo] = useState<PrincipalTipo>(semilla?.principalTipo ?? "imagen");
+  const [videoPrincipalPublicId, setVideoPrincipalPublicId] = useState<string | undefined>(
+    semilla?.videoPrincipalPublicId,
+  );
   const [videoPrincipal, setVideoPrincipal] = useState<string | undefined>();
   /** Igual que en `Extra.fuente`: `undefined` es "sin franja", `""` es "pedida pero en blanco". */
-  const [fuenteVideoPrincipal, setFuenteVideoPrincipal] = useState<string | undefined>();
-  const [cintilloVideoPrincipal, setCintilloVideoPrincipal] = useState<Cintillo | undefined>();
+  const [fuenteVideoPrincipal, setFuenteVideoPrincipal] = useState<string | undefined>(
+    semilla?.fuenteVideoPrincipal,
+  );
+  const [cintilloVideoPrincipal, setCintilloVideoPrincipal] = useState<Cintillo | undefined>(
+    semilla?.cintilloVideoPrincipal,
+  );
   /** Proporción del carrusel; solo se elige cuando el principal es un video. */
-  const [proporcion, setProporcion] = useState<ProporcionCarrusel>("1:1");
+  const [proporcion, setProporcion] = useState<ProporcionCarrusel>(semilla?.proporcion ?? "1:1");
   const [subida, setSubida] = useState<Subida | null>(null);
-  const [extras, setExtras] = useState<Extra[]>([]);
+  const [extras, setExtras] = useState<Extra[]>(semilla?.extras ?? []);
   const [diapositivas, setDiapositivas] = useState<Diapositiva[] | null>(null);
+  /** Qué selector de "elegir de la biblioteca" está abierto, si alguno. */
+  const [selector, setSelector] = useState<Selector>(null);
   /**
    * El título y la fuente no van grabados en la foto: el marco los compone en
    * cada render. Así que se pueden editar después de subirla — pero entonces
@@ -240,6 +360,79 @@ export function PublicarNoticiaForm({ onProgramada }: { onProgramada: () => void
     setDiapositivas(null);
     setDesactualizado(false);
     setEstado({ paso: "inicial" });
+  }
+
+  /** Igual que `ponerFotoPrincipal`, pero con la URL de un recurso ya subido en vez de un `File` local. */
+  function usarFotoPrincipalRemota(url: string) {
+    setFotoPrincipal((previa) => {
+      if (previa?.startsWith("blob:")) URL.revokeObjectURL(previa);
+      return url;
+    });
+  }
+
+  /** Igual, para el video principal. */
+  function usarVideoPrincipalRemoto(url: string) {
+    setVideoPrincipal((previo) => {
+      if (previo?.startsWith("blob:")) URL.revokeObjectURL(previo);
+      return url;
+    });
+  }
+
+  /**
+   * Elegir de la biblioteca hace exactamente lo que hace terminar de subir un
+   * archivo nuevo — cambia el `publicId` y refresca lo que dependa de él— solo
+   * que sin pasar por Cloudinary, porque el recurso ya está ahí.
+   */
+  async function elegirImagenPrincipalDeBiblioteca(item: ItemMedia) {
+    setSelector(null);
+    setImagenPublicId(item.publicId);
+    usarFotoPrincipalRemota(item.url);
+
+    if (preview) {
+      const endpoint = modo === "url" ? "/api/admin/preview-noticia" : "/api/admin/preview-noticia-manual";
+      const body =
+        modo === "url"
+          ? { url, imagenPublicId: item.publicId }
+          : { title, sourceHost, caption, imagenPublicId: item.publicId };
+      try {
+        const response = await fetch(endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        if (response.ok) {
+          const data = (await response.json()) as Preview;
+          setEstado({ paso: "preview", preview: { ...preview, imageUrl: data.imageUrl } });
+        }
+      } catch {
+        // El botón de "Vista previa" sigue disponible para reintentar.
+      }
+      await refrescarCarrusel(extras, { tipo: "subida", publicId: item.publicId }, preview);
+    }
+  }
+
+  function elegirVideoPrincipalDeBiblioteca(item: ItemMedia) {
+    setSelector(null);
+    setVideoPrincipalPublicId(item.publicId);
+    usarVideoPrincipalRemoto(item.url);
+    if (preview) {
+      void refrescarCarrusel(
+        extras,
+        {
+          tipo: "video",
+          publicId: item.publicId,
+          fuente: fuenteVideoPrincipal,
+          titulo: cintilloVideoPrincipal?.titulo,
+          segundos: cintilloVideoPrincipal?.segundos,
+        },
+        preview,
+      );
+    }
+  }
+
+  function elegirExtraDeBiblioteca(item: ItemMedia, tipo: "imagen" | "video") {
+    setSelector(null);
+    aplicarExtras([...extras, { clave: `${item.publicId}-${extras.length}`, tipo, publicId: item.publicId }]);
   }
 
   /** Quita la foto principal para poder subir otra. */
@@ -585,22 +778,39 @@ export function PublicarNoticiaForm({ onProgramada }: { onProgramada: () => void
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="flex gap-2" role="tablist" aria-label="Origen de la noticia">
-        {(["url", "manual"] as const).map((opcion) => (
-          <button
-            key={opcion}
-            type="button"
-            role="tab"
-            aria-selected={modo === opcion}
-            onClick={() => cambiarModo(opcion)}
-            className={`flex-1 rounded-xl border px-3 py-2 text-sm font-semibold transition active:scale-95 ${
-              modo === opcion ? "border-accent bg-accent/15 text-accent" : "border-border-soft bg-surface text-muted"
-            }`}
-          >
-            {opcion === "url" ? "Desde un artículo" : "Noticia propia"}
-          </button>
-        ))}
-      </div>
+      {edicion ? (
+        <div className="flex items-center justify-between gap-2 rounded-2xl border border-accent/40 bg-accent/10 px-4 py-3">
+          <p className="text-sm text-accent">Editando una publicación en cola.</p>
+          {onCancelarEdicion && (
+            <button
+              type="button"
+              onClick={onCancelarEdicion}
+              className="shrink-0 rounded-full border border-accent/40 px-3 py-1 text-xs font-medium text-accent transition active:scale-95"
+            >
+              Cancelar edición
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="flex gap-2" role="tablist" aria-label="Origen de la noticia">
+          {(["url", "manual"] as const).map((opcion) => (
+            <button
+              key={opcion}
+              type="button"
+              role="tab"
+              aria-selected={modo === opcion}
+              onClick={() => cambiarModo(opcion)}
+              className={`flex-1 rounded-xl border px-3 py-2 text-sm font-semibold transition active:scale-95 ${
+                modo === opcion
+                  ? "border-accent bg-accent/15 text-accent"
+                  : "border-border-soft bg-surface text-muted"
+              }`}
+            >
+              {opcion === "url" ? "Desde un artículo" : "Noticia propia"}
+            </button>
+          ))}
+        </div>
+      )}
 
       {modo === "url" ? (
         <div className="flex flex-col gap-1">
@@ -722,20 +932,23 @@ export function PublicarNoticiaForm({ onProgramada }: { onProgramada: () => void
 
               {datosDelMarcoListos ? (
                 <>
-                  <label className={claseSelector("px-4 py-4", subiendo)}>
-                    {fotoPrincipal ? "Cambiar la foto" : "Elegir imagen"}
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      disabled={subiendo}
-                      onChange={(e) => {
-                        const archivo = e.target.files?.[0];
-                        if (archivo) void reemplazarImagenPrincipal(archivo);
-                        e.target.value = "";
-                      }}
-                    />
-                  </label>
+                  <div className="flex gap-2">
+                    <label className={claseSelector("flex-1 px-4 py-4", subiendo)}>
+                      {fotoPrincipal ? "Cambiar la foto" : "Elegir imagen"}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        disabled={subiendo}
+                        onChange={(e) => {
+                          const archivo = e.target.files?.[0];
+                          if (archivo) void reemplazarImagenPrincipal(archivo);
+                          e.target.value = "";
+                        }}
+                      />
+                    </label>
+                    <BotonBiblioteca onClick={() => setSelector("imagen-principal")} disabled={subiendo} />
+                  </div>
                   {subida?.origen === "principal" && (
                     <BarraProgreso fase={subida.fase} etiqueta={textoDeSubida(subida)} />
                   )}
@@ -797,20 +1010,23 @@ export function PublicarNoticiaForm({ onProgramada }: { onProgramada: () => void
 
               {datosDelMarcoListos ? (
                 <>
-                  <label className={claseSelector("px-4 py-4", subiendo)}>
-                    {videoPrincipal ? "Cambiar el video" : "Elegir video"}
-                    <input
-                      type="file"
-                      accept="video/*"
-                      className="hidden"
-                      disabled={subiendo}
-                      onChange={(e) => {
-                        const archivo = e.target.files?.[0];
-                        if (archivo) void subirVideoPrincipal(archivo);
-                        e.target.value = "";
-                      }}
-                    />
-                  </label>
+                  <div className="flex gap-2">
+                    <label className={claseSelector("flex-1 px-4 py-4", subiendo)}>
+                      {videoPrincipal ? "Cambiar el video" : "Elegir video"}
+                      <input
+                        type="file"
+                        accept="video/*"
+                        className="hidden"
+                        disabled={subiendo}
+                        onChange={(e) => {
+                          const archivo = e.target.files?.[0];
+                          if (archivo) void subirVideoPrincipal(archivo);
+                          e.target.value = "";
+                        }}
+                      />
+                    </label>
+                    <BotonBiblioteca onClick={() => setSelector("video-principal")} disabled={subiendo} />
+                  </div>
                   {subida?.origen === "principal" && (
                     <BarraProgreso fase={subida.fase} etiqueta={textoDeSubida(subida)} />
                   )}
@@ -939,20 +1155,23 @@ export function PublicarNoticiaForm({ onProgramada }: { onProgramada: () => void
 
           {modo === "url" && (
             <div className="flex flex-col gap-2">
-              <label className={claseSelector("px-4 py-3", subiendo || publicando)}>
-                {imagenPublicId ? "Imagen principal propia · cambiar" : "Usar una imagen propia"}
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  disabled={subiendo || publicando}
-                  onChange={(e) => {
-                    const archivo = e.target.files?.[0];
-                    if (archivo) void reemplazarImagenPrincipal(archivo);
-                    e.target.value = "";
-                  }}
-                />
-              </label>
+              <div className="flex gap-2">
+                <label className={claseSelector("flex-1 px-4 py-3", subiendo || publicando)}>
+                  {imagenPublicId ? "Imagen principal propia · cambiar" : "Usar una imagen propia"}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    disabled={subiendo || publicando}
+                    onChange={(e) => {
+                      const archivo = e.target.files?.[0];
+                      if (archivo) void reemplazarImagenPrincipal(archivo);
+                      e.target.value = "";
+                    }}
+                  />
+                </label>
+                <BotonBiblioteca onClick={() => setSelector("imagen-principal")} disabled={subiendo || publicando} />
+              </div>
               {subida?.origen === "principal" && (
                 <BarraProgreso fase={subida.fase} etiqueta={textoDeSubida(subida)} />
               )}
@@ -967,35 +1186,41 @@ export function PublicarNoticiaForm({ onProgramada }: { onProgramada: () => void
                 Llegaste al máximo de {MAX_ELEMENTOS} elementos que permite Instagram.
               </p>
             ) : (
-              <div className="flex gap-2">
-                <label className={claseSelector("flex-1 px-3 py-3", subiendo || publicando)}>
-                  + Imagen
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    disabled={subiendo || publicando}
-                    onChange={(e) => {
-                      const archivo = e.target.files?.[0];
-                      if (archivo) void agregarExtra(archivo, "imagen");
-                      e.target.value = "";
-                    }}
-                  />
-                </label>
-                <label className={claseSelector("flex-1 px-3 py-3", subiendo || publicando)}>
-                  + Video
-                  <input
-                    type="file"
-                    accept="video/*"
-                    className="hidden"
-                    disabled={subiendo || publicando}
-                    onChange={(e) => {
-                      const archivo = e.target.files?.[0];
-                      if (archivo) void agregarExtra(archivo, "video");
-                      e.target.value = "";
-                    }}
-                  />
-                </label>
+              <div className="flex flex-col gap-2">
+                <div className="flex gap-2">
+                  <label className={claseSelector("flex-1 px-3 py-3", subiendo || publicando)}>
+                    + Imagen
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      disabled={subiendo || publicando}
+                      onChange={(e) => {
+                        const archivo = e.target.files?.[0];
+                        if (archivo) void agregarExtra(archivo, "imagen");
+                        e.target.value = "";
+                      }}
+                    />
+                  </label>
+                  <label className={claseSelector("flex-1 px-3 py-3", subiendo || publicando)}>
+                    + Video
+                    <input
+                      type="file"
+                      accept="video/*"
+                      className="hidden"
+                      disabled={subiendo || publicando}
+                      onChange={(e) => {
+                        const archivo = e.target.files?.[0];
+                        if (archivo) void agregarExtra(archivo, "video");
+                        e.target.value = "";
+                      }}
+                    />
+                  </label>
+                </div>
+                <div className="flex gap-2">
+                  <BotonBiblioteca onClick={() => setSelector("extra-imagen")} disabled={subiendo || publicando} />
+                  <BotonBiblioteca onClick={() => setSelector("extra-video")} disabled={subiendo || publicando} />
+                </div>
               </div>
             )}
 
@@ -1100,47 +1325,64 @@ export function PublicarNoticiaForm({ onProgramada }: { onProgramada: () => void
 
           <p className="text-xs text-muted">Fuente: {preview.sourceHost}</p>
 
-          {estado.paso === "confirmar" ? (
-            <div className="flex flex-col gap-2 rounded-2xl border border-warning/40 bg-warning/5 px-4 py-3">
-              <p className="text-sm text-warning">
-                {esCarrusel
-                  ? `¿Publicar ahora un carrusel de ${totalElementos} elementos en la cuenta real de Instagram?`
-                  : "¿Publicar ahora en la cuenta real de Instagram?"}
-              </p>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => publicar(preview)}
-                  className="flex-1 rounded-xl border border-warning bg-warning/15 px-4 py-3 text-sm font-semibold text-warning transition active:scale-95"
-                >
-                  Sí, publicar ahora
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setEstado({ paso: "preview", preview })}
-                  className="flex-1 rounded-xl border border-border-soft bg-surface-strong px-4 py-3 text-sm font-semibold text-muted transition active:scale-95"
-                >
-                  Cancelar
-                </button>
+          {/* En modo edición no hay publicación inmediata: es una operación
+              de cola, y "Publicar ahora" queda para la fila en la cola misma. */}
+          {!edicion &&
+            (estado.paso === "confirmar" ? (
+              <div className="flex flex-col gap-2 rounded-2xl border border-warning/40 bg-warning/5 px-4 py-3">
+                <p className="text-sm text-warning">
+                  {esCarrusel
+                    ? `¿Publicar ahora un carrusel de ${totalElementos} elementos en la cuenta real de Instagram?`
+                    : "¿Publicar ahora en la cuenta real de Instagram?"}
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => publicar(preview)}
+                    className="flex-1 rounded-xl border border-warning bg-warning/15 px-4 py-3 text-sm font-semibold text-warning transition active:scale-95"
+                  >
+                    Sí, publicar ahora
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEstado({ paso: "preview", preview })}
+                    className="flex-1 rounded-xl border border-border-soft bg-surface-strong px-4 py-3 text-sm font-semibold text-muted transition active:scale-95"
+                  >
+                    Cancelar
+                  </button>
+                </div>
               </div>
-            </div>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setEstado({ paso: "confirmar", preview })}
-              disabled={publicando || subiendo || desactualizado || faltanElementos}
-              className="rounded-xl border border-warning bg-warning/15 px-4 py-3 text-base font-semibold text-warning transition active:scale-95 disabled:opacity-50"
-            >
-              {publicando ? "Publicando…" : esCarrusel ? "Publicar carrusel" : "Publicar"}
-            </button>
-          )}
+            ) : (
+              <button
+                type="button"
+                onClick={() => setEstado({ paso: "confirmar", preview })}
+                disabled={publicando || subiendo || desactualizado || faltanElementos}
+                className="rounded-xl border border-warning bg-warning/15 px-4 py-3 text-base font-semibold text-warning transition active:scale-95 disabled:opacity-50"
+              >
+                {publicando ? "Publicando…" : esCarrusel ? "Publicar carrusel" : "Publicar"}
+              </button>
+            ))}
 
           <ProgramarPublicacion
             payload={construirPayload(preview)}
             deshabilitado={publicando || subiendo || desactualizado || faltanElementos}
             onProgramada={onProgramada}
+            edicion={edicion ? { id: edicion.id, publicarEnInicial: edicion.publicarEn } : undefined}
           />
         </div>
+      )}
+
+      {selector && (
+        <SelectorMedia
+          tipo={selector === "video-principal" || selector === "extra-video" ? "video" : "image"}
+          onCerrar={() => setSelector(null)}
+          onElegir={(item) => {
+            if (selector === "imagen-principal") void elegirImagenPrincipalDeBiblioteca(item);
+            else if (selector === "video-principal") elegirVideoPrincipalDeBiblioteca(item);
+            else if (selector === "extra-imagen") elegirExtraDeBiblioteca(item, "imagen");
+            else if (selector === "extra-video") elegirExtraDeBiblioteca(item, "video");
+          }}
+        />
       )}
     </div>
   );

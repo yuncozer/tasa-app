@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { PublicacionPayload } from "@/lib/publish-news";
 import { BarraProgreso } from "@/components/BarraProgreso";
 import type { Cintillo } from "@/components/ControlCintillo";
 import { ControlCintillo } from "@/components/ControlCintillo";
 import { ProgramarPublicacion } from "@/components/ProgramarPublicacion";
+import { SelectorMedia, type ItemMedia } from "@/components/SelectorMedia";
 import { subirMediaConProgreso, type FaseSubida } from "@/lib/subida";
 
 type Estado =
@@ -27,22 +28,40 @@ async function leerError(response: Response): Promise<string> {
  * publicado como Reel — independiente del post de imagen: Instagram no
  * permite combinarlos en un mismo post fuera de un carrusel, así que aquí se
  * publican por separado, cada uno con su confirmación.
+ *
+ * `edicion`, si viene, prellena el formulario con el `reel` guardado de una
+ * programada `pendiente`: el padre remonta el componente con una `key`
+ * distinta por fila, así que solo el video necesita pedirse de nuevo al
+ * montar (para tener una URL con la que mostrarlo), el resto de los campos se
+ * siembra directo en el estado inicial.
  */
-export function PublicarVideoForm({ onProgramada }: { onProgramada: () => void }) {
-  const [caption, setCaption] = useState("");
-  const [conFuente, setConFuente] = useState(false);
-  const [fuente, setFuente] = useState("");
+export function PublicarVideoForm({
+  onProgramada,
+  edicion,
+  onCancelarEdicion,
+}: {
+  onProgramada: () => void;
+  edicion?: { id: string; payload: Extract<PublicacionPayload, { tipo: "reel" }>; publicarEn: string };
+  onCancelarEdicion?: () => void;
+}) {
+  const [caption, setCaption] = useState(edicion?.payload.caption ?? "");
+  const [conFuente, setConFuente] = useState(Boolean(edicion?.payload.fuente));
+  const [fuente, setFuente] = useState(edicion?.payload.fuente ?? "");
   /**
    * El crédito que de verdad está horneado en la URL que se está mirando. La
    * marca la compone Cloudinary al pedir la URL, así que editar el campo no
    * cambia el video en pantalla: hay que volver a pedirla. Guardarlo aparte es
    * lo que permite avisar de que lo que se ve ya no es lo que se publicaría.
    */
+  const cintilloInicial = edicion?.payload.titulo
+    ? { titulo: edicion.payload.titulo, segundos: edicion.payload.segundos }
+    : undefined;
   const [fuenteAplicada, setFuenteAplicada] = useState("");
-  const [cintillo, setCintillo] = useState<Cintillo | undefined>();
+  const [cintillo, setCintillo] = useState<Cintillo | undefined>(cintilloInicial);
   /** El cintillo horneado en la URL que se está mirando, para detectar cambios. */
   const [cintilloAplicado, setCintilloAplicado] = useState<Cintillo | undefined>();
   const [refrescando, setRefrescando] = useState(false);
+  const [selectorAbierto, setSelectorAbierto] = useState(false);
   const [estado, setEstado] = useState<Estado>({ paso: "inicial" });
 
   const subiendo = estado.paso === "subiendo";
@@ -50,15 +69,26 @@ export function PublicarVideoForm({ onProgramada }: { onProgramada: () => void }
   /** Sin la casilla activada el video va sin franja, aunque quede texto escrito. */
   const fuenteDeseada = conFuente ? fuente.trim() : "";
 
-  async function pedirPreview(videoPublicId: string): Promise<void> {
+  /**
+   * `overrides` existe solo para el arranque en modo edición: ahí hace falta
+   * pedir la vista previa con los valores que trae `edicion`, no con el
+   * estado —que en ese primer render todavía no se ha aplicado— así que se
+   * pueden pasar explícitos en vez de leerlos siempre del cierre.
+   */
+  async function pedirPreview(
+    videoPublicId: string,
+    overrides?: { fuente?: string; cintillo?: Cintillo },
+  ): Promise<void> {
+    const fuenteUsada = overrides?.fuente ?? fuenteDeseada;
+    const cintilloUsado = overrides ? overrides.cintillo : cintillo;
     const preview = await fetch("/api/admin/preview-video", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         videoPublicId,
-        fuente: fuenteDeseada,
-        titulo: cintillo?.titulo,
-        segundos: cintillo?.segundos,
+        fuente: fuenteUsada,
+        titulo: cintilloUsado?.titulo,
+        segundos: cintilloUsado?.segundos,
       }),
     });
     if (!preview.ok) {
@@ -70,9 +100,33 @@ export function PublicarVideoForm({ onProgramada }: { onProgramada: () => void }
       descargaUrl: string;
       conCintillo: boolean;
     };
-    setFuenteAplicada(fuenteDeseada);
-    setCintilloAplicado(cintillo);
+    setFuenteAplicada(fuenteUsada);
+    setCintilloAplicado(cintilloUsado);
     setEstado({ paso: "preview", videoUrl, descargaUrl, conCintillo, videoPublicId });
+  }
+
+  useEffect(() => {
+    if (!edicion) return;
+    (async () => {
+      try {
+        await pedirPreview(edicion.payload.videoPublicId, {
+          fuente: edicion.payload.fuente ?? "",
+          cintillo: cintilloInicial,
+        });
+      } catch {
+        setEstado({ paso: "error", mensaje: "No se pudo cargar la vista previa del video" });
+      }
+    })();
+    // Se pide una sola vez al montar: el padre remonta este componente con
+    // una `key` distinta por fila, así que no hace falta reaccionar a más.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function elegirVideoDeBiblioteca(item: ItemMedia) {
+    setSelectorAbierto(false);
+    void pedirPreview(item.publicId).catch(() =>
+      setEstado({ paso: "error", mensaje: "No se pudo generar la vista previa del video" }),
+    );
   }
 
   async function subirVideo(archivo: File) {
@@ -154,26 +208,51 @@ export function PublicarVideoForm({ onProgramada }: { onProgramada: () => void }
         </p>
       </div>
 
-      {/* El `disabled` real vive en el `<input>` oculto, así que la opacidad de
-          deshabilitado hay que ponerla a mano en la etiqueta. */}
-      <label
-        className={`flex cursor-pointer items-center justify-center rounded-xl border border-dashed border-border-soft bg-surface-strong px-4 py-4 text-sm font-semibold text-muted transition active:scale-95 ${
-          subiendo || publicando ? "opacity-50" : ""
-        }`}
-      >
-        {conVideo ? "Video cargado · cambiar" : "Elegir video"}
-        <input
-          type="file"
-          accept="video/*"
-          className="hidden"
+      {edicion && (
+        <div className="flex items-center justify-between gap-2 rounded-2xl border border-accent/40 bg-accent/10 px-4 py-3">
+          <p className="text-sm text-accent">Editando una publicación en cola.</p>
+          {onCancelarEdicion && (
+            <button
+              type="button"
+              onClick={onCancelarEdicion}
+              className="shrink-0 rounded-full border border-accent/40 px-3 py-1 text-xs font-medium text-accent transition active:scale-95"
+            >
+              Cancelar edición
+            </button>
+          )}
+        </div>
+      )}
+
+      <div className="flex gap-2">
+        {/* El `disabled` real vive en el `<input>` oculto, así que la opacidad de
+            deshabilitado hay que ponerla a mano en la etiqueta. */}
+        <label
+          className={`flex flex-1 cursor-pointer items-center justify-center rounded-xl border border-dashed border-border-soft bg-surface-strong px-4 py-4 text-sm font-semibold text-muted transition active:scale-95 ${
+            subiendo || publicando ? "opacity-50" : ""
+          }`}
+        >
+          {conVideo ? "Video cargado · cambiar" : "Elegir video"}
+          <input
+            type="file"
+            accept="video/*"
+            className="hidden"
+            disabled={subiendo || publicando}
+            onChange={(e) => {
+              const archivo = e.target.files?.[0];
+              if (archivo) void subirVideo(archivo);
+              e.target.value = "";
+            }}
+          />
+        </label>
+        <button
+          type="button"
+          onClick={() => setSelectorAbierto(true)}
           disabled={subiendo || publicando}
-          onChange={(e) => {
-            const archivo = e.target.files?.[0];
-            if (archivo) void subirVideo(archivo);
-            e.target.value = "";
-          }}
-        />
-      </label>
+          className="rounded-xl border border-border-soft bg-surface px-4 py-4 text-sm font-semibold text-muted transition active:scale-95 disabled:opacity-50"
+        >
+          Elegir de la biblioteca
+        </button>
+      </div>
 
       {estado.paso === "subiendo" && (
         <BarraProgreso
@@ -282,48 +361,55 @@ export function PublicarVideoForm({ onProgramada }: { onProgramada: () => void }
             />
           </div>
 
-          {estado.paso === "confirmar" ? (
-            <div className="flex flex-col gap-2 rounded-2xl border border-warning/40 bg-warning/5 px-4 py-3">
-              <p className="text-sm text-warning">¿Publicar este Reel ahora en la cuenta real de Instagram?</p>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => publicar(conVideo.videoPublicId)}
-                  className="flex-1 rounded-xl border border-warning bg-warning/15 px-4 py-3 text-sm font-semibold text-warning transition active:scale-95"
-                >
-                  Sí, publicar ahora
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setEstado({
-                      paso: "preview",
-                      videoUrl: conVideo.videoUrl,
-                      descargaUrl: conVideo.descargaUrl,
-                      conCintillo: conVideo.conCintillo,
-                      videoPublicId: conVideo.videoPublicId,
-                    })}
-                  className="flex-1 rounded-xl border border-border-soft bg-surface-strong px-4 py-3 text-sm font-semibold text-muted transition active:scale-95"
-                >
-                  Cancelar
-                </button>
+          {/* En modo edición no hay publicación inmediata: es una operación
+              de cola, y "Publicar ahora" queda para la fila en la cola misma. */}
+          {!edicion &&
+            (estado.paso === "confirmar" ? (
+              <div className="flex flex-col gap-2 rounded-2xl border border-warning/40 bg-warning/5 px-4 py-3">
+                <p className="text-sm text-warning">¿Publicar este Reel ahora en la cuenta real de Instagram?</p>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => publicar(conVideo.videoPublicId)}
+                    className="flex-1 rounded-xl border border-warning bg-warning/15 px-4 py-3 text-sm font-semibold text-warning transition active:scale-95"
+                  >
+                    Sí, publicar ahora
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setEstado({
+                        paso: "preview",
+                        videoUrl: conVideo.videoUrl,
+                        descargaUrl: conVideo.descargaUrl,
+                        conCintillo: conVideo.conCintillo,
+                        videoPublicId: conVideo.videoPublicId,
+                      })
+                    }
+                    className="flex-1 rounded-xl border border-border-soft bg-surface-strong px-4 py-3 text-sm font-semibold text-muted transition active:scale-95"
+                  >
+                    Cancelar
+                  </button>
+                </div>
               </div>
-            </div>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setEstado({
-                  paso: "confirmar",
-                  videoUrl: conVideo.videoUrl,
-                  descargaUrl: conVideo.descargaUrl,
-                  conCintillo: conVideo.conCintillo,
-                  videoPublicId: conVideo.videoPublicId,
-                })}
-              disabled={!caption.trim() || publicando || desactualizado || refrescando}
-              className="rounded-xl border border-warning bg-warning/15 px-4 py-3 text-base font-semibold text-warning transition active:scale-95 disabled:opacity-50"
-            >
-              {publicando ? "Publicando…" : "Publicar Reel"}
-            </button>
-          )}
+            ) : (
+              <button
+                type="button"
+                onClick={() =>
+                  setEstado({
+                    paso: "confirmar",
+                    videoUrl: conVideo.videoUrl,
+                    descargaUrl: conVideo.descargaUrl,
+                    conCintillo: conVideo.conCintillo,
+                    videoPublicId: conVideo.videoPublicId,
+                  })
+                }
+                disabled={!caption.trim() || publicando || desactualizado || refrescando}
+                className="rounded-xl border border-warning bg-warning/15 px-4 py-3 text-base font-semibold text-warning transition active:scale-95 disabled:opacity-50"
+              >
+                {publicando ? "Publicando…" : "Publicar Reel"}
+              </button>
+            ))}
 
           <ProgramarPublicacion
             payload={
@@ -340,8 +426,13 @@ export function PublicarVideoForm({ onProgramada }: { onProgramada: () => void }
             }
             deshabilitado={publicando || subiendo || desactualizado || refrescando}
             onProgramada={onProgramada}
+            edicion={edicion ? { id: edicion.id, publicarEnInicial: edicion.publicarEn } : undefined}
           />
         </div>
+      )}
+
+      {selectorAbierto && (
+        <SelectorMedia tipo="video" onCerrar={() => setSelectorAbierto(false)} onElegir={elegirVideoDeBiblioteca} />
       )}
     </div>
   );

@@ -24,18 +24,25 @@ async function leerError(response: Response): Promise<string> {
  * La hora se escribe y se lee **en hora de Caracas**, no en la del dispositivo
  * (ver `isoDesdeHoraCaracas`): desde Cúcuta el teléfono va en UTC−5 y un post
  * "de las 7" saldría corrido.
+ *
+ * `edicion`, si viene, cambia el destino: en vez de crear una fila nueva
+ * (`POST /api/admin/programar`), guarda los cambios sobre la fila que ya
+ * existe (`PATCH /api/admin/programadas`), con la hora prellenada con la que
+ * ya tenía —lo habitual es guardar sin tocarla, no reescribirla de cero.
  */
 export function ProgramarPublicacion({
   payload,
   deshabilitado,
   onProgramada,
+  edicion,
 }: {
   /** `null` mientras el post todavía no está completo. */
   payload: PublicacionPayload | null;
   deshabilitado?: boolean;
   onProgramada: () => void;
+  edicion?: { id: string; publicarEnInicial: string };
 }) {
-  const [cuando, setCuando] = useState("");
+  const [cuando, setCuando] = useState(edicion ? horaCaracasDesdeIso(edicion.publicarEnInicial) : "");
   const [estado, setEstado] = useState<Estado>({ paso: "inicial" });
 
   const enviando = estado.paso === "enviando";
@@ -46,16 +53,22 @@ export function ProgramarPublicacion({
     if (!payload || !publicarEn) return;
     setEstado({ paso: "enviando" });
     try {
-      const response = await fetch("/api/admin/programar", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ payload, publicarEn }),
-      });
+      const response = edicion
+        ? await fetch("/api/admin/programadas", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id: edicion.id, publicarEn, payload }),
+          })
+        : await fetch("/api/admin/programar", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ payload, publicarEn }),
+          });
       if (!response.ok) {
         setEstado({ paso: "error", mensaje: await leerError(response) });
         return;
       }
-      setCuando("");
+      if (!edicion) setCuando("");
       setEstado({ paso: "programada" });
       onProgramada();
     } catch {
@@ -66,7 +79,7 @@ export function ProgramarPublicacion({
   return (
     <div className="flex flex-col gap-2">
       <label htmlFor="programar-cuando" className="text-sm font-semibold uppercase tracking-wide text-muted">
-        O programarlo
+        {edicion ? "Hora de publicación" : "O programarlo"}
       </label>
 
       <input
@@ -81,7 +94,9 @@ export function ProgramarPublicacion({
         className="tabular rounded-xl border border-border-soft bg-surface-strong px-4 py-3 text-base text-foreground outline-none"
       />
       <p className="text-xs text-muted">
-        Hora de Venezuela. Sale dentro de los diez minutos siguientes a la hora que elijas.
+        {edicion
+          ? "Hora de Venezuela. Puedes dejarla igual si solo cambiaste el contenido."
+          : "Hora de Venezuela. Sale dentro de los diez minutos siguientes a la hora que elijas."}
       </p>
 
       {estado.paso === "error" && (
@@ -92,14 +107,18 @@ export function ProgramarPublicacion({
 
       {estado.paso === "programada" && (
         <p className="rounded-2xl border border-accent/40 bg-accent/10 px-4 py-3 text-sm text-accent">
-          Queda en cola. Puedes cancelarlo desde la lista de arriba hasta que salga.
+          {edicion
+            ? "Los cambios quedaron guardados."
+            : "Queda en cola. Puedes cancelarlo desde la lista de arriba hasta que salga."}
         </p>
       )}
 
       {estado.paso === "confirmar" ? (
         <div className="flex flex-col gap-2 rounded-2xl border border-warning/40 bg-warning/5 px-4 py-3">
           <p className="text-sm text-warning">
-            ¿Dejarlo en cola? Saldrá solo en la cuenta real, sin volver a preguntar.
+            {edicion
+              ? "¿Guardar los cambios? Reemplaza lo que había en cola para esta publicación."
+              : "¿Dejarlo en cola? Saldrá solo en la cuenta real, sin volver a preguntar."}
           </p>
           <div className="flex gap-2">
             <button
@@ -107,7 +126,7 @@ export function ProgramarPublicacion({
               onClick={programar}
               className="flex-1 rounded-xl border border-warning bg-warning/15 px-4 py-3 text-sm font-semibold text-warning transition active:scale-95"
             >
-              Sí, programar
+              {edicion ? "Sí, guardar" : "Sí, programar"}
             </button>
             <button
               type="button"
@@ -125,7 +144,7 @@ export function ProgramarPublicacion({
           disabled={!listo || enviando}
           className="rounded-xl border border-border-soft bg-surface-strong px-4 py-3 text-base font-semibold text-muted transition active:scale-95 disabled:opacity-50"
         >
-          {enviando ? "Programando…" : "Programar"}
+          {enviando ? (edicion ? "Guardando…" : "Programando…") : edicion ? "Guardar cambios" : "Programar"}
         </button>
       )}
     </div>

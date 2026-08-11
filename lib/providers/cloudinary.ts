@@ -114,6 +114,84 @@ export function firmarSubidaDirecta(): PermisoSubida {
   };
 }
 
+export interface ItemMedia {
+  publicId: string;
+  resourceType: "image" | "video";
+  format: string;
+  url: string;
+  createdAt: string;
+  bytes: number;
+}
+
+export interface PaginaMedia {
+  items: ItemMedia[];
+  siguienteCursor?: string;
+}
+
+/**
+ * `public_id`s que nunca deben salir en el selector de "elegir de la
+ * biblioteca": son recursos de sistema (logo, sello, cintillos generados),
+ * no material que un admin pudiera querer reutilizar como imagen o video de
+ * una noticia.
+ */
+const PREFIJOS_EXCLUIDOS = ["cintillo_"];
+
+/**
+ * Lista lo ya subido a Cloudinary, para el selector de `/admin/noticia` que
+ * evita volver a subir un archivo que ya está en la cuenta.
+ *
+ * Usa el Admin API (`resources`) y no el Search API: no hay ninguna prueba de
+ * que la cuenta tenga ese complemento habilitado, y para listar por tipo con
+ * paginación por cursor alcanza con el primero, que sí viene con el plan
+ * gratuito.
+ */
+export async function listarMedia(opciones: {
+  tipo: "image" | "video";
+  cursor?: string;
+  limite?: number;
+}): Promise<PaginaMedia> {
+  const client = configurar();
+  const respuesta = await client.api.resources({
+    resource_type: opciones.tipo,
+    type: "upload",
+    max_results: opciones.limite ?? 30,
+    next_cursor: opciones.cursor,
+    direction: "desc",
+  });
+
+  // `LOGO_PUBLIC_ID` y `SELLO_PUBLIC_ID` son recursos de sistema, no material
+  // que un admin quiera reutilizar como imagen o video de una noticia.
+  const publicIdsExcluidos = [LOGO_PUBLIC_ID, SELLO_PUBLIC_ID];
+
+  const items: ItemMedia[] = (respuesta.resources as Array<Record<string, string | number>>)
+    .filter(
+      (r) =>
+        !publicIdsExcluidos.includes(r.public_id as string) &&
+        !PREFIJOS_EXCLUIDOS.some((prefijo) => (r.public_id as string).startsWith(prefijo)),
+    )
+    .map((r) => ({
+      publicId: r.public_id as string,
+      resourceType: opciones.tipo,
+      format: r.format as string,
+      url: r.secure_url as string,
+      createdAt: r.created_at as string,
+      bytes: r.bytes as number,
+    }));
+
+  return { items, siguienteCursor: respuesta.next_cursor };
+}
+
+/**
+ * Miniatura sin marca de un video ya subido, para el selector de biblioteca.
+ * No reutiliza `urlFotogramaConMarca`: esa lleva el sello y el cintillo
+ * superpuestos, que no corresponden al navegar la biblioteca, solo al
+ * revisar cómo va a salir publicado.
+ */
+export function urlMiniaturaVideo(publicId: string): string {
+  const client = configurar();
+  return client.url(publicId, { resource_type: "video", secure: true, format: "jpg" });
+}
+
 /** Sube un video o imagen propios (sin marca todavía) y valida el tamaño. */
 export async function subirMedia(buffer: Buffer, resourceType: "image" | "video"): Promise<MediaSubido> {
   if (buffer.byteLength > MAX_BYTES) {
