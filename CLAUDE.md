@@ -584,12 +584,28 @@ Lo que hay que respetar:
 - **Un video principal solo puede titularse así.** El `title` del marco lo
   compone la plantilla de imagen, y con un video principal no hay imagen que
   enmarcar; el cintillo es la única vía.
-- `asegurarCintillo()` sube el PNG con un **`public_id` derivado del contenido**
-  (patrón de `asegurarLogo()`, pero por hash). El mismo titular da el mismo
-  identificador, así que reabrir la vista previa no vuelve a generar nada — sin
-  eso, cada "Actualizar vista previa" dejaría un asset más en una cuenta de 25
-  créditos al mes. **`VERSION_CINTILLO` entra en el hash**: si cambias el diseño
-  y no la subes, los videos siguen sirviendo el PNG viejo ya cacheado.
+- `asegurarCintillo()` sube el PNG con un **`public_id` derivado del contenido**,
+  así que el mismo titular reutiliza el mismo asset y no se acumula uno por cada
+  "Actualizar vista previa" en una cuenta de 25 créditos al mes.
+  **`VERSION_CINTILLO` entra en el hash**: si cambias el diseño y no la subes,
+  los videos siguen sirviendo el PNG viejo ya cacheado.
+- **Sube siempre, con `overwrite: false`, y esto no es un descuido.** Al principio
+  seguía el patrón de `asegurarLogo()` —preguntar por el recurso y subirlo solo
+  si la consulta fallaba— y con eso **el cintillo no llegaba nunca al video**: si
+  esa consulta no lanza para un `public_id` inexistente, no se sube nada y la URL
+  apunta a un asset fantasma. Lo que lo hizo difícil de encontrar es que ahí no
+  hay error: **Cloudinary ignora en silencio una capa que no encuentra** y sirve
+  el video sin ella (verificado en producción: salía el sello, no el cintillo, y
+  la petición respondía 200). Subir siempre elimina la suposición, y con
+  `overwrite: false` una subida repetida no reemplaza nada. No lo "optimices"
+  devolviendo a comprobar-y-subir.
+- Por lo mismo, la vista previa devuelve **`conCintillo`** y la interfaz lo
+  muestra. Una capa que no se aplica es invisible por definición, así que sin ese
+  dato el admin publicaría creyendo que lleva marca. Es la misma idea que el
+  aviso de "vista previa desactualizada": que no se publique a ciegas.
+- `previewNewsVideoPost` compone las dos URLs **en serie, no con `Promise.all`**:
+  las dos resuelven el mismo cintillo, y en paralelo lo generaban y lo subían dos
+  veces a la vez.
 - `MAX_TITULO` recorta por caracteres y no con `line-clamp`, que Satori no
   implementa: sin tope, un titular largo empuja la caja y se sale del lienzo.
 - El margen inferior se calcula **proporcional a la altura del lienzo**
