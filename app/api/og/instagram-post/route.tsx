@@ -1,6 +1,6 @@
 import { ImageResponse } from "next/og";
 import { formatClock, formatDate, formatRate, vigenciaBcv } from "@/lib/format";
-import { AVISO_TASAS, COLOR, Encabezado, FilaMoneda, Pie, leerFontBuffer, leerSvgComoDataUri } from "@/lib/og-shared";
+import { AIRE_LATERAL, AVISO_TASAS, COLOR, Encabezado, FilaMoneda, Pie, leerFontBuffer, leerSvgComoDataUri } from "@/lib/og-shared";
 import { getRates } from "@/lib/rates";
 import type { Rate, RateKey, RatesSnapshot } from "@/lib/types";
 
@@ -60,7 +60,15 @@ function PostImage({ snapshot, banderas, icons }: { snapshot: RatesSnapshot; ban
         fontFamily: "Geist",
       }}
     >
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "flex-start",
+          paddingLeft: AIRE_LATERAL,
+          paddingRight: AIRE_LATERAL,
+        }}
+      >
         <Encabezado subtitulo="Cuánto vale tu dinero hoy" />
         <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
           <span style={{ fontSize: 32, color: COLOR.foreground, fontWeight: 700 }}>
@@ -72,7 +80,15 @@ function PostImage({ snapshot, banderas, icons }: { snapshot: RatesSnapshot; ban
         </div>
       </div>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: 20,
+          paddingLeft: AIRE_LATERAL,
+          paddingRight: AIRE_LATERAL,
+        }}
+      >
         {FILAS.map((key) => (
           <FilaTasa key={key} rate={snapshot.rates[key]} banderaSrc={banderas[key]} />
         ))}
