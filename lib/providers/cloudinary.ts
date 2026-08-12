@@ -48,10 +48,23 @@ function subirBuffer(
 }
 
 /**
+ * `true` en cuanto se confirma (o se sube) el logo una vez en este proceso.
+ * El `public_id` es fijo y el logo no cambia, así que no hace falta volver a
+ * preguntarle a Cloudinary por él en cada URL de video que se compone —cada
+ * `urlVideoConMarca`/`urlDescargaVideo`/`urlFotogramaConMarca` llama a
+ * `asegurarLogo()` por su cuenta, así que sin esta bandera una sola vista
+ * previa de un carrusel con varios videos dispara varias llamadas al Admin
+ * API por algo que ya se sabe que existe.
+ */
+let logoConfirmado = false;
+
+/**
  * Sube el logo una sola vez: `public_id` fijo, así que en las siguientes
- * llamadas basta comprobar que ya existe en vez de volver a subirlo.
+ * llamadas basta comprobar que ya existe en vez de volver a subirlo. Y una
+ * vez confirmado en este proceso, ni eso: ver `logoConfirmado`.
  */
 async function asegurarLogo(): Promise<void> {
+  if (logoConfirmado) return;
   const client = configurar();
   try {
     await client.api.resource(LOGO_PUBLIC_ID, { resource_type: "image" });
@@ -59,6 +72,7 @@ async function asegurarLogo(): Promise<void> {
     const buffer = await readFile(path.join(process.cwd(), "public/icon-512.png"));
     await subirBuffer(buffer, "image", LOGO_PUBLIC_ID);
   }
+  logoConfirmado = true;
 }
 
 export interface MediaSubido {
@@ -181,17 +195,6 @@ export async function listarMedia(opciones: {
   return { items, siguienteCursor: respuesta.next_cursor };
 }
 
-/**
- * Miniatura sin marca de un video ya subido, para el selector de biblioteca.
- * No reutiliza `urlFotogramaConMarca`: esa lleva el sello y el cintillo
- * superpuestos, que no corresponden al navegar la biblioteca, solo al
- * revisar cómo va a salir publicado.
- */
-export function urlMiniaturaVideo(publicId: string): string {
-  const client = configurar();
-  return client.url(publicId, { resource_type: "video", secure: true, format: "jpg" });
-}
-
 /** Sube un video o imagen propios (sin marca todavía) y valida el tamaño. */
 export async function subirMedia(buffer: Buffer, resourceType: "image" | "video"): Promise<MediaSubido> {
   if (buffer.byteLength > MAX_BYTES) {
@@ -279,7 +282,21 @@ export function limpiarFuente(valor: unknown): string | undefined {
  * `VERSION_CINTILLO` entra en el hash a propósito: si se cambia el diseño de
  * la plantilla sin subirla, los videos seguirían sirviendo el PNG viejo que ya
  * está cacheado con ese identificador.
+ *
+ * `cintillosSubidos` guarda, dentro de este mismo proceso, qué `public_id`s ya
+ * se confirmaron subidos: una sola vista previa llama a esta función dos
+ * veces para el mismo video (una para la URL de reproducción, otra para la de
+ * descarga — `previewNewsVideoPost` en `lib/publish-news.ts`), y un carrusel
+ * repite eso por cada elemento de video. Sin este set, cada una de esas
+ * llamadas reintenta la subida completa aunque el PNG sea idéntico al que
+ * acaba de subir la llamada anterior. Esto **no** reintroduce el bug que años
+ * atrás dejó cintillos sin aplicar: aquí solo se salta la subida cuando *esta
+ * misma función, en esta misma ejecución del proceso*, ya la confirmó — nunca
+ * se asume que existe solo por el nombre. Un proceso nuevo (cold start)
+ * empieza con el set vacío y sube de verdad la primera vez, igual que hoy.
  */
+const cintillosSubidos = new Set<string>();
+
 async function asegurarCintillo(datos: DatosCintillo): Promise<string> {
   const huella = createHash("sha256")
     .update(JSON.stringify({ ...datos, v: VERSION_CINTILLO }))
@@ -287,10 +304,13 @@ async function asegurarCintillo(datos: DatosCintillo): Promise<string> {
     .slice(0, 16);
   const publicId = `cintillo_${huella}`;
 
+  if (cintillosSubidos.has(publicId)) return publicId;
+
   await subirBuffer(await generarCintillo(datos), "image", publicId, {
     overwrite: false,
     invalidate: false,
   });
+  cintillosSubidos.add(publicId);
   return publicId;
 }
 

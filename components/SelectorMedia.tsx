@@ -16,6 +16,24 @@ async function leerError(response: Response): Promise<string> {
   return body?.error ? `${body.error}${body.detail ? `: ${body.detail}` : ""}` : `Error ${response.status}`;
 }
 
+interface PaginaCacheada {
+  items: ItemMedia[];
+  siguienteCursor?: string;
+  pedidaEn: number;
+}
+
+/**
+ * Primera página por `tipo`, para no volver a pedirla si el admin cierra el
+ * selector y lo vuelve a abrir segundos después dentro de la misma sesión de
+ * edición — el componente se monta y desmonta con cada apertura, así que sin
+ * esto cada apertura repite la llamada al Admin API de Cloudinary aunque la
+ * biblioteca no haya cambiado. Vive a nivel de módulo (sobrevive a que el
+ * modal se desmonte) y no a "Cargar más": las páginas siguientes si tiene
+ * sentido pedirlas de nuevo, son solo la primera pantalla la que se repite.
+ */
+const cachePrimeraPagina = new Map<"image" | "video", PaginaCacheada>();
+const VIGENCIA_CACHE_MS = 60_000;
+
 /**
  * Modal para elegir un recurso ya subido a Cloudinary en vez de subir uno
  * nuevo, y ahorrar así la cuota y el tiempo de repetir un archivo que ya está
@@ -36,9 +54,20 @@ export function SelectorMedia({
   onCerrar: () => void;
   onElegir: (item: ItemMedia) => void;
 }) {
-  const [items, setItems] = useState<ItemMedia[]>([]);
-  const [cursor, setCursor] = useState<string | undefined>();
-  const [cargando, setCargando] = useState(true);
+  /**
+   * Se calcula una sola vez, en el inicializador perezoso de `useState` —no
+   * en el cuerpo del componente—, porque leer `Date.now()` ahí lo haría
+   * impuro: cada inicializador solo corre en el montaje, así que es el sitio
+   * correcto para decidir de una vez si la caché sigue vigente.
+   */
+  const [cacheInicial] = useState(() => {
+    const cacheada = cachePrimeraPagina.get(tipo);
+    return cacheada && Date.now() - cacheada.pedidaEn < VIGENCIA_CACHE_MS ? cacheada : null;
+  });
+
+  const [items, setItems] = useState<ItemMedia[]>(cacheInicial?.items ?? []);
+  const [cursor, setCursor] = useState<string | undefined>(cacheInicial?.siguienteCursor);
+  const [cargando, setCargando] = useState(!cacheInicial);
   const [error, setError] = useState<string | null>(null);
 
   async function cargar(cursorActual?: string) {
@@ -57,6 +86,11 @@ export function SelectorMedia({
       const pagina = (await response.json()) as { items: ItemMedia[]; siguienteCursor?: string };
       setItems((previo) => (cursorActual ? [...previo, ...pagina.items] : pagina.items));
       setCursor(pagina.siguienteCursor);
+      // Solo la primera página (sin cursor) se guarda: es la única que se
+      // repite entre aperturas del modal.
+      if (!cursorActual) {
+        cachePrimeraPagina.set(tipo, { items: pagina.items, siguienteCursor: pagina.siguienteCursor, pedidaEn: Date.now() });
+      }
     } catch {
       setError("No se pudo conectar con el servidor");
     } finally {
@@ -65,6 +99,7 @@ export function SelectorMedia({
   }
 
   useEffect(() => {
+    if (cacheInicial) return;
     // Es justo lo que el modal necesita al abrirse: pedir la primera página.
     // eslint-disable-next-line react-hooks/set-state-in-effect -- carga inicial al montar, no una sincronización derivada.
     void cargar();
