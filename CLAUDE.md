@@ -589,11 +589,31 @@ Lo que hay que respetar:
   izquierda y 3,7 px por debajo. `AJUSTE_LOGO` lo compensa. El efecto es que la
   caja queda algo alta, y es inevitable: en una forma asimétrica centrar la masa
   y centrar la caja son cosas distintas, y manda la masa.
-- **Los altos salen del contenido, no de una cifra redonda**: dos líneas de
-  titular más el crédito son ~143 px, y la franja mide 180. Llegó a medir 260 y
-  eran más de 100 px tapando video para nada. La banda baja no puede encogerse
-  en la misma proporción porque su suelo lo marca el círculo del logo más el
-  handle, no el texto.
+- **La franja crece con el texto y no tiene tope de líneas.** El titular puede
+  ocupar dos, tres, cuatro o más, y la banda se hace más alta para acomodarlo.
+  Solo tiene suelo (`ALTO_MINIMO_FRANJA`, 150 px), y no lo marca el texto sino
+  el círculo del logo más el handle, que tienen que caber dentro; con dos
+  líneas y crédito la franja sale en ~176 px, a un pelo de los 180 que medía
+  cuando el alto era fijo. Llegó a medir 260 y eran más de 100 px tapando video para
+  nada, así que crecer sí, pero desde el contenido.
+- **El alto del PNG se estima, y se estima por lo bajo a propósito.** Satori
+  exige el alto del lienzo *antes* de maquetar, así que no hay forma de
+  preguntarle cuántas líneas salieron: `altoFranja()` las calcula a mano
+  dividiendo el titular entre `CARACTERES_POR_LINEA`, un número deliberadamente
+  corto, más una línea de holgura. Los dos errores no cuestan igual —
+  quedarse corto recortaría el titular, mientras que pasarse solo deja lienzo
+  transparente de más, y ese no se ve: Cloudinary ancla la capa por su borde
+  inferior (`gravity: south`), de modo que unos píxeles vacíos arriba no mueven
+  la franja. No lo "afines" a una medida exacta: la holgura es la red.
+- **El texto va centrado en el hueco que queda a la derecha del logo**, tanto el
+  titular como el crédito que lo acompaña. Hacen falta `justifyContent` **y**
+  `textAlign` en cada `span`: el primero coloca la línea suelta (una sola línea
+  es un único hijo del flex) y el segundo alinea las demás cuando el texto
+  envuelve, y heredadas del contenedor no llegan a todos — verificado, el
+  crédito se quedaba a la izquierda. La caja se deja a ancho completo y se
+  centra el texto dentro; encogerla al contenido la mediría a línea completa y
+  un titular largo se saldría en vez de envolver. La variante de solo crédito
+  no se centra: ahí esa línea es toda la franja y sigue a la izquierda.
 - **El cintillo se decide por video, no por post**: cada clip de un carrusel y
   el Reel llevan su propia `MarcaVideo` (`titulo`, `fuente`, `segundos`). Los
   tres campos son opcionales porque en la cola hay posts programados antes de
@@ -623,8 +643,11 @@ Lo que hay que respetar:
 - `previewNewsVideoPost` compone las dos URLs **en serie, no con `Promise.all`**:
   las dos resuelven el mismo cintillo, y en paralelo lo generaban y lo subían dos
   veces a la vez.
-- `MAX_TITULO` recorta por caracteres y no con `line-clamp`, que Satori no
-  implementa: sin tope, un titular largo empuja la caja y se sale del lienzo.
+- `MAX_TITULO` ya **no** es el límite de dos líneas que fue: es un tope de
+  seguridad alto (200 caracteres, ~8 líneas). Pasado ahí la banda taparía medio
+  video y un titular así ya no se lee de pasada, que es para lo que existe el
+  cintillo. Sigue recortando por caracteres porque Satori no implementa
+  `line-clamp`.
 - El margen inferior se calcula **proporcional a la altura del lienzo**
   (`yDelCintillo`), por el mismo motivo que `yDelSello`: los tres formatos
   comparten anchura pero no altura. Un mismo PNG sirve para los tres.
