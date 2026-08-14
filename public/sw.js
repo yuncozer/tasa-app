@@ -10,7 +10,8 @@
  * respuesta de `/api/` desde la caché, porque ahí sí pasaría por fresca.
  */
 
-const VERSION = "v3";
+const VERSION = "v4";
+const ATAJOS = ["/hoy", "/ig", "/wa"];
 const CACHE_PAGINA = `latasa-pagina-${VERSION}`;
 const CACHE_ESTATICOS = `latasa-estaticos-${VERSION}`;
 const VIGENTES = [CACHE_PAGINA, CACHE_ESTATICOS];
@@ -138,6 +139,11 @@ self.addEventListener("fetch", (event) => {
   // Las tasas nunca se sirven de caché: una tasa vieja que parece fresca es
   // justo el daño que esta app debe evitar.
   if (url.pathname.startsWith("/api/")) return;
+
+  // Los atajos del dominio los resuelve el servidor: a dónde llevan cambia
+  // cada pocas horas, y la copia guardada de la portada no lo sabe. Sin esto
+  // /hoy mostraría la portada en vez de abrir el post del día.
+  if (ATAJOS.includes(url.pathname)) return;
 
   if (request.mode === "navigate") {
     event.respondWith(portada(request));

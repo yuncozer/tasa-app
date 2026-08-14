@@ -314,6 +314,50 @@ vive aquí.
   el proyecto evita (mismo motivo que `useSyncExternalStore` más arriba) y que
   el linter rechaza.
 
+### `/hoy` es una página, no una redirección
+
+Tres atajos del dominio para compartir: `/hoy` al carrusel de tasas del día, `/ig`
+al perfil y `/wa` al WhatsApp. Los dos últimos sí son `redirects()` de
+`next.config.ts`, que es lo idiomático. `/hoy` no, y por dos motivos distintos que
+conviene no confundir:
+
+- **`redirects()` se evalúa al compilar.** El destino de `/hoy` cambia dos veces al
+  día y en Vercel un cambio de variable de entorno solo entra con un despliegue
+  nuevo, así que ponerlo ahí obligaría a redesplegar cada mañana y cada tarde. En su
+  lugar lo anota el propio cron: tras publicar el carrusel pide el permalink a Meta
+  (`permalinkDeMedia`) y lo guarda en la tabla `enlaces` (`lib/enlaces.ts`).
+- **Una redirección se queda sin vista previa.** Este enlace se pega en WhatsApp, y
+  su rastreador sigue el 307 hasta Instagram, donde encuentra el muro de login: sin
+  `og:image` la tarjeta sale vacía. Por eso `app/hoy/page.tsx` declara sus propias
+  etiquetas Open Graph, con la imagen que ya genera `/api/og/instagram-post` —la
+  misma que se publicó, no una compuesta aparte—, y manda al visitante con un
+  `<meta http-equiv="refresh">`. El rastreador no lo ejecuta y se queda con la
+  tarjeta; la persona ve un parpadeo. El `refresh` va en HTML y no en un script
+  para que funcione también sin JavaScript, y debajo queda un enlace visible por si
+  el navegador bloquea la redirección.
+
+Lo demás que hay que respetar:
+
+- **Anotar el enlace no puede tumbar la publicación.** Va en un `try/catch` que se
+  ignora, aparte del `try` que publica: el post ya está en la cuenta y eso es lo
+  irreversible, así que un fallo al anotar no debe devolver un error que invite a
+  reintentar y duplique el post (mismo criterio que `calentarVideo`). Si falla,
+  `/hoy` cae a su respaldo y como mucho apunta al post anterior.
+- **La cadena de respaldos es tabla → `ENLACE_HOY` → perfil**, y cada candidato pasa
+  por `esUrlValida()`. Nunca se queda sin destino: el enlace ya está compartido en
+  chats de gente que no va a volver a preguntar.
+- **Solo lo anota el cron de tasas.** Los posts de noticias de `/admin` no tocan
+  `/hoy`: "el post del día" es el de tasas.
+- `/hoy` va con `Cache-Control: no-store` desde `next.config.ts`, junto a la cabecera
+  de la portada. Si la CDN se queda una copia, el enlace lleva toda la tarde al post
+  de la mañana.
+- **El service worker tiene que dejarla pasar.** Sirve *cualquier* navegación desde
+  la caché de la portada, así que sin la guarda de `ATAJOS` en `public/sw.js` `/hoy`
+  mostraría la portada en vez de abrir el post. Al tocar eso se sube `VERSION`.
+- **`/wa` no tiene respaldo en el código**, al contrario que `/ig`: un número de
+  WhatsApp no se adivina y uno inventado mandaría a un chat ajeno. Sin
+  `ENLACE_WHATSAPP` la ruta simplemente no existe.
+
 ### El aviso legal se queda
 
 El pie declara que los datos son de terceros, que La Tasa no fija ni certifica

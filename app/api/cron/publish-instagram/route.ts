@@ -1,7 +1,8 @@
 import type { NextRequest } from "next/server";
 import { apiError, apiJson } from "@/lib/api";
 import { buildCaption } from "@/lib/caption";
-import { publishCarouselPost } from "@/lib/instagram";
+import { guardarEnlace } from "@/lib/enlaces";
+import { permalinkDeMedia, publishCarouselPost } from "@/lib/instagram";
 import { getRates } from "@/lib/rates";
 
 /**
@@ -64,7 +65,21 @@ export async function GET(request: NextRequest) {
       caption,
     );
 
-    return apiJson({ ok: true, mediaId }, { cachear: false });
+    // Deja `/hoy` apuntando al post que acaba de salir. Va aparte del
+    // `try` de la publicación y con su error tragado a propósito: el post ya
+    // está en la cuenta y eso es lo irreversible, así que un fallo al anotar
+    // el enlace no puede convertir una publicación exitosa en una respuesta
+    // de error que invite a reintentar y duplique el post. Si falla, `/hoy`
+    // cae a su respaldo y lo peor que pasa es que apunte al post anterior.
+    let enlace: string | null = null;
+    try {
+      enlace = await permalinkDeMedia(mediaId);
+      await guardarEnlace("hoy", enlace);
+    } catch {
+      enlace = null;
+    }
+
+    return apiJson({ ok: true, mediaId, enlace }, { cachear: false });
   } catch (error) {
     return apiError("No se pudo publicar el post de Instagram", error);
   }
