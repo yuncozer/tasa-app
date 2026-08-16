@@ -26,6 +26,12 @@ export interface FilaSemanal {
   id: FilaSemanalId;
   titulo: string;
   subtitulo: string;
+  /**
+   * El nombre con su artículo, para poder redactar una frase con él ("**El
+   * dólar BCV** subió 1,4 % esta semana"). Va aparte de `titulo` porque ese es
+   * una etiqueta de tarjeta y no encaja en medio de una oración.
+   */
+  sujeto: string;
   /** `null` si la fuente falló hoy. */
   valor: number | null;
   /** El valor ya formateado con su unidad, o "No disponible". */
@@ -146,6 +152,7 @@ export function armarReporteSemanal(
       id: "USD_BCV",
       titulo: "Dólar BCV",
       subtitulo: "Tasa oficial · Banco Central de Venezuela",
+      sujeto: "El dólar BCV",
       valor: bcvHoy,
       valorTexto: bcvHoy === null ? "No disponible" : `${formatRate(bcvHoy)} Bs`,
       unidadVariacion: "porcentaje",
@@ -155,6 +162,7 @@ export function armarReporteSemanal(
       id: "BRECHA",
       titulo: "Brecha BCV / Binance",
       subtitulo: "Diferencia entre tasa oficial y tasa P2P",
+      sujeto: "La brecha entre el BCV y Binance",
       valor: brechaHoy,
       valorTexto: brechaHoy === null ? "No disponible" : formatPercent(brechaHoy),
       unidadVariacion: "puntos",
@@ -164,6 +172,7 @@ export function armarReporteSemanal(
       id: "TRM",
       titulo: "TRM · Peso colombiano",
       subtitulo: "Peso frente al dólar · Banrep",
+      sujeto: "La TRM del peso colombiano",
       // La TRM se toma tal cual la publica el Banco de la República, igual que
       // en `lib/pesos.ts`: derivarla de USD_BCV ÷ COP_OFICIAL daría lo mismo
       // por construcción pero con dos redondeos encima, sobre una cifra
