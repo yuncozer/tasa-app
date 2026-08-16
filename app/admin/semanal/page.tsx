@@ -2,50 +2,38 @@ import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import type { ProgramadaVista } from "@/components/ColaProgramadas";
 import { Logo } from "@/components/Logo";
-import { PublicarPanel } from "@/components/PublicarPanel";
+import { ReporteSemanalPanel } from "@/components/ReporteSemanalPanel";
 import { COOKIE_SESION, esSesionValida } from "@/lib/admin-session";
-import { listarProgramadas } from "@/lib/programadas";
-import { resumenPublicacion } from "@/lib/publish-news";
+import { buildCaptionSemanal } from "@/lib/caption";
+import { getRates } from "@/lib/rates";
+import { construirReporteSemanal } from "@/lib/semanal";
 
 export const metadata: Metadata = {
-  title: "Publicar noticia — La Tasa",
+  title: "Reporte semanal — La Tasa",
 };
 
 /**
- * La cola se lee aquí, en el servidor, y baja por props: pedirla desde el
- * cliente obligaría a un `setState` dentro de un efecto, que es justo el
- * patrón que el proyecto evita.
+ * Página aparte de `/admin/noticia` y no una pestaña suya: aquella es un
+ * formulario con estado propio (switch Post/Reel, subidas, vista previa
+ * desactualizada, cola de programadas) y este reporte **no tiene entradas** —se
+ * mira y se publica—. Meterlo dentro obligaría a un tercer destino en
+ * `PublicarPanel` que no comparte ni un campo con los otros dos.
  *
- * Si Supabase no está configurado se devuelve vacía en vez de tumbar la
- * página: programar es opcional, y sin esas variables todo lo demás de
- * `/admin/noticia` sigue funcionando igual.
+ * El reporte se construye en el servidor y baja por props, por la misma razón
+ * que la cola de `/admin/noticia`: pedirlo desde el cliente obligaría a un
+ * `setState` dentro de un efecto, el patrón que el proyecto evita.
  */
-async function leerCola(): Promise<ProgramadaVista[]> {
-  try {
-    const programadas = await listarProgramadas();
-    return programadas.map((p) => ({
-      id: p.id,
-      publicarEn: p.publicar_en,
-      estado: p.estado,
-      error: p.error,
-      // El payload entero no baja al navegador: de él solo interesa con qué
-      // nombre se reconoce la fila.
-      resumen: resumenPublicacion(p.payload),
-    }));
-  } catch {
-    return [];
-  }
-}
-
-export default async function AdminNoticiaPage() {
+export default async function AdminSemanalPage() {
   const cookieStore = await cookies();
   if (!esSesionValida(cookieStore.get(COOKIE_SESION)?.value)) {
     redirect("/admin/login");
   }
 
-  const programadas = await leerCola();
+  // `construirReporteSemanal` ya degrada sola si Supabase falla: devuelve el
+  // reporte sin variaciones en vez de tumbar la página.
+  const snapshot = await getRates();
+  const reporte = await construirReporteSemanal(snapshot);
 
   return (
     <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-6 px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(1.5rem,env(safe-area-inset-top))] sm:px-6">
@@ -53,15 +41,15 @@ export default async function AdminNoticiaPage() {
         <div className="flex items-center gap-3">
           <Logo className="h-8 w-8 shrink-0 text-accent" />
           <h1 className="text-xl font-bold leading-none tracking-tight">
-            Publicar <span className="text-accent">noticia</span>
+            Reporte <span className="text-accent">semanal</span>
           </h1>
         </div>
         <div className="flex items-center gap-2">
           <Link
-            href="/admin/semanal"
+            href="/admin/noticia"
             className="rounded-full border border-border-soft px-3 py-1 text-xs font-medium text-muted transition active:scale-95"
           >
-            Semanal
+            Noticias
           </Link>
           <form method="POST" action="/api/admin/logout">
             <button
@@ -74,7 +62,11 @@ export default async function AdminNoticiaPage() {
         </div>
       </header>
 
-      <PublicarPanel programadas={programadas} />
+      <ReporteSemanalPanel
+        rangoTexto={reporte.rangoTexto}
+        sinComparacion={reporte.sinComparacion}
+        caption={buildCaptionSemanal(reporte)}
+      />
     </main>
   );
 }

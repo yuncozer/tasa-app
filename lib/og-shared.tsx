@@ -31,6 +31,16 @@ export const COLOR = {
   muted: "#94a3b8",
   accent: "#34d399",
   warning: "#fbbf24",
+  /**
+   * Para una variación que sube. El reporte semanal pinta las subidas de rojo
+   * y las bajadas de verde: el color dice qué significa el cambio para quien
+   * lee —una tasa que sube es una devaluación—, no si el número creció. La
+   * flecha sí sigue el signo, así que las dos informaciones se ven por
+   * separado.
+   */
+  danger: "#f87171",
+  /** El "REPORTE SEMANAL" que corona la imagen del reporte. */
+  kicker: "#38bdf8",
 };
 
 /**
@@ -54,6 +64,18 @@ export const AVISO_NOTICIA =
   "Esta noticia proviene de terceros; La Tasa no es su autora, no la " +
   "certifica ni garantiza su exactitud. Se comparte con fines informativos.";
 
+/**
+ * Aviso del reporte semanal. Es más corto que `AVISO_TASAS` porque en esa
+ * imagen lo que se muestra no es una tasa para operar sino cuánto se movió, y
+ * porque el pie ya carga con el rango de fechas; lo esencial —de dónde salen
+ * los números y que hay que confirmarlos en la fuente— se mantiene.
+ */
+export const AVISO_SEMANAL =
+  "Fuentes: BCV, Binance P2P y Banco de la República (TRM). Variación calculada " +
+  "contra el dato de hace una semana. Datos con fines exclusivamente informativos: " +
+  "La Tasa no fija ni certifica ninguna tasa y esto no es asesoría financiera. " +
+  "Confirma siempre con la fuente oficial.";
+
 /** Lee un archivo de fuente `.ttf` compartido por ambas plantillas de imagen. */
 export async function leerFontBuffer(nombre: string): Promise<Buffer> {
   return readFile(path.join(process.cwd(), "app/api/og/_assets", nombre));
@@ -65,11 +87,16 @@ export async function leerSvgComoDataUri(nombre: string): Promise<string> {
   return `data:image/svg+xml;base64,${buffer.toString("base64")}`;
 }
 
-export function LogoTaza() {
+/**
+ * El `tamano` es opcional y por defecto vale 80, que es el de las plantillas
+ * del post diario: el reporte semanal lo encoge en el lienzo cuadrado, donde
+ * cada píxel de alto hace falta para las tarjetas.
+ */
+export function LogoTaza({ tamano = 80 }: { tamano?: number } = {}) {
   return (
     <svg
-      width={80}
-      height={80}
+      width={tamano}
+      height={tamano}
       viewBox="0 0 24 24"
       fill="none"
       stroke={COLOR.accent}

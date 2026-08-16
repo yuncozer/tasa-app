@@ -218,6 +218,86 @@ pesos después.
   la dice ("Dólar BCV", "Dólar Binance", "Dólar TRM"). El texto se lee de
   `rate.source`, no se escribe a mano.
 
+### El reporte semanal necesita memoria, y de ahí sale el histórico
+
+Además de los dos posts diarios, hay un **reporte semanal** ("Así se movieron las
+tasas esta semana") con tres tarjetas: dólar BCV, brecha BCV/Binance y TRM, cada
+una con su valor y **cuánto se movió en siete días**. Se dispara a mano desde
+`/admin/semanal`, nunca por cron: sale una vez por semana y conviene mirarlo antes.
+
+- **Hasta aquí la app solo conocía el presente.** La variación obligó a guardar
+  algo, así que existe `historico_tasas` (migración `0004`) y `lib/historico.ts`.
+  El registro lo hace el **cron de tasas**, justo después de `getRates()`, en un
+  `try/catch` tragado y aparte del `try` que publica: si fuera dentro, un Supabase
+  caído convertiría una publicación correcta en un 500 que invita a reintentar y
+  duplica el post. Es el mismo criterio que `guardarEnlace` y `calentarVideo`.
+  No lo muevas a `getRates()` ni a `/api/rates`: ahí sería una escritura por
+  visitante.
+- **Una fila por `(fecha, clave)`, no un JSON por día.** La pregunta que se le
+  hace a la tabla es siempre "cuánto valía X alrededor del día D", y los huecos
+  son por clave y no por día —el BCV se raspa y puede caerse mientras Binance
+  responde—. Con un JSON habría que traer la semana entera y desenrollarla para
+  descubrir que justo esa clave venía nula. La clave primaria es lo que hace
+  idempotente el upsert: el cron dispara dos veces al día y el segundo disparo
+  **pisa** al primero, así que lo guardado es el último dato conocido de la
+  jornada. Verificado en vivo: dos escrituras, una sola fila.
+- **La ventana de tolerancia es simétrica** (±3 días). Si el cron falló el lunes
+  pero corrió el martes, ese dato sirve y está más cerca que el del viernes
+  anterior. En empate gana la fecha más antigua, para que la comparación no se
+  acorte por debajo de la semana. No la amplíes a diez días: entonces "esta
+  semana" deja de ser una semana.
+- **Sin dato, la clave no aparece en el `Map`.** Nada de `valor: null` ni
+  centinelas: quien consume tiene que distinguir "no hay comparación" de "el valor
+  era cero". En la imagen eso se ve como `Sin comparación` en gris, sin flecha y
+  sin cifra — nunca un `0,0 %` ni un guion suelto.
+- **La brecha se mide contra `USD_BINANCE_SELL`, no contra el `mid`.** Compra y
+  venta dejaron de promediarse por lo explicado más arriba, y `mid` sobrevive solo
+  para el cruce de `COP_FRONTERA`. Una tarjeta que dice "brecha" tiene que nombrar
+  un lado del mercado, y el que responde a la pregunta del lector —cuánto pago de
+  más— es la venta. Los dos extremos de la comparación se calculan con las mismas
+  dos claves: si falta cualquiera en el histórico, no hay brecha anterior.
+- **La variación de la brecha va en puntos porcentuales, no en porcentaje.** La
+  brecha ya *es* un porcentaje. De 30,1 % a 34,2 % son `+4,1 pp`, que es lo que se
+  lee en las dos cifras; en relativo sería `+13,6 %`, un número que no aparece en
+  ninguna parte de la tarjeta y que se confundiría con la brecha misma. De ahí
+  `unidadVariacion` en `lib/semanal.ts`.
+- **El color va por impacto y la flecha por signo.** Sube → rojo, baja → verde:
+  una tasa que sube es una devaluación para quien lee, y pintarla de verde por ser
+  un número mayor daría el mensaje contrario. `lib/semanal.ts` solo expone
+  `direccion`; el mapa a color vive en la ruta, con los demás colores.
+  `formatVariacion` devuelve la **magnitud absoluta** justamente porque el signo ya
+  viaja en la flecha.
+- **La imagen va sin firma HMAC**, al contrario que `instagram-post-news`. El
+  criterio no es quién la llama sino si recibe texto controlable por quien arme la
+  URL: aquella lo lleva porque el titular viaja por query; esta no recibe ni un
+  carácter libre —lee las tasas y el histórico del servidor— y sus únicas entradas
+  son dos enums. Firmarla añadiría los 403 por conjunto desajustado sin cerrar
+  nada.
+- **Dos lienzos: 1:1 para el feed y 9:16 para Story.** Los 840 px de diferencia
+  **no se reparten proporcionalmente**: en una Story, Instagram superpone su
+  interfaz arriba y abajo, así que el vertical lleva reservas (110 y 130 px) y lo
+  que caiga ahí queda tapado. Los 104 px de la variación que pedía el diseño solo
+  caben en vertical (y ahí bajan a 76); en el cuadrado, a ese tamaño se perdían la
+  tercera tarjeta y el pie entero.
+- **La Story no se publica desde la app, se descarga.** Una Story por la Graph API
+  no admite sticker de enlace ni texto, que es lo que la hace útil. El botón baja
+  el PNG con `?descargar=1` —por cabecera, no con el atributo `download`, que en
+  iOS es poco fiable— y se sube a mano.
+- **El reporte semanal no se puede programar**, y `materializarParaProgramar` lo
+  rechaza explícitamente. La regla del proyecto es que el post se congela al
+  programarlo, y este resuelve su imagen al publicar leyendo las tasas del
+  momento: programado saldría con cifras distintas de las previsualizadas. La
+  variante `{ tipo: "semanal" }` del payload existe solo para que el botón
+  inmediato pase por `ejecutarPublicacion()`, que es la puerta única.
+- **Tampoco toca `/hoy`**: "el post del día" es el de tasas.
+- Los primeros siete días no hay con qué comparar. La imagen sale igual —los
+  valores actuales no dependen del histórico— con `Sin comparación` en las tres
+  tarjetas y una línea bajo la cabecera que lo dice. Desaparece sola al octavo
+  día. Se puede ver sin esperar con
+  `npx tsx scripts/preview-semanal.ts --sin-historico`; ese flag vive **en el
+  script y nunca en la ruta**, porque un parámetro que falsea datos en una URL
+  pública es justo lo que la ausencia de firma no debe permitir.
+
 ### Los crons ya no son de Vercel, y por eso hay cola de programadas
 
 Un post de `/admin/noticia` se puede dejar en cola para que salga a cierta hora.
@@ -775,6 +855,7 @@ dos scripts se reparten el trabajo:
 | --- | --- | --- |
 | `scripts/preview-noticia.ts <url>` | Un artículo real: imagen enmarcada + caption | Sí |
 | `scripts/preview-marca.ts <archivo>` | Material propio: marcos, video en sus tres lienzos, sello y cintillo | Solo para las de imagen |
+| `scripts/preview-semanal.ts` | El reporte semanal: caption y las dos URLs (1:1 y 9:16) | Sí |
 
 ```bash
 # Artículo real: imprime el caption y una URL firmada de la imagen

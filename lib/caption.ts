@@ -1,6 +1,7 @@
-import { formatDate, formatRate, vigenciaBcv } from "@/lib/format";
+import { formatDate, formatRate, formatVariacion, vigenciaBcv } from "@/lib/format";
 import { buildFilasPesos, type FilaPesosId } from "@/lib/pesos";
 import type { ArticleData } from "@/lib/providers/news";
+import type { FilaSemanalId, ReporteSemanal } from "@/lib/semanal";
 import type { RateKey, RatesSnapshot } from "@/lib/types";
 
 /**
@@ -84,6 +85,57 @@ export function buildCaption(snapshot: RatesSnapshot, momento?: "manana" | "tard
     "Convierte cualquier monto en la calculadora completa: link en la bio.",
     "",
     HASHTAGS,
+  ].join("\n");
+}
+
+const HASHTAGS_SEMANAL =
+  "#Venezuela #Colombia #DolarBCV #TasaDeCambio #Binance #TRM #PesoColombiano " +
+  "#Cucuta #ResumenSemanal #LaTasaOnline";
+
+const EMOJI_POR_FILA_SEMANAL: Record<FilaSemanalId, string> = {
+  USD_BCV: "🇺🇸",
+  BRECHA: "📊",
+  TRM: "🇨🇴",
+};
+
+/**
+ * Caption del reporte semanal.
+ *
+ * Consume las filas que ya armó `lib/semanal.ts` —las mismas que la imagen—
+ * por el mismo motivo que `lineasEnPesos`: son el mismo post y no pueden acabar
+ * diciendo cosas distintas. El aviso legal tampoco se repite aquí; vive
+ * completo en la imagen.
+ *
+ * La flecha viaja en el texto y la magnitud llega ya en valor absoluto desde
+ * `formatVariacion`, así que el signo se dice una sola vez.
+ */
+export function buildCaptionSemanal(reporte: ReporteSemanal): string {
+  const lineas = reporte.filas.map((fila) => {
+    const emoji = EMOJI_POR_FILA_SEMANAL[fila.id];
+    const valor = fila.valor === null ? "no disponible" : fila.valorTexto;
+
+    if (fila.direccion === "desconocida") {
+      return `${emoji} ${fila.titulo}: ${valor} (sin comparación: aún no hay una semana de histórico)`;
+    }
+
+    if (fila.direccion === "igual") {
+      return `${emoji} ${fila.titulo}: ${valor} (sin cambios en la semana)`;
+    }
+
+    const flecha = fila.direccion === "sube" ? "↑" : "↓";
+    return `${emoji} ${fila.titulo}: ${valor} (${flecha} ${formatVariacion(fila.variacion, fila.unidadVariacion)} en la semana)`;
+  });
+
+  return [
+    `📈 Así se movieron las tasas esta semana — ${reporte.rangoTexto}`,
+    "",
+    ...lineas,
+    "",
+    "La brecha se mide en puntos porcentuales (pp) porque ya es un porcentaje.",
+    "",
+    "Convierte cualquier monto en la calculadora completa: link en la bio.",
+    "",
+    HASHTAGS_SEMANAL,
   ].join("\n");
 }
 
