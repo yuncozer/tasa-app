@@ -289,6 +289,19 @@ una con su valor y **cuánto se movió en siete días**. Se dispara a mano desde
   momento: programado saldría con cifras distintas de las previsualizadas. La
   variante `{ tipo: "semanal" }` del payload existe solo para que el botón
   inmediato pase por `ejecutarPublicacion()`, que es la puerta única.
+- **El caption abre con el movimiento más fuerte**, no con el titular de la
+  imagen. Instagram corta el texto tras ~125 caracteres, así que esa primera
+  línea es lo único que se lee sin pulsar "más", y repetir ahí lo que ya se lee
+  enorme en la imagen es desperdiciarla. **Solo compiten filas de la misma
+  unidad**: un `%` y un `pp` no son magnitudes comparables, así que la contienda
+  es entre el dólar y la TRM, y la brecha encabeza únicamente si es la única con
+  comparación. Elegir por el número más grande a secas haría ganar casi siempre
+  a la brecha, que se mueve en otra escala. Sin ninguna comparación se cae al
+  titular de la imagen. De ahí `sujeto` en `FilaSemanal`: `titulo` es una
+  etiqueta de tarjeta y no encaja dentro de una oración.
+- Los `pp` se explican **pegados a su propio número** y no en un párrafo aparte,
+  y el rango de fechas va entre paréntesis: la frase ya lleva un guion largo
+  dentro ("Lunes 10 — Domingo 16") y encadenar dos se lee fatal.
 - **Tampoco toca `/hoy`**: "el post del día" es el de tasas.
 - Los primeros siete días no hay con qué comparar. La imagen sale igual —los
   valores actuales no dependen del histórico— con `Sin comparación` en las tres
