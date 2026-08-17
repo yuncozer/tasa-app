@@ -825,6 +825,12 @@ la otra protege los endpoints de publicación/cron. La sesión es una cookie
 `CRON_SECRET` nunca llega al navegador: `/admin/noticia` lo usa solo del lado
 servidor, a través de `publishNewsPost`.
 
+Cuelgan dos páginas de esa misma sesión: `/admin/noticia` y `/admin/semanal`,
+enlazadas entre sí desde la cabecera. Son páginas separadas y no dos pestañas de
+una porque la primera es un formulario con estado propio —switch Post/Reel,
+subidas, previa desactualizada, cola— y el reporte semanal **no tiene entradas**:
+se mira y se publica.
+
 ## Cómo trabajar en este proyecto
 
 ### Estilos
@@ -862,7 +868,7 @@ desplegar a mano.
 ### Probar las marcas en local, sin publicar ni pasar por `/admin`
 
 La app marca **cinco piezas**, y todas se pueden revisar sin publicar nada. Los
-dos scripts se reparten el trabajo:
+tres scripts se reparten el trabajo:
 
 | Script | Para qué | Necesita `npm run dev` |
 | --- | --- | --- |
@@ -884,6 +890,10 @@ npx tsx scripts/preview-marca.ts clip.mp4     # video en 1:1, 4:5 y Reel, con su
 --proporcion 1:1|4:5  # lienzo del marco de imagen
 --segundo N           # de qué segundo se saca el fotograma del video
 --public-id <id> --tipo imagen|video   # reusa algo ya subido, sin volver a subirlo
+
+# Reporte semanal: imprime el caption y las dos URLs (no lleva firma)
+npx tsx scripts/preview-semanal.ts
+npx tsx scripts/preview-semanal.ts --sin-historico   # la degradación del arranque
 ```
 
 **Qué compone cada pieza y dónde se edita:**
@@ -895,6 +905,7 @@ npx tsx scripts/preview-marca.ts clip.mp4     # video en 1:1, 4:5 y Reel, con su
 | Video (1:1, 4:5 y Reel 9:16) | Cloudinary, transformación por URL | `lib/providers/cloudinary.ts` |
 | Sello de marca sobre el video | Cloudinary, capa fija ya subida | el mismo (`SELLO_PUBLIC_ID`, `yDelSello`) |
 | Cintillo del video | Satori, PNG transparente que Cloudinary superpone | `lib/og-cintillo.tsx` |
+| Reporte semanal (1:1 y 9:16) | Satori, sin firma; las filas salen de `lib/semanal.ts` | `app/api/og/instagram-semanal/route.tsx` |
 
 **Cómo pedir cada variante del video**, que es lo que más se confunde:
 
@@ -926,10 +937,12 @@ para ver si el overlay quedó bien es mucho más lento.
 
 **Requisitos y avisos:**
 
-- Los dos scripts leen `.env.local` y **se corren desde la raíz del repo**
+- Los tres scripts leen `.env.local` y **se corren desde la raíz del repo**
   (`asegurarLogo()` lee `public/icon-512.png` relativo al directorio de trabajo).
 - `preview-noticia.ts` necesita `CRON_SECRET`. `preview-marca.ts` necesita además
-  las tres `CLOUDINARY_*`.
+  las tres `CLOUDINARY_*`. `preview-semanal.ts` necesita `SUPABASE_URL` y
+  `SUPABASE_SERVICE_ROLE_KEY` para leer el histórico, salvo con
+  `--sin-historico`, que no consulta nada.
 - `npm run dev` hace falta **solo para las URLs de imagen**; las de video las
   sirve Cloudinary directamente.
 - Cada corrida sin `--public-id` gasta almacenamiento del plan gratuito (25
@@ -939,10 +952,11 @@ para ver si el overlay quedó bien es mucho más lento.
 - Si una URL de imagen contesta **403**, el conjunto firmado y el enviado no
   coinciden: es lo que pasaba cuando los scripts firmaban sin `proporcion`
   después de que la ruta empezara a incluirla siempre.
-- **Ninguno de los dos publica nada.** Solo publican de verdad
-  `POST /api/publish-instagram-news` y los botones de `/admin/noticia`.
-- Para probar `/admin/noticia` en sí —y no solo el render— hace falta además
-  `ADMIN_PASSWORD` en `.env.local`.
+- **Ninguno de los tres publica nada.** Solo publican de verdad
+  `POST /api/publish-instagram-news` y los botones de `/admin/noticia` y
+  `/admin/semanal`.
+- Para probar `/admin/noticia` o `/admin/semanal` en sí —y no solo el render—
+  hace falta además `ADMIN_PASSWORD` en `.env.local`.
 
 ### El entorno de desarrollo
 
