@@ -137,6 +137,17 @@ export function isoDesdeHoraCaracas(local: string): string | null {
   return new Date(instante).toISOString();
 }
 
+/**
+ * Día calendario en Caracas como "YYYY-MM-DD".
+ *
+ * Vive aquí, junto al resto de la aritmética de Caracas, en vez de exportar
+ * `CARACAS_OFFSET_MS` para que cada módulo haga la cuenta por su lado: las
+ * fechas de este proyecto se arman en un solo sitio.
+ */
+export function diaCaracasISO(ms: number): string {
+  return new Date(ms - CARACAS_OFFSET_MS).toISOString().slice(0, 10);
+}
+
 /** El mismo formato, de vuelta: sirve para el `min` del input. */
 export function horaCaracasDesdeIso(iso: string): string {
   const caracas = new Date(new Date(iso).getTime() - CARACAS_OFFSET_MS);
@@ -234,6 +245,101 @@ export function vigenciaBcv(iso: string | null): string | undefined {
   if (diasDiferencia === 1) return "vigente mañana";
 
   return `vigente el ${DIAS_SEMANA[objetivo.getUTCDay()]}`;
+}
+
+const MESES_LARGOS = [
+  "enero",
+  "febrero",
+  "marzo",
+  "abril",
+  "mayo",
+  "junio",
+  "julio",
+  "agosto",
+  "septiembre",
+  "octubre",
+  "noviembre",
+  "diciembre",
+];
+
+/**
+ * Un porcentaje ya calculado, con su símbolo: "1,4 %".
+ *
+ * No usa `style: "percent"` de `Intl` porque ese espera una fracción (0,014) y
+ * aquí el número ya viene en puntos, además de que el espacio antes del signo
+ * cambia según la versión de ICU — lo mismo que obligó a armar las fechas a
+ * mano.
+ */
+export function formatPercent(value: number | null, decimales = 1): string {
+  if (value === null || !Number.isFinite(value)) return "—";
+
+  const numero = new Intl.NumberFormat("es-VE", {
+    minimumFractionDigits: decimales,
+    maximumFractionDigits: decimales,
+  }).format(value);
+
+  return `${numero} %`;
+}
+
+/**
+ * La magnitud de una variación semanal, con su unidad.
+ *
+ * Devuelve el **valor absoluto** a propósito: el signo lo comunican la flecha y
+ * el color, y repetirlo en el texto daría un "↑ −1,4 %" contradictorio o un
+ * "↑ +1,4 %" redundante. Con la dirección viviendo en un solo sitio, la imagen
+ * y el caption no pueden acabar diciendo cosas distintas.
+ *
+ * La unidad no es cosmética: una tasa varía en porcentaje, pero la brecha ya
+ * *es* un porcentaje, así que su cambio se mide en puntos porcentuales. Ver
+ * `lib/semanal.ts`.
+ */
+export function formatVariacion(value: number | null, unidad: "porcentaje" | "puntos"): string {
+  if (value === null || !Number.isFinite(value)) return "—";
+
+  const magnitud = Math.abs(value);
+  if (unidad === "porcentaje") return formatPercent(magnitud);
+
+  const numero = new Intl.NumberFormat("es-VE", {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+  }).format(magnitud);
+
+  return `${numero} pp`;
+}
+
+/**
+ * El rango de una semana en lenguaje llano: "Lunes 10 — Domingo 16 de agosto",
+ * o "Lunes 28 de julio — Domingo 3 de agosto" cuando cruza de mes.
+ *
+ * Recibe días de Caracas ya resueltos ("YYYY-MM-DD", como los produce
+ * `diaCaracasISO`), así que no vuelve a convertir zonas: parsea los tres
+ * números y calcula el día de la semana en UTC.
+ *
+ * Se arma a mano, sin `Intl.DateTimeFormat`, por la regla dura del proyecto —y
+ * aquí además el texto viaja a Satori, que es un entorno más con su propio ICU.
+ * La inicial se capitaliza en la propia cadena y no con CSS porque el mismo
+ * texto lo usa el caption, donde no hay CSS que valga.
+ */
+export function rangoSemana(desde: string, hasta: string): string {
+  const inicio = new Date(`${desde}T00:00:00Z`);
+  const fin = new Date(`${hasta}T00:00:00Z`);
+  if (Number.isNaN(inicio.getTime()) || Number.isNaN(fin.getTime())) return "—";
+
+  const nombre = (fecha: Date) => {
+    const dia = DIAS_SEMANA[fecha.getUTCDay()];
+    return dia.charAt(0).toUpperCase() + dia.slice(1);
+  };
+
+  const mesInicio = MESES_LARGOS[inicio.getUTCMonth()];
+  const mesFin = MESES_LARGOS[fin.getUTCMonth()];
+
+  // Dentro del mismo mes el nombre se dice una sola vez, al final.
+  const izquierda =
+    mesInicio === mesFin
+      ? `${nombre(inicio)} ${inicio.getUTCDate()}`
+      : `${nombre(inicio)} ${inicio.getUTCDate()} de ${mesInicio}`;
+
+  return `${izquierda} — ${nombre(fin)} ${fin.getUTCDate()} de ${mesFin}`;
 }
 
 /** Convierte lo tecleado en la calculadora ("1.234,56") a número. */

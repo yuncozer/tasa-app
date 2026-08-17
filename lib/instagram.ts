@@ -104,6 +104,26 @@ export async function estadoContenedor(containerId: string, queEs: string): Prom
 }
 
 /**
+ * La URL pública del post ya publicado (`instagram.com/p/…`).
+ *
+ * Se consulta después de publicar porque `media_publish` solo devuelve el id
+ * del media, que no sirve para compartir. Con ella el cron de tasas puede
+ * anotar a dónde apunta `/hoy` sin que nadie copie nada a mano.
+ */
+export async function permalinkDeMedia(mediaId: string): Promise<string> {
+  const { accessToken } = credenciales();
+  const url = new URL(`${GRAPH_BASE}/${mediaId}`);
+  url.searchParams.set("fields", "permalink");
+  url.searchParams.set("access_token", accessToken);
+
+  const res = await fetch(url);
+  const body = await res.json();
+  if (!res.ok) throw new InstagramApiError("No se pudo consultar el enlace del post", body);
+  if (!body.permalink) throw new Error("Instagram no devolvió el enlace del post");
+  return body.permalink as string;
+}
+
+/**
  * Espera a que Meta termine de procesar un contenedor, sondeando en bucle.
  *
  * La usan los caminos que publican de un tirón dentro de una sola petición

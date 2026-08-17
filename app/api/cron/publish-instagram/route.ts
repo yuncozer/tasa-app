@@ -1,7 +1,9 @@
 import type { NextRequest } from "next/server";
 import { apiError, apiJson } from "@/lib/api";
 import { buildCaption } from "@/lib/caption";
-import { publishCarouselPost } from "@/lib/instagram";
+import { guardarEnlace } from "@/lib/enlaces";
+import { registrarSnapshot } from "@/lib/historico";
+import { permalinkDeMedia, publishCarouselPost } from "@/lib/instagram";
 import { getRates } from "@/lib/rates";
 
 /**
@@ -56,6 +58,25 @@ export async function GET(request: NextRequest) {
 
   try {
     const snapshot = await getRates();
+
+    // Archiva el snapshot del día para que el reporte semanal pueda calcular
+    // variaciones. Va en su propio `try` con el error tragado, igual que
+    // `guardarEnlace` más abajo y por el mismo motivo: si fuera dentro del
+    // `try` grande, un Supabase caído convertiría una publicación correcta en
+    // un 500 que invita a reintentar y duplica el post. Lo peor que pasa al
+    // fallar es un hueco de un día, que la ventana de tolerancia de
+    // `leerComparativa` ya absorbe.
+    //
+    // Se archiva aquí, y no en `getRates()` ni en `/api/rates`, porque este
+    // cron ya corre dos veces al día a hora fija y ya tiene el snapshot en la
+    // mano: en las otras dos sería una escritura por visitante. Y así lo que
+    // queda guardado es exactamente lo que se publicó.
+    try {
+      await registrarSnapshot(snapshot);
+    } catch {
+      // Sin histórico de hoy, el reporte semanal degrada solo.
+    }
+
     const caption = buildCaption(snapshot, momentoDesdeQuery(request));
 
     // El orden es el orden en que se deslizan: bolívares primero.
@@ -64,7 +85,21 @@ export async function GET(request: NextRequest) {
       caption,
     );
 
-    return apiJson({ ok: true, mediaId }, { cachear: false });
+    // Deja `/hoy` apuntando al post que acaba de salir. Va aparte del
+    // `try` de la publicación y con su error tragado a propósito: el post ya
+    // está en la cuenta y eso es lo irreversible, así que un fallo al anotar
+    // el enlace no puede convertir una publicación exitosa en una respuesta
+    // de error que invite a reintentar y duplique el post. Si falla, `/hoy`
+    // cae a su respaldo y lo peor que pasa es que apunte al post anterior.
+    let enlace: string | null = null;
+    try {
+      enlace = await permalinkDeMedia(mediaId);
+      await guardarEnlace("hoy", enlace);
+    } catch {
+      enlace = null;
+    }
+
+    return apiJson({ ok: true, mediaId, enlace }, { cachear: false });
   } catch (error) {
     return apiError("No se pudo publicar el post de Instagram", error);
   }

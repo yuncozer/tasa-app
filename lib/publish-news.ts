@@ -380,7 +380,20 @@ export type PublicacionPayload =
   | { tipo: "articulo"; url: string; caption?: string; imagenPublicId?: string }
   | { tipo: "manual"; datos: NoticiaManual }
   | { tipo: "carrusel"; datos: CarruselEntrada; caption: string }
-  | ({ tipo: "reel"; videoPublicId: string; caption: string } & MarcaVideo);
+  | ({ tipo: "reel"; videoPublicId: string; caption: string } & MarcaVideo)
+  /**
+   * El reporte semanal. No lleva datos porque la imagen se genera al publicar,
+   * leyendo las tasas y el histórico del servidor: lo único que hace falta es
+   * el caption, que sí se compone antes para poder mostrarlo en la vista
+   * previa.
+   *
+   * Por eso mismo **no se puede programar**: la regla del proyecto es que el
+   * post se congela al programarlo, y un reporte que se resuelve al publicar
+   * saldría con cifras distintas de las que se vieron. `materializarParaProgramar`
+   * lo rechaza explícitamente. Está aquí para que el botón inmediato pase por
+   * `ejecutarPublicacion()`, que es la puerta única.
+   */
+  | { tipo: "semanal"; caption: string };
 
 /**
  * Cuánto del título se guarda para la cola. No es el ancho de la pantalla —de
@@ -415,7 +428,7 @@ export function resumenPublicacion(payload: PublicacionPayload): string {
       ? payload.datos.title
       : payload.tipo === "carrusel"
         ? (payload.datos.title ?? primeraLinea(payload.caption))
-        : payload.tipo === "reel"
+        : payload.tipo === "reel" || payload.tipo === "semanal"
           ? primeraLinea(payload.caption)
           : (payload.caption ?? payload.url);
 
@@ -450,7 +463,23 @@ export async function prepararPublicacion(payload: PublicacionPayload): Promise<
       const { videoUrl } = await previewNewsVideoPost(payload.videoPublicId, payload);
       return { tipo: "reel", videoUrl, caption: payload.caption };
     }
+    case "semanal":
+      return { tipo: "imagen", imageUrl: urlReporteSemanal("1:1"), caption: payload.caption };
   }
+}
+
+/**
+ * La imagen del reporte semanal, para que Meta la descargue.
+ *
+ * Al feed va el cuadrado: el 9:16 es para Story, que la Graph API publica sin
+ * sticker de enlace —lo que la hace útil— así que esa se descarga y se sube a
+ * mano desde `/admin/semanal`.
+ */
+export function urlReporteSemanal(proporcion: "1:1" | "9:16"): string {
+  const siteUrl = process.env.SITE_URL;
+  if (!siteUrl) throw new Error("Falta configurar SITE_URL");
+
+  return `${siteUrl.replace(/\/$/, "")}/api/og/instagram-semanal?proporcion=${encodeURIComponent(proporcion)}`;
 }
 
 /**
@@ -533,6 +562,12 @@ export function leerPublicacionPayload(valor: unknown): PublicacionPayload | nul
     return { tipo: "reel", videoPublicId, caption, ...leerMarcaVideo(p) };
   }
 
+  if (p?.tipo === "semanal") {
+    const caption = texto((p as { caption?: unknown }).caption);
+    if (!caption) return null;
+    return { tipo: "semanal", caption };
+  }
+
   return null;
 }
 
@@ -551,6 +586,14 @@ export function leerPublicacionPayload(valor: unknown): PublicacionPayload | nul
 export async function materializarParaProgramar(
   payload: PublicacionPayload,
 ): Promise<PublicacionPayload> {
+  // El reporte semanal es lo único que no se puede congelar: su imagen se
+  // resuelve al publicar, leyendo las tasas del momento, así que programarlo
+  // publicaría cifras distintas de las previsualizadas. Se rechaza aquí en vez
+  // de dejar que la cola lo acepte y sorprenda después.
+  if (payload.tipo === "semanal") {
+    throw new Error("El reporte semanal no se puede programar: sus cifras se resuelven al publicar");
+  }
+
   await calentarVideo(payload);
 
   if (payload.tipo === "articulo") {

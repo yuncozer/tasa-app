@@ -1,6 +1,7 @@
-import { formatDate, formatRate, vigenciaBcv } from "@/lib/format";
+import { formatDate, formatRate, formatVariacion, vigenciaBcv } from "@/lib/format";
 import { buildFilasPesos, type FilaPesosId } from "@/lib/pesos";
 import type { ArticleData } from "@/lib/providers/news";
+import type { FilaSemanal, FilaSemanalId, ReporteSemanal } from "@/lib/semanal";
 import type { RateKey, RatesSnapshot } from "@/lib/types";
 
 /**
@@ -84,6 +85,105 @@ export function buildCaption(snapshot: RatesSnapshot, momento?: "manana" | "tard
     "Convierte cualquier monto en la calculadora completa: link en la bio.",
     "",
     HASHTAGS,
+  ].join("\n");
+}
+
+const HASHTAGS_SEMANAL =
+  "#Venezuela #Colombia #DolarBCV #TasaDeCambio #Binance #TRM #PesoColombiano " +
+  "#Cucuta #ResumenSemanal #LaTasaOnline";
+
+const EMOJI_POR_FILA_SEMANAL: Record<FilaSemanalId, string> = {
+  USD_BCV: "🇺🇸",
+  BRECHA: "📊",
+  TRM: "🇨🇴",
+};
+
+/** De dónde salen las tres cifras. En la imagen va en el pie; aquí, buscable y copiable. */
+const FUENTES_SEMANAL = "Fuentes: BCV, Binance P2P y Banco de la República (TRM).";
+
+/**
+ * Con qué abre el caption.
+ *
+ * Instagram corta el texto tras ~125 caracteres, así que esa primera línea es
+ * lo único que se lee sin pulsar "más": repetir ahí el titular que ya se lee
+ * enorme en la imagen es desperdiciarla. Se abre con el movimiento más fuerte
+ * de la semana.
+ *
+ * **Solo se comparan filas de la misma unidad.** Un 1,4 % y un 2,7 pp no son
+ * magnitudes comparables —uno es un cambio relativo y el otro una diferencia
+ * entre porcentajes—, así que la contienda es entre el dólar y la TRM, y la
+ * brecha solo encabeza si es la única con comparación. Elegir por el número más
+ * grande a secas haría ganar casi siempre a la brecha, que se mueve en una
+ * escala distinta.
+ *
+ * Sin ninguna comparación se cae al titular de la imagen, que es lo único
+ * cierto que queda por decir.
+ */
+function titularSemanal(reporte: ReporteSemanal): string {
+  const conCambio = reporte.filas.filter((fila) => fila.direccion === "sube" || fila.direccion === "baja");
+  const enPorcentaje = conCambio.filter((fila) => fila.unidadVariacion === "porcentaje");
+  const candidatas = enPorcentaje.length > 0 ? enPorcentaje : conCambio;
+
+  const destacada = candidatas.reduce<FilaSemanal | null>(
+    (mejor, fila) => (mejor === null || Math.abs(fila.variacion!) > Math.abs(mejor.variacion!) ? fila : mejor),
+    null,
+  );
+
+  if (!destacada) return `📈 Así se movieron las tasas esta semana (${reporte.rangoTexto})`;
+
+  const verbo = destacada.direccion === "sube" ? "subió" : "bajó";
+  const magnitud = formatVariacion(destacada.variacion, destacada.unidadVariacion);
+
+  // El rango va entre paréntesis y no tras un guion: la frase ya lleva uno
+  // dentro ("Lunes 10 — Domingo 16") y encadenar dos se lee fatal.
+  return `📈 ${destacada.sujeto} ${verbo} ${magnitud} esta semana (${reporte.rangoTexto})`;
+}
+
+/**
+ * Caption del reporte semanal.
+ *
+ * Consume las filas que ya armó `lib/semanal.ts` —las mismas que la imagen—
+ * por el mismo motivo que `lineasEnPesos`: son el mismo post y no pueden acabar
+ * diciendo cosas distintas. El aviso legal tampoco se repite aquí; vive
+ * completo en la imagen.
+ *
+ * La flecha viaja en el texto y la magnitud llega ya en valor absoluto desde
+ * `formatVariacion`, así que el signo se dice una sola vez.
+ */
+export function buildCaptionSemanal(reporte: ReporteSemanal): string {
+  const lineas = reporte.filas.map((fila) => {
+    const emoji = EMOJI_POR_FILA_SEMANAL[fila.id];
+    const valor = fila.valor === null ? "no disponible" : fila.valorTexto;
+
+    if (fila.direccion === "desconocida") {
+      return `${emoji} ${fila.titulo}: ${valor} (sin comparación: aún no hay una semana de histórico)`;
+    }
+
+    if (fila.direccion === "igual") {
+      return `${emoji} ${fila.titulo}: ${valor} (sin cambios en la semana)`;
+    }
+
+    const flecha = fila.direccion === "sube" ? "↑" : "↓";
+    // La unidad se aclara pegada al número que la usa, y no en un párrafo
+    // aparte: se explica una sola vez, donde de verdad se lee.
+    const aclaracion = fila.unidadVariacion === "puntos" ? " —puntos porcentuales—" : "";
+
+    return (
+      `${emoji} ${fila.titulo}: ${valor} ` +
+      `(${flecha} ${formatVariacion(fila.variacion, fila.unidadVariacion)}${aclaracion} en la semana)`
+    );
+  });
+
+  return [
+    titularSemanal(reporte),
+    "",
+    ...lineas,
+    "",
+    "Convierte cualquier monto en la calculadora completa: link en la bio.",
+    "",
+    FUENTES_SEMANAL,
+    "",
+    HASHTAGS_SEMANAL,
   ].join("\n");
 }
 

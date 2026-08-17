@@ -117,6 +117,9 @@ ellas, el resto de la app funciona igual. Ver `.env.example`.
 | `IG_ACCESS_TOKEN` | — | Token de acceso de larga duración con permiso `instagram_content_publish` |
 | `SUPABASE_URL` | — | Proyecto de Supabase donde vive la cola de publicaciones programadas |
 | `SUPABASE_SERVICE_ROLE_KEY` | — | Clave `service_role` del mismo proyecto. Salta el RLS: solo servidor, nunca `NEXT_PUBLIC_` |
+| `ENLACE_HOY` | — | Respaldo de `/hoy` si el cron todavía no anotó el post del día (ver [Atajos del dominio](#atajos-del-dominio)) |
+| `PERFIL_INSTAGRAM_URL` | `instagram.com/latasa.online` | Destino de `/ig` |
+| `ENLACE_WHATSAPP` | — | Destino de `/wa`. Sin ella la ruta no existe |
 
 ## Caché y actualización
 
@@ -241,6 +244,36 @@ distintas.
 8. Carga `IG_ACCESS_TOKEN`, `IG_BUSINESS_ACCOUNT_ID`, `CRON_SECRET` y `SITE_URL` en
    las variables de entorno de Vercel (producción) y en `.env.local` para probar
    en local.
+
+## Atajos del dominio
+
+Tres rutas cortas para compartir, pensadas para pegarse en un chat:
+
+| Ruta | A dónde lleva |
+| --- | --- |
+| `/hoy` | El carrusel de tasas más reciente publicado en Instagram |
+| `/ig` | El perfil `@latasa.online` |
+| `/wa` | El WhatsApp de La Tasa (solo si `ENLACE_WHATSAPP` está configurada) |
+
+`/ig` y `/wa` son redirecciones 307 declaradas en `next.config.ts`. `/hoy` no puede
+serlo por dos motivos:
+
+- **Su destino cambia dos veces al día.** `redirects()` se evalúa al compilar, y en
+  Vercel un cambio de variable de entorno solo entra con un despliegue nuevo. En vez
+  de eso, el cron que publica el carrusel consulta el permalink del post
+  (`GET /{mediaId}?fields=permalink`) y lo anota en la tabla `enlaces` de Supabase;
+  `app/hoy/page.tsx` lo lee en cada visita. Si no hay nada anotado cae a `ENLACE_HOY`,
+  y si tampoco, al perfil.
+- **Una redirección se queda sin vista previa en WhatsApp.** El rastreador la sigue
+  hasta Instagram y ahí se encuentra el muro de login, sin `og:image` ni `og:title`.
+  Por eso `/hoy` es una página que declara sus propias etiquetas Open Graph —con la
+  imagen del post del día, la que genera `/api/og/instagram-post`— y manda al
+  visitante real a Instagram con un `<meta http-equiv="refresh">`. El rastreador no
+  ejecuta esa redirección, así que se queda con la tarjeta.
+
+Anotar el enlace va dentro de un `try/catch` que se ignora: el post ya salió y es lo
+irreversible, así que un fallo ahí no puede convertir una publicación exitosa en un
+error que invite a reintentar y duplique el post.
 
 ## PWA
 

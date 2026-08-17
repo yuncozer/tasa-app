@@ -218,6 +218,99 @@ pesos después.
   la dice ("Dólar BCV", "Dólar Binance", "Dólar TRM"). El texto se lee de
   `rate.source`, no se escribe a mano.
 
+### El reporte semanal necesita memoria, y de ahí sale el histórico
+
+Además de los dos posts diarios, hay un **reporte semanal** ("Así se movieron las
+tasas esta semana") con tres tarjetas: dólar BCV, brecha BCV/Binance y TRM, cada
+una con su valor y **cuánto se movió en siete días**. Se dispara a mano desde
+`/admin/semanal`, nunca por cron: sale una vez por semana y conviene mirarlo antes.
+
+- **Hasta aquí la app solo conocía el presente.** La variación obligó a guardar
+  algo, así que existe `historico_tasas` (migración `0004`) y `lib/historico.ts`.
+  El registro lo hace el **cron de tasas**, justo después de `getRates()`, en un
+  `try/catch` tragado y aparte del `try` que publica: si fuera dentro, un Supabase
+  caído convertiría una publicación correcta en un 500 que invita a reintentar y
+  duplica el post. Es el mismo criterio que `guardarEnlace` y `calentarVideo`.
+  No lo muevas a `getRates()` ni a `/api/rates`: ahí sería una escritura por
+  visitante.
+- **Una fila por `(fecha, clave)`, no un JSON por día.** La pregunta que se le
+  hace a la tabla es siempre "cuánto valía X alrededor del día D", y los huecos
+  son por clave y no por día —el BCV se raspa y puede caerse mientras Binance
+  responde—. Con un JSON habría que traer la semana entera y desenrollarla para
+  descubrir que justo esa clave venía nula. La clave primaria es lo que hace
+  idempotente el upsert: el cron dispara dos veces al día y el segundo disparo
+  **pisa** al primero, así que lo guardado es el último dato conocido de la
+  jornada. Verificado en vivo: dos escrituras, una sola fila.
+- **La ventana de tolerancia es simétrica** (±3 días). Si el cron falló el lunes
+  pero corrió el martes, ese dato sirve y está más cerca que el del viernes
+  anterior. En empate gana la fecha más antigua, para que la comparación no se
+  acorte por debajo de la semana. No la amplíes a diez días: entonces "esta
+  semana" deja de ser una semana.
+- **Sin dato, la clave no aparece en el `Map`.** Nada de `valor: null` ni
+  centinelas: quien consume tiene que distinguir "no hay comparación" de "el valor
+  era cero". En la imagen eso se ve como `Sin comparación` en gris, sin flecha y
+  sin cifra — nunca un `0,0 %` ni un guion suelto.
+- **La brecha se mide contra `USD_BINANCE_SELL`, no contra el `mid`.** Compra y
+  venta dejaron de promediarse por lo explicado más arriba, y `mid` sobrevive solo
+  para el cruce de `COP_FRONTERA`. Una tarjeta que dice "brecha" tiene que nombrar
+  un lado del mercado, y el que responde a la pregunta del lector —cuánto pago de
+  más— es la venta. Los dos extremos de la comparación se calculan con las mismas
+  dos claves: si falta cualquiera en el histórico, no hay brecha anterior.
+- **La variación de la brecha va en puntos porcentuales, no en porcentaje.** La
+  brecha ya *es* un porcentaje. De 30,1 % a 34,2 % son `+4,1 pp`, que es lo que se
+  lee en las dos cifras; en relativo sería `+13,6 %`, un número que no aparece en
+  ninguna parte de la tarjeta y que se confundiría con la brecha misma. De ahí
+  `unidadVariacion` en `lib/semanal.ts`.
+- **El color va por impacto y la flecha por signo.** Sube → rojo, baja → verde:
+  una tasa que sube es una devaluación para quien lee, y pintarla de verde por ser
+  un número mayor daría el mensaje contrario. `lib/semanal.ts` solo expone
+  `direccion`; el mapa a color vive en la ruta, con los demás colores.
+  `formatVariacion` devuelve la **magnitud absoluta** justamente porque el signo ya
+  viaja en la flecha.
+- **La imagen va sin firma HMAC**, al contrario que `instagram-post-news`. El
+  criterio no es quién la llama sino si recibe texto controlable por quien arme la
+  URL: aquella lo lleva porque el titular viaja por query; esta no recibe ni un
+  carácter libre —lee las tasas y el histórico del servidor— y sus únicas entradas
+  son dos enums. Firmarla añadiría los 403 por conjunto desajustado sin cerrar
+  nada.
+- **Dos lienzos: 1:1 para el feed y 9:16 para Story.** Los 840 px de diferencia
+  **no se reparten proporcionalmente**: en una Story, Instagram superpone su
+  interfaz arriba y abajo, así que el vertical lleva reservas (110 y 130 px) y lo
+  que caiga ahí queda tapado. Los 104 px de la variación que pedía el diseño solo
+  caben en vertical (y ahí bajan a 76); en el cuadrado, a ese tamaño se perdían la
+  tercera tarjeta y el pie entero.
+- **La Story no se publica desde la app, se descarga.** Una Story por la Graph API
+  no admite sticker de enlace ni texto, que es lo que la hace útil. El botón baja
+  el PNG con `?descargar=1` —por cabecera, no con el atributo `download`, que en
+  iOS es poco fiable— y se sube a mano.
+- **El reporte semanal no se puede programar**, y `materializarParaProgramar` lo
+  rechaza explícitamente. La regla del proyecto es que el post se congela al
+  programarlo, y este resuelve su imagen al publicar leyendo las tasas del
+  momento: programado saldría con cifras distintas de las previsualizadas. La
+  variante `{ tipo: "semanal" }` del payload existe solo para que el botón
+  inmediato pase por `ejecutarPublicacion()`, que es la puerta única.
+- **El caption abre con el movimiento más fuerte**, no con el titular de la
+  imagen. Instagram corta el texto tras ~125 caracteres, así que esa primera
+  línea es lo único que se lee sin pulsar "más", y repetir ahí lo que ya se lee
+  enorme en la imagen es desperdiciarla. **Solo compiten filas de la misma
+  unidad**: un `%` y un `pp` no son magnitudes comparables, así que la contienda
+  es entre el dólar y la TRM, y la brecha encabeza únicamente si es la única con
+  comparación. Elegir por el número más grande a secas haría ganar casi siempre
+  a la brecha, que se mueve en otra escala. Sin ninguna comparación se cae al
+  titular de la imagen. De ahí `sujeto` en `FilaSemanal`: `titulo` es una
+  etiqueta de tarjeta y no encaja dentro de una oración.
+- Los `pp` se explican **pegados a su propio número** y no en un párrafo aparte,
+  y el rango de fechas va entre paréntesis: la frase ya lleva un guion largo
+  dentro ("Lunes 10 — Domingo 16") y encadenar dos se lee fatal.
+- **Tampoco toca `/hoy`**: "el post del día" es el de tasas.
+- Los primeros siete días no hay con qué comparar. La imagen sale igual —los
+  valores actuales no dependen del histórico— con `Sin comparación` en las tres
+  tarjetas y una línea bajo la cabecera que lo dice. Desaparece sola al octavo
+  día. Se puede ver sin esperar con
+  `npx tsx scripts/preview-semanal.ts --sin-historico`; ese flag vive **en el
+  script y nunca en la ruta**, porque un parámetro que falsea datos en una URL
+  pública es justo lo que la ausencia de firma no debe permitir.
+
 ### Los crons ya no son de Vercel, y por eso hay cola de programadas
 
 Un post de `/admin/noticia` se puede dejar en cola para que salga a cierta hora.
@@ -313,6 +406,50 @@ vive aquí.
   el cliente obligaba a un `setState` dentro de un efecto, que es el patrón que
   el proyecto evita (mismo motivo que `useSyncExternalStore` más arriba) y que
   el linter rechaza.
+
+### `/hoy` es una página, no una redirección
+
+Tres atajos del dominio para compartir: `/hoy` al carrusel de tasas del día, `/ig`
+al perfil y `/wa` al WhatsApp. Los dos últimos sí son `redirects()` de
+`next.config.ts`, que es lo idiomático. `/hoy` no, y por dos motivos distintos que
+conviene no confundir:
+
+- **`redirects()` se evalúa al compilar.** El destino de `/hoy` cambia dos veces al
+  día y en Vercel un cambio de variable de entorno solo entra con un despliegue
+  nuevo, así que ponerlo ahí obligaría a redesplegar cada mañana y cada tarde. En su
+  lugar lo anota el propio cron: tras publicar el carrusel pide el permalink a Meta
+  (`permalinkDeMedia`) y lo guarda en la tabla `enlaces` (`lib/enlaces.ts`).
+- **Una redirección se queda sin vista previa.** Este enlace se pega en WhatsApp, y
+  su rastreador sigue el 307 hasta Instagram, donde encuentra el muro de login: sin
+  `og:image` la tarjeta sale vacía. Por eso `app/hoy/page.tsx` declara sus propias
+  etiquetas Open Graph, con la imagen que ya genera `/api/og/instagram-post` —la
+  misma que se publicó, no una compuesta aparte—, y manda al visitante con un
+  `<meta http-equiv="refresh">`. El rastreador no lo ejecuta y se queda con la
+  tarjeta; la persona ve un parpadeo. El `refresh` va en HTML y no en un script
+  para que funcione también sin JavaScript, y debajo queda un enlace visible por si
+  el navegador bloquea la redirección.
+
+Lo demás que hay que respetar:
+
+- **Anotar el enlace no puede tumbar la publicación.** Va en un `try/catch` que se
+  ignora, aparte del `try` que publica: el post ya está en la cuenta y eso es lo
+  irreversible, así que un fallo al anotar no debe devolver un error que invite a
+  reintentar y duplique el post (mismo criterio que `calentarVideo`). Si falla,
+  `/hoy` cae a su respaldo y como mucho apunta al post anterior.
+- **La cadena de respaldos es tabla → `ENLACE_HOY` → perfil**, y cada candidato pasa
+  por `esUrlValida()`. Nunca se queda sin destino: el enlace ya está compartido en
+  chats de gente que no va a volver a preguntar.
+- **Solo lo anota el cron de tasas.** Los posts de noticias de `/admin` no tocan
+  `/hoy`: "el post del día" es el de tasas.
+- `/hoy` va con `Cache-Control: no-store` desde `next.config.ts`, junto a la cabecera
+  de la portada. Si la CDN se queda una copia, el enlace lleva toda la tarde al post
+  de la mañana.
+- **El service worker tiene que dejarla pasar.** Sirve *cualquier* navegación desde
+  la caché de la portada, así que sin la guarda de `ATAJOS` en `public/sw.js` `/hoy`
+  mostraría la portada en vez de abrir el post. Al tocar eso se sube `VERSION`.
+- **`/wa` no tiene respaldo en el código**, al contrario que `/ig`: un número de
+  WhatsApp no se adivina y uno inventado mandaría a un chat ajeno. Sin
+  `ENLACE_WHATSAPP` la ruta simplemente no existe.
 
 ### El aviso legal se queda
 
@@ -589,11 +726,31 @@ Lo que hay que respetar:
   izquierda y 3,7 px por debajo. `AJUSTE_LOGO` lo compensa. El efecto es que la
   caja queda algo alta, y es inevitable: en una forma asimétrica centrar la masa
   y centrar la caja son cosas distintas, y manda la masa.
-- **Los altos salen del contenido, no de una cifra redonda**: dos líneas de
-  titular más el crédito son ~143 px, y la franja mide 180. Llegó a medir 260 y
-  eran más de 100 px tapando video para nada. La banda baja no puede encogerse
-  en la misma proporción porque su suelo lo marca el círculo del logo más el
-  handle, no el texto.
+- **La franja crece con el texto y no tiene tope de líneas.** El titular puede
+  ocupar dos, tres, cuatro o más, y la banda se hace más alta para acomodarlo.
+  Solo tiene suelo (`ALTO_MINIMO_FRANJA`, 150 px), y no lo marca el texto sino
+  el círculo del logo más el handle, que tienen que caber dentro; con dos
+  líneas y crédito la franja sale en ~176 px, a un pelo de los 180 que medía
+  cuando el alto era fijo. Llegó a medir 260 y eran más de 100 px tapando video para
+  nada, así que crecer sí, pero desde el contenido.
+- **El alto del PNG se estima, y se estima por lo bajo a propósito.** Satori
+  exige el alto del lienzo *antes* de maquetar, así que no hay forma de
+  preguntarle cuántas líneas salieron: `altoFranja()` las calcula a mano
+  dividiendo el titular entre `CARACTERES_POR_LINEA`, un número deliberadamente
+  corto, más una línea de holgura. Los dos errores no cuestan igual —
+  quedarse corto recortaría el titular, mientras que pasarse solo deja lienzo
+  transparente de más, y ese no se ve: Cloudinary ancla la capa por su borde
+  inferior (`gravity: south`), de modo que unos píxeles vacíos arriba no mueven
+  la franja. No lo "afines" a una medida exacta: la holgura es la red.
+- **El texto va centrado en el hueco que queda a la derecha del logo**, tanto el
+  titular como el crédito que lo acompaña. Hacen falta `justifyContent` **y**
+  `textAlign` en cada `span`: el primero coloca la línea suelta (una sola línea
+  es un único hijo del flex) y el segundo alinea las demás cuando el texto
+  envuelve, y heredadas del contenedor no llegan a todos — verificado, el
+  crédito se quedaba a la izquierda. La caja se deja a ancho completo y se
+  centra el texto dentro; encogerla al contenido la mediría a línea completa y
+  un titular largo se saldría en vez de envolver. La variante de solo crédito
+  no se centra: ahí esa línea es toda la franja y sigue a la izquierda.
 - **El cintillo se decide por video, no por post**: cada clip de un carrusel y
   el Reel llevan su propia `MarcaVideo` (`titulo`, `fuente`, `segundos`). Los
   tres campos son opcionales porque en la cola hay posts programados antes de
@@ -623,8 +780,11 @@ Lo que hay que respetar:
 - `previewNewsVideoPost` compone las dos URLs **en serie, no con `Promise.all`**:
   las dos resuelven el mismo cintillo, y en paralelo lo generaban y lo subían dos
   veces a la vez.
-- `MAX_TITULO` recorta por caracteres y no con `line-clamp`, que Satori no
-  implementa: sin tope, un titular largo empuja la caja y se sale del lienzo.
+- `MAX_TITULO` ya **no** es el límite de dos líneas que fue: es un tope de
+  seguridad alto (200 caracteres, ~8 líneas). Pasado ahí la banda taparía medio
+  video y un titular así ya no se lee de pasada, que es para lo que existe el
+  cintillo. Sigue recortando por caracteres porque Satori no implementa
+  `line-clamp`.
 - El margen inferior se calcula **proporcional a la altura del lienzo**
   (`yDelCintillo`), por el mismo motivo que `yDelSello`: los tres formatos
   comparten anchura pero no altura. Un mismo PNG sirve para los tres.
@@ -665,6 +825,12 @@ la otra protege los endpoints de publicación/cron. La sesión es una cookie
 `CRON_SECRET` nunca llega al navegador: `/admin/noticia` lo usa solo del lado
 servidor, a través de `publishNewsPost`.
 
+Cuelgan dos páginas de esa misma sesión: `/admin/noticia` y `/admin/semanal`,
+enlazadas entre sí desde la cabecera. Son páginas separadas y no dos pestañas de
+una porque la primera es un formulario con estado propio —switch Post/Reel,
+subidas, previa desactualizada, cola— y el reporte semanal **no tiene entradas**:
+se mira y se publica.
+
 ## Cómo trabajar en este proyecto
 
 ### Estilos
@@ -702,12 +868,13 @@ desplegar a mano.
 ### Probar las marcas en local, sin publicar ni pasar por `/admin`
 
 La app marca **cinco piezas**, y todas se pueden revisar sin publicar nada. Los
-dos scripts se reparten el trabajo:
+tres scripts se reparten el trabajo:
 
 | Script | Para qué | Necesita `npm run dev` |
 | --- | --- | --- |
 | `scripts/preview-noticia.ts <url>` | Un artículo real: imagen enmarcada + caption | Sí |
 | `scripts/preview-marca.ts <archivo>` | Material propio: marcos, video en sus tres lienzos, sello y cintillo | Solo para las de imagen |
+| `scripts/preview-semanal.ts` | El reporte semanal: caption y las dos URLs (1:1 y 9:16) | Sí |
 
 ```bash
 # Artículo real: imprime el caption y una URL firmada de la imagen
@@ -723,6 +890,10 @@ npx tsx scripts/preview-marca.ts clip.mp4     # video en 1:1, 4:5 y Reel, con su
 --proporcion 1:1|4:5  # lienzo del marco de imagen
 --segundo N           # de qué segundo se saca el fotograma del video
 --public-id <id> --tipo imagen|video   # reusa algo ya subido, sin volver a subirlo
+
+# Reporte semanal: imprime el caption y las dos URLs (no lleva firma)
+npx tsx scripts/preview-semanal.ts
+npx tsx scripts/preview-semanal.ts --sin-historico   # la degradación del arranque
 ```
 
 **Qué compone cada pieza y dónde se edita:**
@@ -734,6 +905,7 @@ npx tsx scripts/preview-marca.ts clip.mp4     # video en 1:1, 4:5 y Reel, con su
 | Video (1:1, 4:5 y Reel 9:16) | Cloudinary, transformación por URL | `lib/providers/cloudinary.ts` |
 | Sello de marca sobre el video | Cloudinary, capa fija ya subida | el mismo (`SELLO_PUBLIC_ID`, `yDelSello`) |
 | Cintillo del video | Satori, PNG transparente que Cloudinary superpone | `lib/og-cintillo.tsx` |
+| Reporte semanal (1:1 y 9:16) | Satori, sin firma; las filas salen de `lib/semanal.ts` | `app/api/og/instagram-semanal/route.tsx` |
 
 **Cómo pedir cada variante del video**, que es lo que más se confunde:
 
@@ -765,10 +937,12 @@ para ver si el overlay quedó bien es mucho más lento.
 
 **Requisitos y avisos:**
 
-- Los dos scripts leen `.env.local` y **se corren desde la raíz del repo**
+- Los tres scripts leen `.env.local` y **se corren desde la raíz del repo**
   (`asegurarLogo()` lee `public/icon-512.png` relativo al directorio de trabajo).
 - `preview-noticia.ts` necesita `CRON_SECRET`. `preview-marca.ts` necesita además
-  las tres `CLOUDINARY_*`.
+  las tres `CLOUDINARY_*`. `preview-semanal.ts` necesita `SUPABASE_URL` y
+  `SUPABASE_SERVICE_ROLE_KEY` para leer el histórico, salvo con
+  `--sin-historico`, que no consulta nada.
 - `npm run dev` hace falta **solo para las URLs de imagen**; las de video las
   sirve Cloudinary directamente.
 - Cada corrida sin `--public-id` gasta almacenamiento del plan gratuito (25
@@ -778,10 +952,11 @@ para ver si el overlay quedó bien es mucho más lento.
 - Si una URL de imagen contesta **403**, el conjunto firmado y el enviado no
   coinciden: es lo que pasaba cuando los scripts firmaban sin `proporcion`
   después de que la ruta empezara a incluirla siempre.
-- **Ninguno de los dos publica nada.** Solo publican de verdad
-  `POST /api/publish-instagram-news` y los botones de `/admin/noticia`.
-- Para probar `/admin/noticia` en sí —y no solo el render— hace falta además
-  `ADMIN_PASSWORD` en `.env.local`.
+- **Ninguno de los tres publica nada.** Solo publican de verdad
+  `POST /api/publish-instagram-news` y los botones de `/admin/noticia` y
+  `/admin/semanal`.
+- Para probar `/admin/noticia` o `/admin/semanal` en sí —y no solo el render—
+  hace falta además `ADMIN_PASSWORD` en `.env.local`.
 
 ### El entorno de desarrollo
 

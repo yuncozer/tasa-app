@@ -5,6 +5,9 @@ import { useState } from "react";
 import type { PublicacionPayload } from "@/lib/publish-news";
 import { formatClock, formatDate, horaCaracasDesdeIso, isoDesdeHoraCaracas } from "@/lib/format";
 
+/** Espera entre cada sondeo de "Publicar ahora", para no encadenar peticiones sin pausa. */
+const PAUSA_ENTRE_SONDEOS_MS = 1_000;
+
 export interface ProgramadaVista {
   id: string;
   publicarEn: string;
@@ -157,6 +160,10 @@ export function ColaProgramadas({
         break;
       }
       setEnCurso({ id, texto: datos?.texto ?? "Publicando…" });
+      // El servidor ya se toma su propio margen internamente mientras Meta
+      // procesa; esta pausa es solo para no encadenar peticiones del
+      // navegador tan rápido como el servidor conteste.
+      await new Promise((resolver) => setTimeout(resolver, PAUSA_ENTRE_SONDEOS_MS));
     }
 
     setEnCurso(null);

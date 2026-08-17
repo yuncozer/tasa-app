@@ -1,8 +1,39 @@
 import type { NextConfig } from "next";
+import { enlaceWhatsapp, perfilInstagram } from "./lib/atajos";
 
 const nextConfig: NextConfig = {
+  /**
+   * Los atajos del dominio que llevan siempre al mismo sitio. `/hoy` **no**
+   * está aquí: su destino cambia dos veces al día y esto se evalúa al
+   * compilar, así que vive en `app/hoy/page.tsx`, que además le pone vista
+   * previa propia.
+   */
+  async redirects() {
+    const whatsapp = enlaceWhatsapp();
+
+    return [
+      {
+        source: "/ig",
+        destination: perfilInstagram(),
+        // 307 y no 301: un permanente se queda cacheado en el navegador para
+        // siempre y dejaría sin arreglo un destino equivocado.
+        permanent: false,
+      },
+      // Sin `ENLACE_WHATSAPP` configurado la ruta no existe, en vez de llevar a
+      // un número inventado (ver `lib/atajos.ts`).
+      ...(whatsapp ? [{ source: "/wa", destination: whatsapp, permanent: false }] : []),
+    ];
+  },
+
   async headers() {
     return [
+      {
+        // El destino de este atajo cambia cada pocas horas: si la CDN se queda
+        // con una copia, el enlace que se comparte por la tarde sigue llevando
+        // al post de la mañana.
+        source: "/hoy",
+        headers: [{ key: "Cache-Control", value: "no-store" }],
+      },
       {
         // La portada es donde de verdad llega el tráfico, y Next la marca como
         // dinámica —los proveedores se consultan con `no-store`—, así que sin
