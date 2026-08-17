@@ -35,6 +35,14 @@ const nextConfig: NextConfig = {
         headers: [{ key: "Cache-Control", value: "no-store" }],
       },
       {
+        // Mismo motivo que `/hoy`: el slug se escribe en el caption antes de
+        // publicar, y el destino real se anota un instante después. Una copia
+        // en la CDN de esa primera respuesta (el respaldo al perfil) se
+        // quedaría sirviéndola aunque el post ya esté anotado.
+        source: "/p/:slug",
+        headers: [{ key: "Cache-Control", value: "no-store" }],
+      },
+      {
         // La portada es donde de verdad llega el tráfico, y Next la marca como
         // dinámica —los proveedores se consultan con `no-store`—, así que sin
         // esto cada visita despertaría una función y repetiría la ronda de

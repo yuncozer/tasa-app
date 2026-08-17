@@ -1,6 +1,7 @@
-import { buildNewsCaption } from "@/lib/caption";
+import { buildNewsCaption, conPieEnlaces } from "@/lib/caption";
+import { generarSlugPost, guardarEnlace } from "@/lib/enlaces";
 import type { ElementoCarrusel } from "@/lib/instagram";
-import { publishCarousel, publishDailyPost, publishReel } from "@/lib/instagram";
+import { permalinkDeMedia, publishCarousel, publishDailyPost, publishReel } from "@/lib/instagram";
 import { signNewsImageParams } from "@/lib/news-signature";
 import { recortarTitulo } from "@/lib/og-cintillo";
 import type { FormatoVideo, MarcaVideo } from "@/lib/providers/cloudinary";
@@ -18,6 +19,56 @@ import { esUrlValida } from "@/lib/validar-url";
 /** Proporción del post/carrusel: la elige el usuario solo cuando el primer elemento es un video. */
 export type ProporcionCarrusel = "1:1" | "4:5";
 
+function sitioUrl(): string {
+  const url = process.env.SITE_URL;
+  if (!url) throw new Error("Falta configurar SITE_URL");
+  return url;
+}
+
+/**
+ * Anota a dónde quedó el post recién publicado, bajo el slug que ya viajaba
+ * en su propio caption (`/p/<slug>`, ver `lib/enlaces.ts`). Mismo patrón que
+ * usa el cron de tasas para `/hoy`: en un `try/catch` tragado y después de
+ * publicar, porque el post ya está en la cuenta —eso es lo irreversible— y un
+ * fallo al anotar el enlace no puede convertir una publicación correcta en un
+ * error que invite a reintentar y duplique el post. Si falla, `/p/<slug>` cae
+ * a su respaldo (el perfil) y lo peor que pasa es un enlace menos preciso.
+ */
+export async function anotarEnlacePost(slug: string, mediaId: string): Promise<void> {
+  try {
+    const permalink = await permalinkDeMedia(mediaId);
+    await guardarEnlace(slug, permalink);
+  } catch {
+    // El post ya salió; el enlace corto se queda en su respaldo.
+  }
+}
+
+/**
+ * Agrega el pie de enlaces (post + calculadora + canal) a un payload de
+ * `manual`, `carrusel` o `reel`, con un slug fresco de `/p/<slug>` — `articulo`
+ * y `semanal` no pasan por aquí: el primero resuelve su propio pie dentro de
+ * `prepararPublicacion()` (necesita scrapear antes de tener un caption que
+ * envolver) y el segundo no lleva enlace a un post propio.
+ *
+ * Es el único punto donde esto ocurre para estos tres tipos, y se llama
+ * exactamente una vez por publicación real: al ejecutarla de un tirón
+ * (`ejecutarPublicacion`) o al congelarla para la cola
+ * (`materializarParaProgramar`). `conPieEnlaces` quita cualquier pie previo
+ * antes de poner uno nuevo, así que llamarlo de nuevo sobre un payload editado
+ * no va acumulando pies.
+ */
+async function conEnlacePost(payload: PublicacionPayload): Promise<PublicacionPayload> {
+  if (payload.tipo === "articulo" || payload.tipo === "semanal") return payload;
+
+  const slug = generarSlugPost();
+  const destino = `${sitioUrl()}/p/${slug}`;
+
+  if (payload.tipo === "manual") {
+    return { ...payload, slugEnlace: slug, datos: { ...payload.datos, caption: conPieEnlaces(payload.datos.caption, destino) } };
+  }
+  return { ...payload, slugEnlace: slug, caption: conPieEnlaces(payload.caption, destino) };
+}
+
 /**
  * Arma la URL firmada de `instagram-post-news`. El título es opcional: las
  * diapositivas secundarias de un carrusel no lo llevan (ni la fecha), porque
@@ -33,9 +84,6 @@ function armarUrlImagenFirmada(params: {
   source: string;
   proporcion?: ProporcionCarrusel;
 }): string {
-  const siteUrl = process.env.SITE_URL;
-  if (!siteUrl) throw new Error("Falta configurar SITE_URL");
-
   const proporcion = params.proporcion ?? "1:1";
   // Sin título, la clave se omite del todo en vez de ir vacía: la ruta firma
   // exactamente los parámetros que recibe, y un `title=` de más no cuadraría.
@@ -44,7 +92,7 @@ function armarUrlImagenFirmada(params: {
     : { image: params.image, source: params.source, proporcion };
 
   const sig = signNewsImageParams(firmados);
-  const url = new URL(`${siteUrl}/api/og/instagram-post-news`);
+  const url = new URL(`${sitioUrl()}/api/og/instagram-post-news`);
   for (const [key, value] of Object.entries(firmados)) url.searchParams.set(key, value);
   url.searchParams.set("sig", sig);
   return url.toString();
@@ -97,7 +145,12 @@ export async function publishNewsPost(
   imagenPropiaPublicId?: string,
 ): Promise<{ mediaId: string }> {
   const { imageUrl, caption } = await buildNewsPost(url, imagenPropiaPublicId);
-  return publishDailyPost(imageUrl, captionOverride ?? caption);
+  const slug = generarSlugPost();
+  const captionFinal = conPieEnlaces(captionOverride ?? caption, `${sitioUrl()}/p/${slug}`);
+
+  const resultado = await publishDailyPost(imageUrl, captionFinal);
+  await anotarEnlacePost(slug, resultado.mediaId);
+  return resultado;
 }
 
 /**
@@ -375,12 +428,22 @@ export async function publishNewsCarouselPost(
  * Existe para que publicar al instante y publicar programado sean **el mismo
  * camino**: si divergieran, lo que sale a la hora programada dejaría de ser lo
  * que se probó con el botón "Publicar".
+ *
+ * `slugEnlace` es el slug de `/p/<slug>` que ya viaja embebido en el `caption`
+ * (`conEnlacePost()`, más abajo, lo agrega junto con el pie de enlaces).
+ * `articulo` no lo lleva porque el suyo se resuelve dentro de
+ * `prepararPublicacion()` en el momento de publicar —esta forma nunca llega a
+ * la cola, `materializarParaProgramar` la convierte en `manual` antes de
+ * guardarla—. Para las otras tres, viajar en el propio payload es lo que le
+ * permite sobrevivir el paso por Supabase: sin él, cuando el disparo del cron
+ * que por fin publica esta fila obtiene el `mediaId`, no habría forma de saber
+ * bajo qué slug anotar el permalink real.
  */
 export type PublicacionPayload =
   | { tipo: "articulo"; url: string; caption?: string; imagenPublicId?: string }
-  | { tipo: "manual"; datos: NoticiaManual }
-  | { tipo: "carrusel"; datos: CarruselEntrada; caption: string }
-  | ({ tipo: "reel"; videoPublicId: string; caption: string } & MarcaVideo)
+  | { tipo: "manual"; datos: NoticiaManual; slugEnlace?: string }
+  | { tipo: "carrusel"; datos: CarruselEntrada; caption: string; slugEnlace?: string }
+  | ({ tipo: "reel"; videoPublicId: string; caption: string } & MarcaVideo & { slugEnlace?: string })
   /**
    * El reporte semanal. No lleva datos porque la imagen se genera al publicar,
    * leyendo las tasas y el histórico del servidor: lo único que hace falta es
@@ -444,24 +507,36 @@ export function resumenPublicacion(payload: PublicacionPayload): string {
  * programadas necesita hacerlo en un disparo y publicar en otro.
  */
 export type PublicacionPreparada =
-  | { tipo: "imagen"; imageUrl: string; caption: string }
-  | { tipo: "reel"; videoUrl: string; caption: string }
-  | { tipo: "carrusel"; elementos: ElementoCarrusel[]; caption: string };
+  | { tipo: "imagen"; imageUrl: string; caption: string; slugEnlace?: string }
+  | { tipo: "reel"; videoUrl: string; caption: string; slugEnlace?: string }
+  | { tipo: "carrusel"; elementos: ElementoCarrusel[]; caption: string; slugEnlace?: string };
 
 /** Resuelve el payload a URLs, sin tocar la API de Instagram. */
 export async function prepararPublicacion(payload: PublicacionPayload): Promise<PublicacionPreparada> {
   switch (payload.tipo) {
     case "articulo": {
       const { imageUrl, caption } = await buildNewsPost(payload.url, payload.imagenPublicId);
-      return { tipo: "imagen", imageUrl, caption: payload.caption ?? caption };
+      const slug = generarSlugPost();
+      const captionFinal = conPieEnlaces(payload.caption ?? caption, `${sitioUrl()}/p/${slug}`);
+      return { tipo: "imagen", imageUrl, caption: captionFinal, slugEnlace: slug };
     }
     case "manual":
-      return { tipo: "imagen", ...previewManualNewsPost(payload.datos), caption: payload.datos.caption };
+      return {
+        tipo: "imagen",
+        ...previewManualNewsPost(payload.datos),
+        caption: payload.datos.caption,
+        slugEnlace: payload.slugEnlace,
+      };
     case "carrusel":
-      return { tipo: "carrusel", elementos: await buildCarousel(payload.datos), caption: payload.caption };
+      return {
+        tipo: "carrusel",
+        elementos: await buildCarousel(payload.datos),
+        caption: payload.caption,
+        slugEnlace: payload.slugEnlace,
+      };
     case "reel": {
       const { videoUrl } = await previewNewsVideoPost(payload.videoPublicId, payload);
-      return { tipo: "reel", videoUrl, caption: payload.caption };
+      return { tipo: "reel", videoUrl, caption: payload.caption, slugEnlace: payload.slugEnlace };
     }
     case "semanal":
       return { tipo: "imagen", imageUrl: urlReporteSemanal("1:1"), caption: payload.caption };
@@ -489,15 +564,23 @@ export function urlReporteSemanal(proporcion: "1:1" | "9:16"): string {
  * cron, porque un carrusel con video no cabe en el tope de una función.
  */
 export async function ejecutarPublicacion(payload: PublicacionPayload): Promise<{ mediaId: string }> {
-  const preparada = await prepararPublicacion(payload);
+  const preparada = await prepararPublicacion(await conEnlacePost(payload));
+
+  let resultado: { mediaId: string };
   switch (preparada.tipo) {
     case "imagen":
-      return publishDailyPost(preparada.imageUrl, preparada.caption);
+      resultado = await publishDailyPost(preparada.imageUrl, preparada.caption);
+      break;
     case "reel":
-      return publishReel(preparada.videoUrl, preparada.caption);
+      resultado = await publishReel(preparada.videoUrl, preparada.caption);
+      break;
     case "carrusel":
-      return publishCarousel(preparada.elementos, preparada.caption);
+      resultado = await publishCarousel(preparada.elementos, preparada.caption);
+      break;
   }
+
+  if (preparada.slugEnlace) await anotarEnlacePost(preparada.slugEnlace, resultado.mediaId);
+  return resultado;
 }
 
 /**
@@ -520,6 +603,11 @@ export function leerPublicacionPayload(valor: unknown): PublicacionPayload | nul
     };
   }
 
+  // El slug ya viaja dentro del propio caption (es el `/p/<slug>` del pie de
+  // enlaces); esta copia aparte es lo que le permite al worker de la cola
+  // saber bajo cuál anotar el permalink real sin tener que parsear el texto.
+  const slugEnlace = (v: unknown) => texto((v as { slugEnlace?: unknown } | null)?.slugEnlace) || undefined;
+
   if (p?.tipo === "manual") {
     const d = (p as { datos?: NoticiaManual }).datos;
     const datos = {
@@ -529,7 +617,7 @@ export function leerPublicacionPayload(valor: unknown): PublicacionPayload | nul
       imagenPublicId: texto(d?.imagenPublicId),
     };
     if (!datos.title || !datos.sourceHost || !datos.caption || !datos.imagenPublicId) return null;
-    return { tipo: "manual", datos };
+    return { tipo: "manual", datos, slugEnlace: slugEnlace(p) };
   }
 
   if (p?.tipo === "carrusel") {
@@ -548,6 +636,7 @@ export function leerPublicacionPayload(valor: unknown): PublicacionPayload | nul
       tipo: "carrusel",
       datos: { title: title || undefined, sourceHost, principal, elementos, proporcion },
       caption,
+      slugEnlace: slugEnlace(p),
     };
   }
 
@@ -559,7 +648,7 @@ export function leerPublicacionPayload(valor: unknown): PublicacionPayload | nul
     // La marca va opcional a propósito: las filas programadas antes de que
     // existieran el crédito y el cintillo no los traen y tienen que seguir
     // publicándose igual.
-    return { tipo: "reel", videoPublicId, caption, ...leerMarcaVideo(p) };
+    return { tipo: "reel", videoPublicId, caption, slugEnlace: slugEnlace(p), ...leerMarcaVideo(p) };
   }
 
   if (p?.tipo === "semanal") {
@@ -596,32 +685,40 @@ export async function materializarParaProgramar(
 
   await calentarVideo(payload);
 
+  let resuelto: PublicacionPayload;
+
   if (payload.tipo === "articulo") {
     const article = await fetchArticle(payload.url);
-    return {
+    resuelto = {
       tipo: "manual",
       datos: {
         title: article.title,
         sourceHost: article.sourceHost,
+        // Sin pie todavía: lo agrega `conEnlacePost` más abajo, igual que al
+        // resto de los tipos, con un slug propio.
         caption: payload.caption ?? buildNewsCaption(article),
         imagenPublicId: payload.imagenPublicId ?? (await subirDesdeUrl(article.imageUrl)),
       },
     };
-  }
-
-  if (payload.tipo === "carrusel" && payload.datos.principal.tipo === "articulo") {
+  } else if (payload.tipo === "carrusel" && payload.datos.principal.tipo === "articulo") {
     const article = await fetchArticle(payload.datos.principal.url);
-    return {
+    resuelto = {
       ...payload,
       datos: {
         ...payload.datos,
         principal: { tipo: "subida", publicId: await subirDesdeUrl(article.imageUrl) },
       },
     };
+  } else {
+    // `manual` y `reel` ya viven enteros en Cloudinary.
+    resuelto = payload;
   }
 
-  // `manual` y `reel` ya viven enteros en Cloudinary.
-  return payload;
+  // Último paso, para los tres tipos por igual: el pie de enlaces con un slug
+  // fresco de `/p/<slug>`, que viaja dentro del payload congelado para que el
+  // disparo del cron que por fin publique esta fila sepa bajo qué slug anotar
+  // el permalink real.
+  return conEnlacePost(resuelto);
 }
 
 /**

@@ -1,4 +1,5 @@
-import { buildNewsCaption } from "../lib/caption";
+import { buildNewsCaption, conPieEnlaces } from "../lib/caption";
+import { generarSlugPost } from "../lib/enlaces";
 import { signNewsImageParams } from "../lib/news-signature";
 import { fetchArticle } from "../lib/providers/news";
 import { cargarEnvLocal } from "./_env";
@@ -35,7 +36,14 @@ async function main() {
   };
   const sig = signNewsImageParams(params);
   const qs = new URLSearchParams({ ...params, sig }).toString();
-  const caption = buildNewsCaption(article);
+
+  // El pie de enlaces (post + calculadora + canal) no lo agrega
+  // `buildNewsCaption`: se suma al publicar de verdad, con un slug propio de
+  // `/p/<slug>`. Aquí se genera uno solo para que el caption impreso se vea
+  // igual que el que de verdad saldría a publicar.
+  const slug = generarSlugPost();
+  const siteUrl = process.env.SITE_URL ?? "http://localhost:3000";
+  const caption = conPieEnlaces(buildNewsCaption(article), `${siteUrl}/p/${slug}`);
 
   console.log("--- Imagen (ábrela en el navegador) ---");
   console.log(`http://localhost:3000/api/og/instagram-post-news?${qs}`);

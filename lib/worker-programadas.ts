@@ -8,7 +8,7 @@ import {
 } from "@/lib/instagram";
 import type { ContenedoresProgramada, FaseProgramada, Programada } from "@/lib/programadas";
 import { cerrarProgramada, guardarAvance, liberarProgramada } from "@/lib/programadas";
-import { leerPublicacionPayload, prepararPublicacion } from "@/lib/publish-news";
+import { anotarEnlacePost, leerPublicacionPayload, prepararPublicacion } from "@/lib/publish-news";
 
 /**
  * Avanza una publicación de la cola por fases, dejando anotado en la fila por
@@ -141,6 +141,17 @@ export async function avanzarPublicacion(programada: Programada): Promise<Result
       if (!contenedores.padre) throw new Error("Falta el contenedor por publicar");
       const mediaId = await publicarContenedor(contenedores.padre);
       await cerrarProgramada(programada.id, { mediaId });
+
+      // El slug ya viaja en el propio caption desde que se programó
+      // (`materializarParaProgramar` → `conEnlacePost`); aquí solo se anota a
+      // dónde quedó, igual que hace `ejecutarPublicacion` para el botón
+      // inmediato.
+      const slugEnlace =
+        payload.tipo === "manual" || payload.tipo === "carrusel" || payload.tipo === "reel"
+          ? payload.slugEnlace
+          : undefined;
+      if (slugEnlace) await anotarEnlacePost(slugEnlace, mediaId);
+
       return { estado: "publicada", mediaId };
     }
   } catch (error) {

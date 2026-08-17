@@ -1,4 +1,4 @@
-import { enlaceWhatsapp } from "@/lib/atajos";
+import { conPieEnlaces } from "@/lib/caption";
 
 /**
  * Arma el mensaje para el canal de WhatsApp a partir del caption ya publicado
@@ -9,38 +9,14 @@ import { enlaceWhatsapp } from "@/lib/atajos";
  * que arriesga el número por violar los términos de servicio — así que el
  * envío es manual. Esta función solo da formato: el admin copia el resultado
  * y lo pega a mano en el canal.
+ *
+ * Todo caption ya publicado (diario o de noticia) termina con el mismo pie de
+ * enlaces (`pieEnlaces` en `lib/caption.ts`), pero apuntando a `/hoy` o
+ * `/p/<slug>` — un atajo, porque al armar el caption el permalink real
+ * todavía no existe. Aquí sí lo tenemos (`permalinkPost` sale de la Graph
+ * API, del post que se está mirando), así que `conPieEnlaces` reconstruye el
+ * mismo pie pero con el enlace directo en vez del atajo.
  */
-
-function sitioUrl(): string {
-  const url = process.env.SITE_URL;
-  if (!url) throw new Error("Falta configurar SITE_URL");
-  return url;
-}
-
-/**
- * Los tres constructores de caption (`lib/caption.ts`) siempre terminan el
- * cuerpo con una línea en blanco y después los hashtags en un único párrafo.
- * El mensaje del canal no los necesita —ahí no cumplen ninguna función—, así
- * que se descarta el último bloque si es justo eso.
- */
-function quitarHashtags(caption: string): string {
-  const bloques = caption.split("\n\n");
-  const ultimo = bloques[bloques.length - 1];
-  if (ultimo?.trimStart().startsWith("#")) bloques.pop();
-  return bloques.join("\n\n");
-}
-
 export function formatMensajeCanal(input: { caption: string | null; permalinkPost: string }): string {
-  const cuerpo = input.caption ? quitarHashtags(input.caption) : "";
-  const canal = enlaceWhatsapp();
-
-  // La línea del canal se omite si no está configurado, en vez de inventar un
-  // enlace — mismo criterio que ya usa `enlaceWhatsapp()` en `next.config.ts`.
-  const pie = [
-    `👉 Post completo: ${input.permalinkPost}`,
-    `🧮 Calculadora: ${sitioUrl()}`,
-    canal ? `📢 Únete al canal: ${canal}` : null,
-  ].filter((linea): linea is string => linea !== null);
-
-  return [cuerpo, pie.join("\n")].filter((bloque) => bloque.length > 0).join("\n\n");
+  return conPieEnlaces(input.caption ?? "", input.permalinkPost);
 }

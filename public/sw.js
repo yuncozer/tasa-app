@@ -10,7 +10,7 @@
  * respuesta de `/api/` desde la caché, porque ahí sí pasaría por fresca.
  */
 
-const VERSION = "v4";
+const VERSION = "v5";
 const ATAJOS = ["/hoy", "/ig", "/wa"];
 const CACHE_PAGINA = `latasa-pagina-${VERSION}`;
 const CACHE_ESTATICOS = `latasa-estaticos-${VERSION}`;
@@ -142,8 +142,10 @@ self.addEventListener("fetch", (event) => {
 
   // Los atajos del dominio los resuelve el servidor: a dónde llevan cambia
   // cada pocas horas, y la copia guardada de la portada no lo sabe. Sin esto
-  // /hoy mostraría la portada en vez de abrir el post del día.
-  if (ATAJOS.includes(url.pathname)) return;
+  // /hoy mostraría la portada en vez de abrir el post del día. `/p/` es la
+  // misma idea pero con un slug por post en vez de una ruta fija, así que se
+  // deja pasar por prefijo.
+  if (ATAJOS.includes(url.pathname) || url.pathname.startsWith("/p/")) return;
 
   if (request.mode === "navigate") {
     event.respondWith(portada(request));

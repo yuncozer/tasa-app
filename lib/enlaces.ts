@@ -11,13 +11,33 @@
  * exponerse con prefijo `NEXT_PUBLIC_`.
  */
 
+import { randomBytes } from "node:crypto";
 import { perfilInstagram } from "@/lib/atajos";
 import { esUrlValida } from "@/lib/validar-url";
 
 const TIMEOUT_MS = 10_000;
 const TABLA = "enlaces";
 
-export type ClaveEnlace = "hoy";
+/**
+ * `"hoy"` es la única clave fija; el resto son slugs de post
+ * (`generarSlugPost()`), uno por publicación de noticia. No vale la pena un
+ * tipo literal por cada uno como con `"hoy"` — son opacos por diseño.
+ */
+export type ClaveEnlace = string;
+
+/**
+ * Slug corto y opaco para `/p/<slug>`, el atajo de un post de noticia —el
+ * mismo papel que `/hoy` cumple para el post diario, pero uno por post en vez
+ * de uno fijo, porque en un mismo día puede salir más de una noticia.
+ *
+ * Se genera **antes** de publicar y va dentro del caption; el permalink real
+ * se anota después (`guardarEnlace`), igual que ya hace el cron de tasas con
+ * `/hoy`. 6 bytes en base64url dan slugs de 8 caracteres, sin choques
+ * prácticos para el volumen de esta cuenta.
+ */
+export function generarSlugPost(): string {
+  return randomBytes(6).toString("base64url");
+}
 
 interface FilaEnlace {
   clave: string;
@@ -107,6 +127,25 @@ export async function destinoDeHoy(): Promise<string> {
 
   const deEntorno = process.env.ENLACE_HOY;
   if (esUrlValida(deEntorno)) return deEntorno;
+
+  return perfilInstagram();
+}
+
+/**
+ * A dónde manda `/p/<slug>`, el atajo de un post de noticia.
+ *
+ * Solo dos respaldos y no tres como `/hoy`: no hay variable de entorno que
+ * tenga sentido para un slug que no existía hasta que se publicó ese post en
+ * concreto. Si el slug no está anotado todavía —el post se está publicando en
+ * este mismo instante— o Supabase falla, cae directo al perfil.
+ */
+export async function destinoDePost(slug: string): Promise<string> {
+  try {
+    const anotado = await leerEnlace(slug);
+    if (esUrlValida(anotado)) return anotado;
+  } catch {
+    // Igual que en `destinoDeHoy`: un Supabase caído no debe tumbar el enlace.
+  }
 
   return perfilInstagram();
 }

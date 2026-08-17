@@ -217,6 +217,87 @@ pesos después.
   aproximación sobre Binance. Las demás filas no la llevan porque su nombre ya
   la dice ("Dólar BCV", "Dólar Binance", "Dólar TRM"). El texto se lee de
   `rate.source`, no se escribe a mano.
+- El pie del caption enlaza tres sitios —el post del día, la calculadora y el
+  canal de WhatsApp— con URLs reales, no "link en la bio". Ver la sección de
+  abajo sobre `/p/<slug>`: el mismo mecanismo lo comparte con los posts de
+  noticia.
+
+### Cada post enlaza al post, a la calculadora y al canal — con `/p/<slug>`
+
+Todo caption que no sea el reporte semanal termina con el mismo pie de tres
+enlaces (`pieEnlaces()` en `lib/caption.ts`):
+
+```
+📲 ¿Quieres ver la publicación de hoy con las tasas actualizadas?
+👉 <enlace del post>
+
+🧮 Calculadora de divisas completa:
+👉 <SITE_URL>
+
+📢 Únete a nuestro canal oficial de WhatsApp:
+👉 <SITE_URL>/wa
+```
+
+El bloque del canal se omite si `ENLACE_WHATSAPP` no está configurado, mismo
+criterio que ya usaba `enlaceWhatsapp()` para la ruta `/wa` — no publicar un
+enlace que no lleva a ningún sitio.
+
+- **El enlace del post nunca es el permalink directo.** El caption se manda a
+  Meta *antes* de publicar, y el permalink (`instagram.com/p/…`) no existe
+  hasta después — Instagram no deja editarlo luego. El post diario ya
+  resolvía esto con `/hoy`: un atajo que se escribe en el caption de
+  antemano y se anota después de publicar. `/p/<slug>` (`app/p/[slug]/page.tsx`,
+  `lib/enlaces.ts`) generaliza esa misma idea a los posts de noticia, que
+  —a diferencia del diario— no tienen una sola ruta fija: puede salir más de
+  uno el mismo día. `generarSlugPost()` da un slug opaco de 8 caracteres
+  (`randomBytes(6)` en base64url) antes de publicar; `anotarEnlacePost()` en
+  `lib/publish-news.ts` anota el permalink real después, en un `try/catch`
+  tragado y aparte de la publicación — mismo motivo que `/hoy`: el post ya
+  está en la cuenta, y un fallo al anotar el enlace no puede convertir una
+  publicación correcta en un error que invite a duplicarla. Si falla, o si
+  alguien abre el enlace en el instante entre publicar y anotarlo,
+  `destinoDePost()` cae al perfil de Instagram — no hay variable de entorno
+  de respaldo como `ENLACE_HOY`, porque no tiene sentido una para un slug que
+  no existía hasta ese post en concreto.
+- **`/p/[slug]/page.tsx` es una página con `<meta refresh>`, no una
+  redirección 307** — igual que `/hoy` y por el mismo motivo: este enlace
+  viaja en el mensaje que se pega en el canal de WhatsApp, y el rastreador que
+  arma la vista previa sigue una redirección de servidor hasta Instagram,
+  donde se encuentra el muro de login sin `og:image`. La tarjeta tiene que
+  salir de este dominio. A diferencia de `/hoy`, no lleva una imagen propia de
+  vista previa (evita otra vuelta de columnas en Supabase); es una tarjeta
+  genérica de "La Tasa".
+- **El pie se agrega en un solo sitio para los cuatro tipos de post**
+  (articulo, manual, carrusel, reel): `conEnlacePost()` en
+  `lib/publish-news.ts`, llamada exactamente una vez por publicación real —al
+  ejecutarla de un tirón (`ejecutarPublicacion`) o al congelarla para la cola
+  (`materializarParaProgramar`). Ninguna función de caption (`buildNewsCaption`,
+  ni el `caption` que el admin teclea a mano en `/admin/noticia` para
+  manual/carrusel/reel) lo incluye por su cuenta: así no hay que duplicar la
+  lógica del pie ni el criterio de cuándo omitir el canal en cada plantilla.
+  `conPieEnlaces()` quita cualquier pie anterior antes de poner uno nuevo
+  (busca el bloque que empieza con la primera línea del pie), así que se
+  puede llamar de nuevo sobre un caption editado sin ir acumulando pies.
+- **Para el post diario y `articulo` con `captionOverride`, el pie también se
+  agrega siempre**, sin excepción — a diferencia de los hashtags que llevaba
+  antes el caption de noticia, que si el admin sobreescribía el texto
+  desaparecían con él. Se decidió así por simplicidad: un caption sin estos
+  tres enlaces es la excepción que nadie pidió, y mantener dos comportamientos
+  distintos según haya o no `captionOverride` habría sido más código para un
+  caso que no vale la pena.
+- **La cola de programadas necesita el slug de vuelta.** `avanzarPublicacion()`
+  en `lib/worker-programadas.ts` obtiene el `mediaId` en un disparo del cron
+  que puede ser horas después de haberse programado, así que el slug generado
+  al congelar el payload viaja dentro de él (`PublicacionPayload.slugEnlace`,
+  un campo más del JSON, sin migración) para que ese disparo sepa bajo cuál
+  anotar el permalink. `articulo` no lo lleva: nunca llega a la cola —
+  `materializarParaProgramar` lo convierte en `manual` antes de guardarlo—, y
+  resuelve su propio slug dentro de `prepararPublicacion()` en el momento de
+  publicar, porque solo ahí se sabe si hubo `captionOverride`.
+- El service worker deja pasar `/p/` **por prefijo** y no por ruta exacta como
+  el resto de `ATAJOS` en `public/sw.js`, porque cada post tiene su propio
+  slug. Al tocar eso se sube `VERSION`, igual que con cualquier cambio de
+  estrategia.
 
 ### El reporte semanal necesita memoria, y de ahí sale el histórico
 
@@ -864,13 +945,14 @@ pegar a mano en el canal. El envío lo sigue haciendo el admin.
   junte tasas diarias, noticias y reporte semanal en un solo lugar: la cuenta
   de Instagram ya es esa lista.
 - **`formatMensajeCanal` (`lib/canal-whatsapp.ts`) solo dice formato, no
-  contenido.** Parte del caption ya publicado, le quita el bloque de
-  hashtags —los tres constructores de `lib/caption.ts` siempre lo separan del
-  cuerpo con una línea en blanco, así que alcanza con partir por `"\n\n"` y
-  descartar el último bloque si empieza con `#`— y agrega el enlace del post,
-  el de la calculadora (`SITE_URL`) y el del canal (`enlaceWhatsapp()`, que ya
-  se omite solo si no está configurado, mismo criterio que `/wa`). No hay IA
-  de por medio, igual que los captions de origen.
+  contenido.** Todo caption ya publicado termina con el mismo pie de tres
+  enlaces (`pieEnlaces()` en `lib/caption.ts` — ver la sección sobre
+  `/p/<slug>`), pero apuntando a un atajo (`/hoy` o `/p/<slug>`) porque al
+  armar el caption el permalink real todavía no existe. Aquí sí lo tenemos
+  —sale de la Graph API, del post que se está mirando—, así que
+  `formatMensajeCanal` es solo `conPieEnlaces(caption, permalinkPost)`:
+  reconstruye el mismo pie pero con el enlace directo en vez del atajo. No hay
+  IA de por medio, igual que los captions de origen.
 - **El texto se muestra editable, no de solo lectura**
   (`components/BotonCopiarTexto.tsx`). Es el mismo criterio que
   `captionOverride` en noticias: lo que arma la plantilla es un punto de
