@@ -825,11 +825,56 @@ la otra protege los endpoints de publicación/cron. La sesión es una cookie
 `CRON_SECRET` nunca llega al navegador: `/admin/noticia` lo usa solo del lado
 servidor, a través de `publishNewsPost`.
 
-Cuelgan dos páginas de esa misma sesión: `/admin/noticia` y `/admin/semanal`,
-enlazadas entre sí desde la cabecera. Son páginas separadas y no dos pestañas de
-una porque la primera es un formulario con estado propio —switch Post/Reel,
-subidas, previa desactualizada, cola— y el reporte semanal **no tiene entradas**:
-se mira y se publica.
+Cuelgan tres páginas de esa misma sesión —`/admin/noticia`, `/admin/semanal`
+y `/admin/canal`—, más `/admin` como menú de entrada. Siguen siendo páginas
+separadas y no pestañas de una: la primera es un formulario con estado propio
+—switch Post/Reel, subidas, previa desactualizada, cola— y el reporte semanal
+**no tiene entradas**: se mira y se publica. La nav compartida vive en
+`components/AdminNav.tsx`; antes cada página repetía a mano su enlace cruzado
+y con tres hermanas más el menú ya pesaba más duplicarla que extraerla.
+
+### El envío al canal de WhatsApp es manual, y por eso `/admin/canal`
+
+El pedido original era reenviar automáticamente cada post de Instagram al
+canal de WhatsApp de La Tasa. No se automatizó, por dos motivos verificados
+en 2026 y no una limitación de tiempo:
+
+- **Los Canales de WhatsApp no tienen API oficial de Meta.** La única forma
+  de publicar en uno por código es una librería no oficial (tipo Baileys)
+  que enlaza el número real por QR y viola los términos de servicio de
+  WhatsApp — el mismo tipo de riesgo que el proyecto ya evita en otras
+  decisiones (raspar el BCV con cuidado en vez de usar APIs de terceros
+  dudosas, no usar ffmpeg de terceros para el video). Arriesgar el número de
+  WhatsApp del negocio por automatizar un reenvío no vale la pena.
+- **La WhatsApp Business Cloud API oficial ya no es gratis para difusión.**
+  Desde julio de 2025 Meta cobra por mensaje de plantilla; solo es gratis
+  responder dentro de una ventana de 24h a alguien que ya escribió, lo que no
+  sirve para un modelo de difusión a un canal.
+
+`/admin/canal` (`app/admin/canal/page.tsx`) resuelve un flujo
+**semiautomático** en su lugar: lista los posts publicados en Instagram en
+los últimos 7 días y, al elegir uno, arma el mensaje listo para copiar y
+pegar a mano en el canal. El envío lo sigue haciendo el admin.
+
+- **La lista sale de la Graph API, no de una tabla propia**
+  (`listarMediaSemana` en `lib/instagram.ts`). Cada media de nivel superior
+  —carrusel, imagen o Reel— es exactamente un post, y Meta ya lleva ese
+  registro con `since`/`until` como filtro de fecha; duplicarlo en Supabase
+  sería mantener dos veces la misma verdad. Por lo mismo no hay tabla que
+  junte tasas diarias, noticias y reporte semanal en un solo lugar: la cuenta
+  de Instagram ya es esa lista.
+- **`formatMensajeCanal` (`lib/canal-whatsapp.ts`) solo dice formato, no
+  contenido.** Parte del caption ya publicado, le quita el bloque de
+  hashtags —los tres constructores de `lib/caption.ts` siempre lo separan del
+  cuerpo con una línea en blanco, así que alcanza con partir por `"\n\n"` y
+  descartar el último bloque si empieza con `#`— y agrega el enlace del post,
+  el de la calculadora (`SITE_URL`) y el del canal (`enlaceWhatsapp()`, que ya
+  se omite solo si no está configurado, mismo criterio que `/wa`). No hay IA
+  de por medio, igual que los captions de origen.
+- **El texto se muestra editable, no de solo lectura**
+  (`components/BotonCopiarTexto.tsx`). Es el mismo criterio que
+  `captionOverride` en noticias: lo que arma la plantilla es un punto de
+  partida, no algo intocable.
 
 ## Cómo trabajar en este proyecto
 

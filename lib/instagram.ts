@@ -166,6 +166,40 @@ export async function publicarContenedor(containerId: string): Promise<string> {
   throw new Error("No se pudo publicar el contenedor tras varios reintentos");
 }
 
+const SIETE_DIAS_MS = 7 * 24 * 60 * 60 * 1000;
+
+export interface MediaReciente {
+  id: string;
+  caption: string | null;
+  permalink: string;
+  timestamp: string;
+}
+
+/**
+ * Los posts publicados en la cuenta en los últimos 7 días, más recientes
+ * primero.
+ *
+ * Lee directo la Graph API en vez de mantener una tabla propia: cada media de
+ * nivel superior (carrusel, imagen o Reel) es exactamente un post, y Meta ya
+ * es la fuente de verdad de qué se publicó y cuándo. La usa `/admin/canal`
+ * para armar el mensaje del canal de WhatsApp a partir de un post real.
+ */
+export async function listarMediaSemana(): Promise<MediaReciente[]> {
+  const { accountId, accessToken } = credenciales();
+  const desde = Math.floor((Date.now() - SIETE_DIAS_MS) / 1000);
+
+  const url = new URL(`${GRAPH_BASE}/${accountId}/media`);
+  url.searchParams.set("fields", "id,caption,permalink,timestamp");
+  url.searchParams.set("since", String(desde));
+  url.searchParams.set("access_token", accessToken);
+
+  const res = await fetch(url, { cache: "no-store" });
+  const body = await res.json();
+  if (!res.ok) throw new InstagramApiError("No se pudo listar los posts recientes", body);
+
+  return (body.data ?? []) as MediaReciente[];
+}
+
 /**
  * Contenedores por tipo de post. Se exportan sueltos porque la cola de
  * programadas los llama por separado —crear en un disparo, sondear en el

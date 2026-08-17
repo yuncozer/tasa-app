@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
-import Link from "next/link";
 import { redirect } from "next/navigation";
+import { AdminNav } from "@/components/AdminNav";
 import { Logo } from "@/components/Logo";
 import { ReporteSemanalPanel } from "@/components/ReporteSemanalPanel";
 import { COOKIE_SESION, esSesionValida } from "@/lib/admin-session";
@@ -37,29 +37,14 @@ export default async function AdminSemanalPage() {
 
   return (
     <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-6 px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(1.5rem,env(safe-area-inset-top))] sm:px-6">
-      <header className="flex items-center justify-between gap-3">
+      <header className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <Logo className="h-8 w-8 shrink-0 text-accent" />
           <h1 className="text-xl font-bold leading-none tracking-tight">
             Reporte <span className="text-accent">semanal</span>
           </h1>
         </div>
-        <div className="flex items-center gap-2">
-          <Link
-            href="/admin/noticia"
-            className="rounded-full border border-border-soft px-3 py-1 text-xs font-medium text-muted transition active:scale-95"
-          >
-            Noticias
-          </Link>
-          <form method="POST" action="/api/admin/logout">
-            <button
-              type="submit"
-              className="rounded-full border border-border-soft px-3 py-1 text-xs font-medium text-muted transition active:scale-95"
-            >
-              Cerrar sesión
-            </button>
-          </form>
-        </div>
+        <AdminNav activa="semanal" />
       </header>
 
       <ReporteSemanalPanel
