@@ -532,6 +532,67 @@ Lo demás que hay que respetar:
   WhatsApp no se adivina y uno inventado mandaría a un chat ajeno. Sin
   `ENLACE_WHATSAPP` la ruta simplemente no existe.
 
+### La IA solo redacta prosa, y siempre con revisión humana
+
+Dos textos de `/admin` se pueden pedir a un modelo de OpenRouter (plan gratuito):
+el caption de un post de noticia y el párrafo de análisis del reporte semanal.
+Todo lo demás sigue saliendo de las plantillas de `lib/caption.ts`.
+
+- **La IA no toca ni una cifra.** Los números los calculan `convert()`,
+  `lib/pesos.ts` y `lib/semanal.ts`, y el modelo solo escribe alrededor. Es la
+  misma regla que ya gobierna el proyecto —lo que se muestra es lo que se
+  calcula— llevada a su consecuencia obvia: un modelo que redondea de memoria
+  publicaría un número que no cuadra con la calculadora, que es justo el daño
+  que esta app no puede causar. Por eso a `redactarAnalisisSemanal` se le pide
+  expresamente que **no repita** las cifras: ya están en la imagen y en las
+  líneas del caption.
+- **No hay IA en ningún cron.** Ni en el post diario de tasas ni en la cola de
+  programadas. Un modelo gratuito caído a las 9:00 no puede ser el motivo de que
+  el post del día no salga, y un texto que nadie mira no puede acabar publicado
+  en la cuenta real. La IA solo vive detrás de dos botones de `/admin`.
+- **`lib/ia.ts` nunca lanza: devuelve `null`.** Sin clave, 401, 429 por cuota
+  agotada, timeout o respuesta vacía son el mismo caso para quien llama, y la
+  respuesta a todos es la plantilla de siempre. Mismo criterio que
+  `construirReporteSemanal()`, `destinoDeHoy()` y `calentarVideo()`. Por lo
+  mismo, `/api/admin/redactar` contesta **200 con `texto: null`** cuando ningún
+  modelo respondió: no haber redactado no es un fallo de la petición, y la
+  interfaz solo tiene que decir que se queda el texto de plantilla.
+- **La lista de modelos está en `OPENROUTER_MODELOS`, no en el código.** Los
+  `:free` de OpenRouter aparecen, se renombran y se retiran sin aviso; cambiar de
+  modelo no puede exigir un despliegue. Se recorren en orden y se pasa al
+  siguiente ante cualquier fallo, con un timeout propio de 20 s: un modelo
+  colgado no puede comerse el minuto de la función.
+- **Se dispara al pulsar un botón, nunca al abrir una pantalla.** Es lo que
+  mantiene el gasto dentro del plan gratuito —ninguna visita de la portada
+  consume cuota— y también lo que garantiza que alguien está mirando cuando el
+  texto aparece. El reintento es volver a pulsar, así que `lib/ia.ts` tampoco
+  lleva reintentos ni caché propios.
+- **`sanearTextoIa()` quita las URLs y el markdown.** Las primeras porque el pie
+  de tres enlaces lo pone `conPieEnlaces()` en un solo sitio, y un enlace
+  inventado por el modelo rompería esa regla mandando al lector a cualquier
+  parte; el segundo porque Instagram no lo interpreta y saldrían los asteriscos
+  a la vista. El crédito de la noticia (`Fuente: <host>`) tampoco se deja al
+  criterio del modelo: se añade después si no está, con el hostname de la URL
+  que se pidió publicar, igual que hace `buildNewsCaption()`.
+- **Del navegador solo viaja la prosa.** `/api/admin/publish-semanal` sigue
+  componiendo el caption en el servidor con las tasas del momento —esa es su
+  razón de ser— y del cliente acepta únicamente `analisis`, que vuelve a sanear
+  aquí: que el cliente ya lo hiciera no es algo en lo que se pueda confiar. El
+  párrafo entra en un hueco fijo, después de las cifras, con
+  `conAnalisisSemanal()`; esa función existe suelta —y no como un `if` dentro de
+  `buildCaptionSemanal`— porque el panel tiene que enseñar el caption exacto
+  mientras se escribe, y con la inserción en dos sitios la vista previa y lo
+  publicado podrían colocarlo en lugares distintos.
+- **El caption de noticia no marca la vista previa como desactualizada.** A
+  diferencia del título y la fuente, no entra en la imagen firmada, así que
+  cambiarlo no cambia lo que se publicaría.
+- Los prompts viven en `lib/ia-textos.ts`, aparte del cliente, por el mismo
+  motivo que `lib/semanal.ts` vive aparte de la ruta de su imagen: son criterio
+  editorial y se tocan mucho más que el transporte. Se iteran con
+  `npx tsx scripts/preview-ia.ts noticia "<url>"` o `… semanal`, que imprimen
+  también el texto de plantilla: lo que hay que comparar no es la IA contra la
+  nada, sino contra lo que ya se publicaba.
+
 ### El aviso legal se queda
 
 El pie declara que los datos son de terceros, que La Tasa no fija ni certifica

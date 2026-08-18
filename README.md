@@ -120,6 +120,9 @@ ellas, el resto de la app funciona igual. Ver `.env.example`.
 | `ENLACE_HOY` | — | Respaldo de `/hoy` si el cron todavía no anotó el post del día (ver [Atajos del dominio](#atajos-del-dominio)) |
 | `PERFIL_INSTAGRAM_URL` | `instagram.com/latasa.online` | Destino de `/ig` |
 | `ENLACE_WHATSAPP` | — | Destino de `/wa`. Sin ella la ruta no existe |
+| `ADMIN_PASSWORD` | — | Contraseña de `/admin`. Secreto aparte de `CRON_SECRET` |
+| `OPENROUTER_API_KEY` | — | Clave de OpenRouter. Sin ella no aparecen los botones de "Redactar con IA" (ver [Textos con IA](#textos-con-ia)) |
+| `OPENROUTER_MODELOS` | lista de `lib/ia.ts` | Modelos a probar, en orden, separados por comas |
 
 ## Caché y actualización
 
@@ -299,6 +302,38 @@ perjuicio real.
 Las notificaciones push quedan fuera por ahora: exigen claves VAPID, guardar las
 suscripciones y un proceso que vigile las tasas.
 
+## Textos con IA
+
+Dos textos de `/admin` se pueden redactar con un modelo de lenguaje, a través de
+[OpenRouter](https://openrouter.ai) y con su plan gratuito:
+
+- **El caption de un post de noticia**, en `/admin/noticia`.
+- **El análisis del reporte semanal**, en `/admin/semanal`: un párrafo de
+  contexto que se publica debajo de las cifras.
+
+Cuatro límites que definen lo que la IA hace aquí, y que no son negociables:
+
+1. **Nunca produce ni toca una cifra.** Los números salen de `convert()`,
+   `lib/pesos.ts` y `lib/semanal.ts`; el modelo solo escribe la prosa que los
+   acompaña.
+2. **Nunca publica sola.** Se dispara al pulsar un botón y el texto cae en un
+   campo editable, que hay que revisar antes de darle publicar. Los crons —el
+   post diario de tasas y la cola de programadas— siguen siendo 100 % plantilla.
+3. **Si falla, no pasa nada.** `lib/ia.ts` nunca lanza: devuelve `null` ante una
+   clave ausente, un 429 por cuota agotada, un timeout o una respuesta vacía, y
+   entonces vale el texto de plantilla de siempre. La interfaz lo dice.
+4. **Ninguna visita gasta cuota.** La portada y la calculadora no llaman a la IA
+   en absoluto; solo lo hacen dos botones detrás de la sesión de `/admin`.
+
+Para iterar los prompts sin pasar por el navegador:
+
+```bash
+npx tsx scripts/preview-ia.ts noticia "https://url-del-articulo"
+npx tsx scripts/preview-ia.ts semanal
+```
+
+Imprime también el texto de plantilla, que es contra lo que hay que compararlo.
+
 ## Estructura
 
 ```
@@ -306,5 +341,5 @@ app/            páginas, rutas API y manifiesto (App Router, sin carpeta src/)
 components/     panel de tasas, calculadora, teclado numérico y piezas de la PWA
 lib/            proveedores, agregación, conversión, formato e Instagram
 public/         service worker e iconos generados
-scripts/        generación de iconos a partir del logo
+scripts/        generación de iconos y vistas previas (marca, semanal, IA)
 ```

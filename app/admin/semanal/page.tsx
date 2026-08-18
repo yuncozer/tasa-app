@@ -6,6 +6,7 @@ import { Logo } from "@/components/Logo";
 import { ReporteSemanalPanel } from "@/components/ReporteSemanalPanel";
 import { COOKIE_SESION, esSesionValida } from "@/lib/admin-session";
 import { buildCaptionSemanal } from "@/lib/caption";
+import { iaDisponible } from "@/lib/ia";
 import { getRates } from "@/lib/rates";
 import { construirReporteSemanal } from "@/lib/semanal";
 
@@ -51,6 +52,7 @@ export default async function AdminSemanalPage() {
         rangoTexto={reporte.rangoTexto}
         sinComparacion={reporte.sinComparacion}
         caption={buildCaptionSemanal(reporte)}
+        iaDisponible={iaDisponible()}
       />
     </main>
   );

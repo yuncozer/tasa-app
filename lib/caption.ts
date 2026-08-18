@@ -189,6 +189,29 @@ const EMOJI_POR_FILA_SEMANAL: Record<FilaSemanalId, string> = {
 /** De dónde salen las tres cifras. En la imagen va en el pie; aquí, buscable y copiable. */
 const FUENTES_SEMANAL = "Fuentes: BCV, Binance P2P y Banco de la República (TRM).";
 
+/** La línea ante la que se inserta el análisis. Ver `conAnalisisSemanal`. */
+const LINEA_CALCULADORA = "Convierte cualquier monto en la calculadora completa: link en la bio.";
+
+/**
+ * Mete el párrafo de análisis en su hueco: después de las cifras y antes de la
+ * línea de la calculadora.
+ *
+ * Existe como función aparte —y no como un `if` dentro de `buildCaptionSemanal`—
+ * porque el panel de `/admin/semanal` tiene que enseñar el caption exacto que se
+ * va a publicar mientras se escribe, y ese panel recibe el caption ya compuesto
+ * por el servidor. Con la inserción en dos sitios, la vista previa y lo
+ * publicado podrían acabar colocando el párrafo en lugares distintos.
+ */
+export function conAnalisisSemanal(caption: string, analisis?: string): string {
+  const contexto = analisis?.trim();
+  if (!contexto) return caption;
+
+  const idx = caption.indexOf(LINEA_CALCULADORA);
+  if (idx === -1) return `${caption}\n\n${contexto}`;
+
+  return `${caption.slice(0, idx)}${contexto}\n\n${caption.slice(idx)}`;
+}
+
 /**
  * Con qué abre el caption.
  *
@@ -237,8 +260,14 @@ function titularSemanal(reporte: ReporteSemanal): string {
  *
  * La flecha viaja en el texto y la magnitud llega ya en valor absoluto desde
  * `formatVariacion`, así que el signo se dice una sola vez.
+ *
+ * `analisis` es el único texto de todo el caption que puede venir de la IA (ver
+ * `lib/ia-textos.ts`), y entra en una posición fija: **después de las cifras**,
+ * nunca entre ellas ni en el titular. Así el párrafo redactado no puede
+ * desordenar ni contradecir lo que dicen las líneas, que salen de las mismas
+ * filas que la imagen. Sin él, el caption sale byte a byte como siempre.
  */
-export function buildCaptionSemanal(reporte: ReporteSemanal): string {
+export function buildCaptionSemanal(reporte: ReporteSemanal, analisis?: string): string {
   const lineas = reporte.filas.map((fila) => {
     const emoji = EMOJI_POR_FILA_SEMANAL[fila.id];
     const valor = fila.valor === null ? "no disponible" : fila.valorTexto;
@@ -262,17 +291,19 @@ export function buildCaptionSemanal(reporte: ReporteSemanal): string {
     );
   });
 
-  return [
+  const base = [
     titularSemanal(reporte),
     "",
     ...lineas,
     "",
-    "Convierte cualquier monto en la calculadora completa: link en la bio.",
+    LINEA_CALCULADORA,
     "",
     FUENTES_SEMANAL,
     "",
     HASHTAGS_SEMANAL,
   ].join("\n");
+
+  return conAnalisisSemanal(base, analisis);
 }
 
 /**

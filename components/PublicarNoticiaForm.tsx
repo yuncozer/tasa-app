@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { ElementoCarruselEntrada, ProporcionCarrusel, PublicacionPayload } from "@/lib/publish-news";
 import { BarraProgreso } from "@/components/BarraProgreso";
+import { BotonRedactarIa } from "@/components/BotonRedactarIa";
 import type { Cintillo } from "@/components/ControlCintillo";
 import { ControlCintillo } from "@/components/ControlCintillo";
 import { ProgramarPublicacion } from "@/components/ProgramarPublicacion";
@@ -257,10 +258,13 @@ export function PublicarNoticiaForm({
   onProgramada,
   edicion,
   onCancelarEdicion,
+  iaDisponible,
 }: {
   onProgramada: () => void;
   edicion?: { id: string; payload: PublicacionPayload; publicarEn: string };
   onCancelarEdicion?: () => void;
+  /** Si hay clave de OpenRouter. Sin ella el botón de redactar no se pinta. */
+  iaDisponible: boolean;
 }) {
   const semilla = semillaDeEdicion(edicion?.payload);
   const [modo, setModo] = useState<Modo>(edicion ? "manual" : "url");
@@ -299,6 +303,20 @@ export function PublicarNoticiaForm({
    */
   const [desactualizado, setDesactualizado] = useState(false);
   const [estado, setEstado] = useState<Estado>({ paso: "inicial" });
+
+  /**
+   * Lo que se le manda a la IA para redactar el caption: el titular, el crédito
+   * de la fuente y —como material de partida— el texto que hay ahora en el
+   * campo, que en modo `url` es lo que trajo el scraper y en modo manual lo que
+   * el admin escribió. Devuelve `null` mientras falte el titular o la fuente,
+   * y entonces el botón se queda deshabilitado en vez de pedir a ciegas.
+   */
+  const cuerpoRedaccion = () => {
+    const titulo = title.trim() || preview?.title?.trim();
+    const fuente = sourceHost.trim() || preview?.sourceHost?.trim();
+    if (!titulo || !fuente) return null;
+    return { tipo: "noticia", title: titulo, sourceHost: fuente, description: caption.trim() || undefined };
+  };
 
   const subiendo = subida !== null;
   const cargandoPreview = estado.paso === "cargando-preview";
@@ -904,6 +922,14 @@ export function PublicarNoticiaForm({
               rows={6}
               className="whitespace-pre-wrap rounded-xl border border-border-soft bg-surface-strong px-4 py-3 text-sm text-foreground outline-none"
             />
+            {iaDisponible && (
+              <BotonRedactarIa
+                etiqueta="Redactar con IA"
+                cuerpo={cuerpoRedaccion}
+                onTexto={setCaption}
+                deshabilitado={publicando || !title.trim() || !sourceHost.trim()}
+              />
+            )}
           </div>
 
           {principalTipo === "imagen" ? (
@@ -1321,6 +1347,17 @@ export function PublicarNoticiaForm({
               rows={8}
               className="whitespace-pre-wrap rounded-xl border border-border-soft bg-surface-strong px-4 py-3 text-sm text-foreground outline-none"
             />
+            {/* Cambiar el caption no marca la vista previa como desactualizada:
+                a diferencia del título y la fuente, no entra en la imagen
+                firmada, así que lo que se ve sigue siendo lo que se publicaría. */}
+            {iaDisponible && (
+              <BotonRedactarIa
+                etiqueta="Redactar con IA"
+                cuerpo={cuerpoRedaccion}
+                onTexto={setCaption}
+                deshabilitado={publicando}
+              />
+            )}
           </div>
 
           <p className="text-xs text-muted">Fuente: {preview.sourceHost}</p>

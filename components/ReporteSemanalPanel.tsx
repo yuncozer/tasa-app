@@ -1,13 +1,17 @@
 "use client";
 
 import { useState } from "react";
+import { BotonRedactarIa } from "@/components/BotonRedactarIa";
+import { conAnalisisSemanal } from "@/lib/caption";
 
 /**
- * Panel del reporte semanal: se mira y se publica, sin campos que llenar.
+ * Panel del reporte semanal: se mira y se publica.
  *
  * Las cifras no se editan a mano —salen del snapshot y del histórico— así que
- * aquí no hay formulario: solo las dos vistas previas, el botón que publica el
- * cuadrado en el feed y el enlace que baja el vertical para subirlo como Story.
+ * el único campo es el análisis: un párrafo de contexto, opcional, que se puede
+ * escribir o pedirle a la IA. Va aparte de las cifras a propósito; el caption
+ * que se publica lo compone el servidor con las tasas del momento, y de aquí
+ * solo viaja esa prosa.
  */
 
 type Estado =
@@ -25,10 +29,13 @@ export function ReporteSemanalPanel({
   rangoTexto,
   sinComparacion,
   caption,
+  iaDisponible,
 }: {
   rangoTexto: string;
   sinComparacion: boolean;
   caption: string;
+  /** Si hay clave de OpenRouter. Sin ella el análisis se escribe a mano. */
+  iaDisponible: boolean;
 }) {
   /**
    * Cambia la URL de las dos imágenes para forzar que el navegador vuelva a
@@ -42,9 +49,16 @@ export function ReporteSemanalPanel({
    * hay nada que refrescar de todas formas.
    */
   const [marca, setMarca] = useState("");
+  const [analisis, setAnalisis] = useState("");
   const [estado, setEstado] = useState<Estado>({ paso: "inicial" });
 
   const publicando = estado.paso === "publicando";
+  /**
+   * El caption tal como saldría. Se compone con la misma función que usa el
+   * servidor al publicar, así que lo que se lee aquí y lo que sale son lo
+   * mismo, con el párrafo en el mismo sitio.
+   */
+  const conAnalisis = conAnalisisSemanal(caption, analisis);
   const base = "/api/og/instagram-semanal";
   const refresco = marca ? `&t=${marca}` : "";
   const cuadrada = `${base}?proporcion=1:1${refresco}`;
@@ -53,7 +67,14 @@ export function ReporteSemanalPanel({
   async function publicar() {
     setEstado({ paso: "publicando" });
     try {
-      const response = await fetch("/api/admin/publish-semanal", { method: "POST" });
+      const response = await fetch("/api/admin/publish-semanal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        // Solo el análisis. Las cifras las recompone el servidor con las tasas
+        // vigentes, que es lo que impide publicar un número viejo de una
+        // pestaña que lleva horas abierta.
+        body: JSON.stringify({ analisis: analisis.trim() || undefined }),
+      });
       if (!response.ok) {
         setEstado({ paso: "error", mensaje: await leerError(response) });
         return;
@@ -131,11 +152,33 @@ export function ReporteSemanalPanel({
       </section>
 
       <section className="flex flex-col gap-2">
+        <label htmlFor="analisis" className="text-sm font-semibold uppercase tracking-wide text-muted">
+          Análisis (opcional)
+        </label>
+        <textarea
+          id="analisis"
+          value={analisis}
+          onChange={(e) => setAnalisis(e.target.value)}
+          rows={4}
+          placeholder="Dos o tres frases de contexto. Se publica debajo de las cifras."
+          className="whitespace-pre-wrap rounded-xl border border-border-soft bg-surface-strong px-4 py-3 text-sm text-foreground outline-none"
+        />
+        {iaDisponible && (
+          <BotonRedactarIa
+            etiqueta="Redactar análisis con IA"
+            cuerpo={() => ({ tipo: "semanal" })}
+            onTexto={setAnalisis}
+            deshabilitado={publicando}
+          />
+        )}
+      </section>
+
+      <section className="flex flex-col gap-2">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">Caption</h2>
         {/* `whitespace-pre-wrap` sobre un `<p>` y no un `<pre>`: aquel heredaría
             la mono del navegador, y el proyecto usa una sola familia. */}
         <p className="whitespace-pre-wrap rounded-2xl border border-border-soft bg-surface px-4 py-3 text-xs leading-relaxed text-muted">
-          {caption}
+          {conAnalisis}
         </p>
       </section>
     </div>

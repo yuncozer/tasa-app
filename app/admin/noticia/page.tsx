@@ -6,6 +6,7 @@ import type { ProgramadaVista } from "@/components/ColaProgramadas";
 import { Logo } from "@/components/Logo";
 import { PublicarPanel } from "@/components/PublicarPanel";
 import { COOKIE_SESION, esSesionValida } from "@/lib/admin-session";
+import { iaDisponible } from "@/lib/ia";
 import { listarProgramadas } from "@/lib/programadas";
 import { resumenPublicacion } from "@/lib/publish-news";
 
@@ -59,7 +60,10 @@ export default async function AdminNoticiaPage() {
         <AdminNav activa="noticia" />
       </header>
 
-      <PublicarPanel programadas={programadas} />
+      {/* Si hay clave de OpenRouter se decide en el servidor y baja por props:
+          `lib/ia.ts` corre solo ahí, y ninguna variable de entorno del modelo
+          tiene por qué llegar al navegador. */}
+      <PublicarPanel programadas={programadas} iaDisponible={iaDisponible()} />
     </main>
   );
 }

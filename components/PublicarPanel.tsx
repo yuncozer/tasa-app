@@ -29,7 +29,14 @@ interface Edicion {
  * vez con lo que trae la edición, sin depender de un efecto que lo reponga en
  * cada cambio.
  */
-export function PublicarPanel({ programadas }: { programadas: ProgramadaVista[] }) {
+export function PublicarPanel({
+  programadas,
+  iaDisponible,
+}: {
+  programadas: ProgramadaVista[];
+  /** Baja hasta el formulario de noticia: es el único que ofrece redactar con IA. */
+  iaDisponible: boolean;
+}) {
   const [destino, setDestino] = useState<Destino>("post");
   const [editando, setEditando] = useState<Edicion | null>(null);
   const router = useRouter();
@@ -97,6 +104,7 @@ export function PublicarPanel({ programadas }: { programadas: ProgramadaVista[] 
           onProgramada={alProgramar}
           edicion={editando ?? undefined}
           onCancelarEdicion={() => setEditando(null)}
+          iaDisponible={iaDisponible}
         />
       ) : (
         <PublicarVideoForm
