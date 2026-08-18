@@ -96,6 +96,42 @@ decimales lo garantiza para montos arbitrariamente grandes —es una limitación
 matemática de mostrar dos números redondeados por separado, no algo que haya
 que seguir afinando.
 
+### La brecha se enseña en la portada y se calcula en un solo sitio
+
+Bajo las tarjetas, la portada dice cuánto se paga de más fuera del BCV. Es la
+misma cifra que la tarjeta del reporte semanal, y lo es literalmente:
+`calcularBrecha()` se mudó de `lib/semanal.ts` a `lib/brecha.ts` para que las dos
+la compartan. Si cada una hiciera su cuenta, el domingo podría publicarse un
+porcentaje distinto del que la gente lleva toda la semana viendo en pantalla —el
+mismo motivo por el que `lib/pesos.ts` es común a la imagen y al caption.
+
+- **Se mide contra `USD_BINANCE_SELL`**, no contra el `mid` ni contra la compra,
+  por lo mismo que en el semanal: una cifra que dice "brecha" tiene que nombrar
+  un lado del mercado, y el que responde a la pregunta del lector —cuánto pago
+  de más— es la venta. Mostrar las dos brechas diluiría el mensaje en dos
+  números casi iguales, y quien quiera esa comparación ya tiene ambas cifras en
+  la tarjeta de Binance.
+- **No lleva semáforo.** El color no cambia con el valor: eso exigiría inventar
+  un umbral (¿15 %? ¿30 %?), y aquí `--warning` es semántico —"este número no es
+  de fiar ahora mismo"—, no "este número es alto". Una brecha grande es un dato
+  correcto. El ámbar queda para cuando falta una de las dos tasas y entonces se
+  dice `Sin dato`, nunca un `0,0 %` ni un guion suelto (mismo criterio que
+  `Sin comparación` en el semanal).
+- **No lleva la variación de la semana**, que sí tiene la tarjeta del reporte.
+  Esa sale de `historico_tasas`, y meter esa lectura en la portada sería una
+  consulta a Supabase por visitante — la misma regla que ya prohíbe registrar el
+  histórico dentro de `getRates()`. La portada dice **dónde está** la brecha; el
+  reporte semanal, **hacia dónde va**.
+- **No hay "tiempo real" nuevo.** Se deriva del snapshot que la página ya
+  renderiza en el servidor, así que se refresca con la caché de 5 minutos, el
+  `s-maxage=60` de la CDN y el botón "Actualizar tasas". No se le añadió ni un
+  `setInterval` ni una petición propia: sería inventar movimiento donde el dato
+  no cambia más rápido que las fuentes.
+- Va en el panel de tasas y **no dentro de la calculadora**: es la distancia
+  entre dos tarjetas que están justo encima, y leerlo pegado a ellas explica de
+  dónde sale. En la calculadora competiría con el número que el usuario está
+  manipulando al teclear, que es el que manda en esa zona.
+
 ### Las fechas se arman a mano, no con `Intl.DateTimeFormat`
 
 Servidor y navegador pueden traer versiones distintas de ICU y devolver textos que

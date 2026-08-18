@@ -1,3 +1,4 @@
+import { Brecha } from "@/components/Brecha";
 import { RateCard } from "@/components/RateCard";
 import { FLAGS } from "@/lib/flags";
 import { RATE_ORDER, rateHelp, inverseHelp } from "@/lib/rates";
@@ -13,6 +14,10 @@ import type { RatesSnapshot } from "@/lib/types";
  * Binance es al revés: compra y venta comparten bandera, fuente y nota (salen
  * del mismo fetch), así que van en una sola tarjeta con los dos montos
  * apilados en vez de duplicar toda esa información en dos tarjetas.
+ *
+ * Debajo de la cuadrícula va la brecha, que no es una tasa más sino la
+ * distancia entre dos de las de arriba: por eso está aquí, pegada a las
+ * tarjetas de las que sale, y no en una sección propia.
  */
 export function RatePanel({ snapshot }: { snapshot: RatesSnapshot }) {
   const keys = RATE_ORDER.filter((key) => key !== "VES" && key !== "USD_BINANCE_SELL");
@@ -26,7 +31,7 @@ export function RatePanel({ snapshot }: { snapshot: RatesSnapshot }) {
         Tasas de hoy
       </h2>
 
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 sm:gap-2 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         {keys.map((key) => {
           if (key === "USD_BINANCE_BUY") {
             const buy = snapshot.rates.USD_BINANCE_BUY;
@@ -86,6 +91,8 @@ export function RatePanel({ snapshot }: { snapshot: RatesSnapshot }) {
           );
         })}
       </div>
+
+      <Brecha snapshot={snapshot} />
     </section>
   );
 }

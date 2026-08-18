@@ -1,3 +1,4 @@
+import { calcularBrecha } from "@/lib/brecha";
 import { diaCaracasISO, formatPercent, formatRate, rangoSemana } from "@/lib/format";
 import { desplazarDia, leerComparativa, type ClaveHistorico, type PuntoHistorico } from "@/lib/historico";
 import type { RatesSnapshot } from "@/lib/types";
@@ -57,23 +58,6 @@ export interface ReporteSemanal {
 const UMBRAL = 0.05;
 
 const CLAVES: readonly ClaveHistorico[] = ["USD_BCV", "USD_BINANCE_SELL", "TRM"];
-
-/**
- * Cuánto se paga de más fuera del BCV, en porcentaje.
- *
- * Se usa `USD_BINANCE_SELL` y **no** el `mid` de `BinanceDetail`: compra y
- * venta dejaron de promediarse a propósito porque la diferencia entre ambas es
- * real y esconderla da una imagen falsa del mercado (ver `CLAUDE.md`); `mid`
- * sobrevive solo porque `COP_FRONTERA` lo necesita para el cruce VES↔COP. Una
- * tarjeta que dice "brecha" tiene que nombrar un lado del mercado, y el que
- * responde a la pregunta del lector —cuánto pago de más— es la venta.
- */
-function calcularBrecha(oficial: number | null, paralelo: number | null): number | null {
-  if (oficial === null || paralelo === null) return null;
-  if (!Number.isFinite(oficial) || !Number.isFinite(paralelo) || oficial === 0) return null;
-
-  return (paralelo / oficial - 1) * 100;
-}
 
 /**
  * El cambio entre dos valores, en la unidad que corresponda.
