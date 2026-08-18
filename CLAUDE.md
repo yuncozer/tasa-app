@@ -1063,6 +1063,7 @@ tres scripts se reparten el trabajo:
 | `scripts/preview-noticia.ts <url>` | Un artículo real: imagen enmarcada + caption | Sí |
 | `scripts/preview-marca.ts <archivo>` | Material propio: marcos, video en sus tres lienzos, sello y cintillo | Solo para las de imagen |
 | `scripts/preview-semanal.ts` | El reporte semanal: caption y las dos URLs (1:1 y 9:16) | Sí |
+| `scripts/preview-ia.ts <tipo>` | Los dos textos que redacta la IA, junto a su plantilla | No |
 
 ```bash
 # Artículo real: imprime el caption y una URL firmada de la imagen
@@ -1082,6 +1083,10 @@ npx tsx scripts/preview-marca.ts clip.mp4     # video en 1:1, 4:5 y Reel, con su
 # Reporte semanal: imprime el caption y las dos URLs (no lleva firma)
 npx tsx scripts/preview-semanal.ts
 npx tsx scripts/preview-semanal.ts --sin-historico   # la degradación del arranque
+
+# Textos de la IA: imprime también la plantilla, que es contra lo que se comparan
+npx tsx scripts/preview-ia.ts noticia "https://url-del-articulo"
+npx tsx scripts/preview-ia.ts semanal
 ```
 
 **Qué compone cada pieza y dónde se edita:**
@@ -1125,12 +1130,13 @@ para ver si el overlay quedó bien es mucho más lento.
 
 **Requisitos y avisos:**
 
-- Los tres scripts leen `.env.local` y **se corren desde la raíz del repo**
+- Los scripts leen `.env.local` y **se corren desde la raíz del repo**
   (`asegurarLogo()` lee `public/icon-512.png` relativo al directorio de trabajo).
 - `preview-noticia.ts` necesita `CRON_SECRET`. `preview-marca.ts` necesita además
   las tres `CLOUDINARY_*`. `preview-semanal.ts` necesita `SUPABASE_URL` y
   `SUPABASE_SERVICE_ROLE_KEY` para leer el histórico, salvo con
-  `--sin-historico`, que no consulta nada.
+  `--sin-historico`, que no consulta nada. `preview-ia.ts` necesita
+  `OPENROUTER_API_KEY`, y para `semanal` también las dos de Supabase.
 - `npm run dev` hace falta **solo para las URLs de imagen**; las de video las
   sirve Cloudinary directamente.
 - Cada corrida sin `--public-id` gasta almacenamiento del plan gratuito (25
@@ -1140,7 +1146,7 @@ para ver si el overlay quedó bien es mucho más lento.
 - Si una URL de imagen contesta **403**, el conjunto firmado y el enviado no
   coinciden: es lo que pasaba cuando los scripts firmaban sin `proporcion`
   después de que la ruta empezara a incluirla siempre.
-- **Ninguno de los tres publica nada.** Solo publican de verdad
+- **Ninguno de los cuatro publica nada.** Solo publican de verdad
   `POST /api/publish-instagram-news` y los botones de `/admin/noticia` y
   `/admin/semanal`.
 - Para probar `/admin/noticia` o `/admin/semanal` en sí —y no solo el render—
