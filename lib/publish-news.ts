@@ -223,7 +223,7 @@ export async function publishNewsVideoPost(
  * acompaña.
  */
 export type ElementoCarruselEntrada =
-  | { tipo: "imagen"; publicId: string }
+  | { tipo: "imagen"; publicId: string; sinMarco?: boolean }
   | ({ tipo: "video"; publicId: string } & MarcaVideo);
 
 /**
@@ -240,7 +240,7 @@ export type ElementoCarruselEntrada =
  */
 export type PrincipalCarrusel =
   | { tipo: "articulo"; url: string }
-  | { tipo: "subida"; publicId: string }
+  | { tipo: "subida"; publicId: string; sinMarco?: boolean }
   | ({ tipo: "video"; publicId: string } & MarcaVideo);
 
 export interface CarruselEntrada {
@@ -266,12 +266,14 @@ export interface CarruselEntrada {
 
 /** Valida el origen del elemento principal tal como llega del navegador. */
 export function leerPrincipalCarrusel(valor: unknown): PrincipalCarrusel | null {
-  const item = valor as { tipo?: unknown; url?: unknown; publicId?: unknown; fuente?: unknown } | null;
+  const item = valor as
+    | { tipo?: unknown; url?: unknown; publicId?: unknown; fuente?: unknown; sinMarco?: unknown }
+    | null;
   if (item?.tipo === "articulo" && esUrlValida(item.url as string)) {
     return { tipo: "articulo", url: item.url as string };
   }
   if (item?.tipo === "subida" && typeof item.publicId === "string" && item.publicId) {
-    return { tipo: "subida", publicId: item.publicId };
+    return { tipo: "subida", publicId: item.publicId, sinMarco: item.sinMarco === true };
   }
   if (item?.tipo === "video" && typeof item.publicId === "string" && item.publicId) {
     return { tipo: "video", publicId: item.publicId, ...leerMarcaVideo(item) };
@@ -284,27 +286,42 @@ export function leerProporcionCarrusel(valor: unknown): ProporcionCarrusel {
   return valor === "4:5" ? "4:5" : "1:1";
 }
 
-/** Tope de la ventana del cintillo: más allá dura de hecho todo el clip. */
+/** Tope del intervalo del cintillo: más allá dura de hecho todo el clip. */
 const MAX_SEGUNDOS_CINTILLO = 60;
 
 /**
  * Valida el cintillo de un video tal como llega del navegador o de la cola.
  *
- * Los tres campos son opcionales, y tienen que serlo: en la cola hay posts
+ * Los campos son opcionales, y tienen que serlo: en la cola hay posts
  * programados antes de que el cintillo existiera, cuyo payload solo trae
  * `fuente`. Sin título ni fuente el video sale solo con el sello, que es
  * exactamente como salía entonces.
+ *
+ * `fin` es lo que decide si hay intervalo: sin él, `inicio` se descarta —un
+ * inicio sin fin no significa nada— y el cintillo dura todo el clip, igual
+ * que siempre. Con `fin`, `inicio` se acota a `[0, fin)` y el propio `fin` a
+ * `MAX_SEGUNDOS_CINTILLO` contados desde `inicio`, no desde el segundo 0: así
+ * un intervalo de `50` a `90` sigue durando como mucho el tope, no se corta a
+ * los 60 segundos del video sin importar dónde arrancó.
  */
 export function leerMarcaVideo(valor: unknown): MarcaVideo {
-  const item = valor as { titulo?: unknown; fuente?: unknown; segundos?: unknown } | null;
+  const item = valor as { titulo?: unknown; fuente?: unknown; inicio?: unknown; fin?: unknown } | null;
 
   const titulo = typeof item?.titulo === "string" ? recortarTitulo(item.titulo) : "";
-  const segundos =
-    typeof item?.segundos === "number" && Number.isFinite(item.segundos) && item.segundos > 0
-      ? Math.min(Math.round(item.segundos), MAX_SEGUNDOS_CINTILLO)
-      : undefined;
 
-  return { titulo: titulo || undefined, fuente: limpiarFuente(item?.fuente), segundos };
+  const finCrudo = typeof item?.fin === "number" && Number.isFinite(item.fin) && item.fin > 0 ? item.fin : undefined;
+  const inicioCrudo =
+    typeof item?.inicio === "number" && Number.isFinite(item.inicio) && item.inicio >= 0 ? item.inicio : 0;
+
+  const inicio = finCrudo !== undefined ? Math.min(Math.round(inicioCrudo), Math.round(finCrudo) - 1) : undefined;
+  const fin = finCrudo !== undefined ? Math.min(Math.round(finCrudo), inicio! + MAX_SEGUNDOS_CINTILLO) : undefined;
+
+  return {
+    titulo: titulo || undefined,
+    fuente: limpiarFuente(item?.fuente),
+    inicio: fin !== undefined && inicio! > 0 ? inicio : undefined,
+    fin,
+  };
 }
 
 /**
@@ -323,7 +340,11 @@ export function leerElementosCarrusel(valor: unknown): ElementoCarruselEntrada[]
     }
     // La marca se copia a mano porque este lector reconstruye el objeto: lo que
     // no se nombre aquí desaparece al programar el post.
-    elementos.push(tipo === "video" ? { tipo, publicId, ...leerMarcaVideo(item) } : { tipo, publicId });
+    elementos.push(
+      tipo === "video"
+        ? { tipo, publicId, ...leerMarcaVideo(item) }
+        : { tipo, publicId, sinMarco: item?.sinMarco === true },
+    );
   }
   return elementos;
 }
@@ -335,8 +356,12 @@ function formatoDeProporcion(proporcion: ProporcionCarrusel): FormatoVideo {
 
 /**
  * Arma las URLs finales del carrusel. Cada imagen pasa por la misma plantilla
- * firmada (`instagram-post-news`) que la imagen principal de una noticia:
- * nunca se publica una imagen cruda del usuario sin el marco de La Tasa.
+ * firmada (`instagram-post-news`) que la imagen principal de una noticia —
+ * salvo que el admin haya pedido explícitamente dejarla original (`sinMarco`),
+ * caso en el que se usa el PNG crudo de Cloudinary tal cual se subió. Solo las
+ * imágenes propias (`elementos` y el principal `"subida"`) tienen esa opción:
+ * la del artículo scrapeado siempre lleva marco, porque es la que da
+ * identidad al post y no tiene sentido publicarla sin la marca de La Tasa.
  */
 async function buildCarousel(datos: CarruselEntrada): Promise<ElementoCarrusel[]> {
   const proporcion = datos.proporcion ?? "1:1";
@@ -351,7 +376,8 @@ async function buildCarousel(datos: CarruselEntrada): Promise<ElementoCarrusel[]
       if (elemento.tipo === "video") {
         return { tipo: "video", url: await urlVideoConMarca(elemento.publicId, formato, elemento) };
       }
-      return { tipo: "imagen", url: enmarcar(urlImagen(elemento.publicId)) };
+      const image = urlImagen(elemento.publicId);
+      return { tipo: "imagen", url: elemento.sinMarco ? image : enmarcar(image) };
     }),
   );
 
@@ -361,6 +387,10 @@ async function buildCarousel(datos: CarruselEntrada): Promise<ElementoCarrusel[]
       url: await urlVideoConMarca(datos.principal.publicId, formato, datos.principal),
     };
     return [principal, ...extras];
+  }
+
+  if (datos.principal.tipo === "subida" && datos.principal.sinMarco) {
+    return [{ tipo: "imagen", url: urlImagen(datos.principal.publicId) }, ...extras];
   }
 
   const imagenPrincipal =

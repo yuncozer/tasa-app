@@ -45,6 +45,12 @@ interface Extra {
   fuente?: string;
   /** Cintillo de este clip. Se decide por video, no para todo el post. */
   cintillo?: Cintillo;
+  /**
+   * Solo aplica a `tipo === "imagen"`: sin marco, se publica el PNG crudo tal
+   * como se subió, sin pasar por la plantilla de marca. `undefined`/`false`
+   * es el comportamiento de siempre.
+   */
+  sinMarco?: boolean;
 }
 
 type Modo = "url" | "manual";
@@ -83,9 +89,9 @@ function textoDeSubida({ que, fase }: Subida): string {
  * lleva título superpuesto, a diferencia de las otras dos variantes.
  */
 type Principal =
-  | { tipo: "subida"; publicId: string }
+  | { tipo: "subida"; publicId: string; sinMarco?: boolean }
   | { tipo: "articulo"; url: string }
-  | { tipo: "video"; publicId: string; fuente?: string; titulo?: string; segundos?: number };
+  | { tipo: "video"; publicId: string; fuente?: string; titulo?: string; inicio?: number; fin?: number };
 
 type Estado =
   | { paso: "inicial" }
@@ -133,10 +139,10 @@ async function leerError(response: Response): Promise<string> {
  * revisado.
  */
 function aElementos(lista: Extra[]): ElementoCarruselEntrada[] {
-  return lista.map(({ tipo, publicId, fuente, cintillo }) =>
+  return lista.map(({ tipo, publicId, fuente, cintillo, sinMarco }) =>
     tipo === "video"
-      ? { tipo, publicId, fuente, titulo: cintillo?.titulo, segundos: cintillo?.segundos }
-      : { tipo, publicId },
+      ? { tipo, publicId, fuente, titulo: cintillo?.titulo, inicio: cintillo?.inicio, fin: cintillo?.fin }
+      : { tipo, publicId, sinMarco },
   );
 }
 
@@ -153,6 +159,7 @@ interface SemillaManual {
   videoPrincipalPublicId?: string;
   fuenteVideoPrincipal?: string;
   cintilloVideoPrincipal?: Cintillo;
+  imagenPrincipalSinMarco?: boolean;
   proporcion: ProporcionCarrusel;
   extras: Extra[];
 }
@@ -192,9 +199,16 @@ function semillaDeEdicion(payload?: PublicacionPayload): SemillaManual | null {
                 tipo: "video",
                 publicId: elemento.publicId,
                 fuente: elemento.fuente,
-                cintillo: elemento.titulo ? { titulo: elemento.titulo, segundos: elemento.segundos } : undefined,
+                cintillo: elemento.titulo
+                  ? { titulo: elemento.titulo, inicio: elemento.inicio, fin: elemento.fin }
+                  : undefined,
               }
-            : { clave: `${elemento.publicId}-${indice}`, tipo: "imagen", publicId: elemento.publicId },
+            : {
+                clave: `${elemento.publicId}-${indice}`,
+                tipo: "imagen",
+                publicId: elemento.publicId,
+                sinMarco: elemento.sinMarco === true,
+              },
       ),
     };
 
@@ -206,7 +220,7 @@ function semillaDeEdicion(payload?: PublicacionPayload): SemillaManual | null {
         videoPrincipalPublicId: principal.publicId,
         fuenteVideoPrincipal: principal.fuente,
         cintilloVideoPrincipal: principal.titulo
-          ? { titulo: principal.titulo, segundos: principal.segundos }
+          ? { titulo: principal.titulo, inicio: principal.inicio, fin: principal.fin }
           : undefined,
       };
     }
@@ -216,6 +230,7 @@ function semillaDeEdicion(payload?: PublicacionPayload): SemillaManual | null {
       principalTipo: "imagen",
       title: payload.datos.title ?? "",
       imagenPublicId: principal.tipo === "subida" ? principal.publicId : undefined,
+      imagenPrincipalSinMarco: principal.tipo === "subida" && principal.sinMarco === true,
     };
   }
 
@@ -273,6 +288,10 @@ export function PublicarNoticiaForm({
   const [sourceHost, setSourceHost] = useState(semilla?.sourceHost ?? "");
   const [caption, setCaption] = useState(semilla?.caption ?? "");
   const [imagenPublicId, setImagenPublicId] = useState<string | undefined>(semilla?.imagenPublicId);
+  /** Solo tiene efecto cuando esta imagen termina de principal de un carrusel. */
+  const [imagenPrincipalSinMarco, setImagenPrincipalSinMarco] = useState(
+    semilla?.imagenPrincipalSinMarco ?? false,
+  );
   /** Miniatura local de la foto principal, para verla al instante sin esperar al servidor. */
   const [fotoPrincipal, setFotoPrincipal] = useState<string | undefined>();
   /** Solo aplica al modo "manual": si el principal es una imagen o un video propio. */
@@ -340,10 +359,11 @@ export function PublicarNoticiaForm({
         publicId: videoPrincipalPublicId ?? "",
         fuente: fuenteVideoPrincipal,
         titulo: cintilloVideoPrincipal?.titulo,
-        segundos: cintilloVideoPrincipal?.segundos,
+        inicio: cintilloVideoPrincipal?.inicio,
+        fin: cintilloVideoPrincipal?.fin,
       }
     : imagenPublicId
-      ? { tipo: "subida", publicId: imagenPublicId }
+      ? { tipo: "subida", publicId: imagenPublicId, sinMarco: imagenPrincipalSinMarco }
       : { tipo: "articulo", url };
 
   /** Sustituye la miniatura local liberando la anterior, que si no queda colgada en memoria. */
@@ -441,7 +461,8 @@ export function PublicarNoticiaForm({
           publicId: item.publicId,
           fuente: fuenteVideoPrincipal,
           titulo: cintilloVideoPrincipal?.titulo,
-          segundos: cintilloVideoPrincipal?.segundos,
+          inicio: cintilloVideoPrincipal?.inicio,
+          fin: cintilloVideoPrincipal?.fin,
         },
         preview,
       );
@@ -611,7 +632,8 @@ export function PublicarNoticiaForm({
             publicId,
             fuente: fuenteVideoPrincipal,
             titulo: cintilloVideoPrincipal?.titulo,
-            segundos: cintilloVideoPrincipal?.segundos,
+            inicio: cintilloVideoPrincipal?.inicio,
+            fin: cintilloVideoPrincipal?.fin,
           },
           preview,
         );
@@ -687,6 +709,18 @@ export function PublicarNoticiaForm({
     editarCampoDelMarco(() => {
       setExtras(extras.map((extra) => (extra.clave === clave ? { ...extra, fuente } : extra)));
     });
+  }
+
+  /** Alterna si una imagen del carrusel lleva el marco de marca o va original. */
+  function cambiarSinMarcoExtra(clave: string) {
+    editarCampoDelMarco(() => {
+      setExtras(extras.map((extra) => (extra.clave === clave ? { ...extra, sinMarco: !extra.sinMarco } : extra)));
+    });
+  }
+
+  /** Igual, para la imagen principal cuando se usa como principal de un carrusel. */
+  function cambiarSinMarcoImagenPrincipal() {
+    editarCampoDelMarco(() => setImagenPrincipalSinMarco((valor) => !valor));
   }
 
   function quitarExtra(clave: string) {
@@ -1204,6 +1238,26 @@ export function PublicarNoticiaForm({
             </div>
           )}
 
+          {/* Solo importa una vez que hay carrusel: con una sola imagen, el
+              principal siempre se publica enmarcado (post de noticia normal). */}
+          {imagenPublicId && esCarrusel && (
+            <button
+              type="button"
+              aria-pressed={imagenPrincipalSinMarco}
+              onClick={cambiarSinMarcoImagenPrincipal}
+              disabled={publicando}
+              className={`rounded-xl border px-3 py-2 text-xs font-semibold transition active:scale-95 disabled:opacity-50 ${
+                imagenPrincipalSinMarco
+                  ? "border-accent bg-accent/15 text-accent"
+                  : "border-border-soft bg-surface text-muted"
+              }`}
+            >
+              {imagenPrincipalSinMarco
+                ? "Imagen principal original · sin el marco de marca"
+                : "Imagen principal con el marco de marca"}
+            </button>
+          )}
+
           <div className="flex flex-col gap-2">
             <span className="text-sm font-semibold uppercase tracking-wide text-muted">Añadir al carrusel</span>
 
@@ -1329,6 +1383,22 @@ export function PublicarNoticiaForm({
                           deshabilitado={publicando}
                         />
                       </div>
+                    )}
+
+                    {extra.tipo === "imagen" && (
+                      <button
+                        type="button"
+                        aria-pressed={extra.sinMarco === true}
+                        onClick={() => cambiarSinMarcoExtra(extra.clave)}
+                        disabled={publicando}
+                        className={`rounded-xl border px-3 py-2 text-xs font-semibold transition active:scale-95 disabled:opacity-50 ${
+                          extra.sinMarco
+                            ? "border-accent bg-accent/15 text-accent"
+                            : "border-border-soft bg-surface text-muted"
+                        }`}
+                      >
+                        {extra.sinMarco ? "Original · sin el marco de marca" : "Con el marco de marca"}
+                      </button>
                     )}
                   </li>
                 ))}

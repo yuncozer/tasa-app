@@ -54,7 +54,7 @@ export function PublicarVideoForm({
    * lo que permite avisar de que lo que se ve ya no es lo que se publicaría.
    */
   const cintilloInicial = edicion?.payload.titulo
-    ? { titulo: edicion.payload.titulo, segundos: edicion.payload.segundos }
+    ? { titulo: edicion.payload.titulo, inicio: edicion.payload.inicio, fin: edicion.payload.fin }
     : undefined;
   const [fuenteAplicada, setFuenteAplicada] = useState("");
   const [cintillo, setCintillo] = useState<Cintillo | undefined>(cintilloInicial);
@@ -88,7 +88,8 @@ export function PublicarVideoForm({
         videoPublicId,
         fuente: fuenteUsada,
         titulo: cintilloUsado?.titulo,
-        segundos: cintilloUsado?.segundos,
+        inicio: cintilloUsado?.inicio,
+        fin: cintilloUsado?.fin,
       }),
     });
     if (!preview.ok) {
@@ -177,7 +178,8 @@ export function PublicarVideoForm({
         caption,
         fuente: fuenteAplicada,
         titulo: cintilloAplicado?.titulo,
-        segundos: cintilloAplicado?.segundos,
+        inicio: cintilloAplicado?.inicio,
+        fin: cintilloAplicado?.fin,
       }),
       });
       if (!response.ok) {
@@ -420,7 +422,8 @@ export function PublicarVideoForm({
                     caption,
                     fuente: fuenteAplicada || undefined,
                     titulo: cintilloAplicado?.titulo || undefined,
-                    segundos: cintilloAplicado?.segundos,
+                    inicio: cintilloAplicado?.inicio,
+                    fin: cintilloAplicado?.fin,
                   } satisfies PublicacionPayload)
                 : null
             }

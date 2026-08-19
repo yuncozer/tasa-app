@@ -66,17 +66,35 @@ const BORDE_CIRCULO = 4;
 const CIRCULO = LOGO + AIRE_LOGO * 2 + BORDE_CIRCULO * 2;
 
 /**
- * Cuánto asoma el círculo por encima de la franja. Es también el hueco que hay
- * que reservar en el lienzo: si no, Satori recortaría lo que sobresale.
+ * Cuánto asoma el círculo por encima de la franja.
  */
 const ASOMA = 34;
+
+/**
+ * El filete de acento ya no corta la franja en seco contra el video: arriba y
+ * abajo sale un degradado de `COLOR.surface` a transparente. El de arriba es
+ * más alto a propósito —ahí es donde vive el logo asomando, y el encuadre
+ * tiene más aire de sobra—; el de abajo se deja más corto para no comerse
+ * tanto video por encima del filo real del clip.
+ */
+const ALTO_DESVANECE_ARRIBA = 200;
+const ALTO_DESVANECE_ABAJO = 100;
+
+/**
+ * Hueco reservado arriba de la franja. Antes era exactamente `ASOMA` (lo que
+ * el círculo necesita para asomar); ahora el degradado superior (200px) es
+ * más alto que eso, así que manda él. Si algún día el degradado se encoge por
+ * debajo de `ASOMA`, esto sigue protegiendo al círculo de que Satori lo
+ * recorte.
+ */
+const RESERVA_ARRIBA = Math.max(ASOMA, ALTO_DESVANECE_ARRIBA);
 
 /**
  * Sube a mano cuando cambie el diseño. Entra en el `public_id` del cintillo
  * (ver `asegurarCintillo`), así que sin subirlo los videos seguirían usando
  * el PNG viejo ya cacheado en Cloudinary.
  */
-export const VERSION_CINTILLO = 3;
+export const VERSION_CINTILLO = 4;
 
 /** El prefijo lo pone el código, para que todos los posts acrediten igual. */
 const PREFIJO_FUENTE = "Fuente: ";
@@ -181,8 +199,21 @@ function Cintillo({ titulo, fuente }: DatosCintillo) {
           posicione respecto a ella y no respecto al lienzo: el lienzo se pide
           con holgura (ver `generarCintillo`) y lo que sobra queda arriba, así
           que un `top: 0` sobre el lienzo dejaría el logo flotando lejos de la
-          franja. El `paddingTop` es justo lo que el círculo asoma. */}
-      <div style={{ width: "100%", display: "flex", position: "relative", paddingTop: ASOMA }}>
+          franja. Ahora es columna flex: el degradado de arriba, la franja y
+          el degradado de abajo son tres bloques apilados, no relleno. */}
+      <div style={{ width: "100%", display: "flex", flexDirection: "column", position: "relative" }}>
+        {/* Sale del filete superior hacia arriba, hasta desvanecerse del todo
+            en transparente: es lo que reemplaza el corte en seco contra el
+            video. */}
+        <div
+          style={{
+            width: "100%",
+            height: RESERVA_ARRIBA,
+            display: "flex",
+            backgroundImage: `linear-gradient(to bottom, transparent, ${COLOR.surface})`,
+          }}
+        />
+
         {/* La franja, cerrada arriba y abajo por dos filetes del verde de marca:
             es lo que la hace leer como cintillo de canal y no como un subtítulo.
             Va con alto mínimo y no fijo: crece con las líneas del titular. */}
@@ -252,13 +283,26 @@ function Cintillo({ titulo, fuente }: DatosCintillo) {
           </div>
         </div>
 
+        {/* Sale del filete inferior hacia abajo. Más corto que el de arriba:
+            ver el porqué de las dos medidas en ALTO_DESVANECE_ARRIBA/ABAJO. */}
+        <div
+          style={{
+            width: "100%",
+            height: ALTO_DESVANECE_ABAJO,
+            display: "flex",
+            backgroundImage: `linear-gradient(to bottom, ${COLOR.surface}, transparent)`,
+          }}
+        />
+
         {/* Logo y cuenta, arriba a la izquierda. El círculo se posiciona en vez
             de ir en el flujo para que pueda asomar por encima del filete
-            superior: dentro de la franja no habría forma de sacarlo. */}
+            superior: dentro de la franja no habría forma de sacarlo. Su `top`
+            ya no es 0: se corre lo que el degradado superior le saca de más a
+            ASOMA, para que siga asomando exactamente lo mismo de siempre. */}
         <div
           style={{
             position: "absolute",
-            top: 0,
+            top: RESERVA_ARRIBA - ASOMA,
             left: MARGEN,
             width: COLUMNA_MARCA,
             display: "flex",
@@ -294,7 +338,7 @@ function Cintillo({ titulo, fuente }: DatosCintillo) {
           {/* La cuenta viaja con el video si alguien lo descarga y lo difunde.
               Va deliberadamente pequeña: tiene que leerse, no competir con el
               titular. */}
-          <span style={{ display: "flex", fontSize: 20, color: COLOR.muted }}>@latasa.online</span>
+          <span style={{ display: "flex", fontSize: 24, color: COLOR.muted }}>@latasa.online</span>
         </div>
       </div>
     </div>
@@ -315,12 +359,13 @@ export async function generarCintillo(datos: DatosCintillo): Promise<Buffer> {
 
   const respuesta = new ImageResponse(<Cintillo {...datos} />, {
     width: ANCHO,
-    // El lienzo se pide con holgura y la pieza se ancla abajo, así que lo que
-    // sobre queda arriba y sale transparente. No se ve: Cloudinary superpone la
-    // capa por su borde inferior (`gravity: south`), de modo que unos píxeles
-    // vacíos de más no mueven la franja ni un milímetro. Es lo que permite
-    // estimar el alto del titular por lo bajo sin arriesgarse a recortarlo.
-    height: altoFranja(datos) + ASOMA,
+    // El lienzo se pide con holgura arriba (el degradado superior, que ya
+    // cubre el asome del círculo) y ahora también abajo (el degradado
+    // inferior). Cloudinary sigue anclando el PNG completo por su borde
+    // inferior (`gravity: south`), así que la franja queda ALTO_DESVANECE_ABAJO
+    // px más arriba del filo real del video que antes — es el precio de que el
+    // borde ya no corte en seco, ver el comentario de ALTO_DESVANECE_ARRIBA/ABAJO.
+    height: altoFranja(datos) + RESERVA_ARRIBA + ALTO_DESVANECE_ABAJO,
     fonts: [
       { name: "Geist", data: regular as unknown as ArrayBuffer, weight: 400, style: "normal" },
       { name: "Geist", data: bold as unknown as ArrayBuffer, weight: 700, style: "normal" },

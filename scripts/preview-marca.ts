@@ -19,12 +19,18 @@ import { cargarEnvLocal } from "./_env";
  *   npx tsx scripts/preview-marca.ts clip.mp4    → video en 1:1, 4:5 y Reel 9:16
  *   npx tsx scripts/preview-marca.ts --public-id <id> --tipo video
  *
- * Opciones: `--titulo`, `--fuente`, `--proporcion 1:1|4:5`, `--segundo N`.
+ * Opciones: `--titulo`, `--fuente`, `--proporcion 1:1|4:5`, `--segundo N`,
+ * `--desde N --hasta N`.
  *
  * `--titulo` y `--fuente` alimentan las dos mitades: en las imágenes son el
  * titular y el crédito del marco; en el video, el cintillo. Con
  * `--titulo "" --fuente ""` el video sale solo con el sello, que es como va el
  * material propio sin acreditar.
+ *
+ * `--desde`/`--hasta` acotan el cintillo a ese intervalo del video (en
+ * segundos); sin ellos, dura todo el clip. `--segundo` es otra cosa: de qué
+ * segundo se saca el fotograma de revisión, no tiene que ver con cuánto dura
+ * el cintillo en pantalla.
  *
  * La marca de las imágenes la compone la plantilla de
  * `app/api/og/instagram-post-news`, así que esas dos URLs necesitan
@@ -52,6 +58,8 @@ interface Opciones {
   titulo: string;
   fuente: string;
   segundo: number;
+  desde?: number;
+  hasta?: number;
   proporcion: ProporcionCarrusel;
 }
 
@@ -94,6 +102,16 @@ function leerOpciones(argv: string[]): Opciones {
       case "--segundo":
         opciones.segundo = Number(valor);
         if (!Number.isFinite(opciones.segundo)) throw new Error("--segundo acepta un número");
+        i += 1;
+        break;
+      case "--desde":
+        opciones.desde = Number(valor);
+        if (!Number.isFinite(opciones.desde)) throw new Error("--desde acepta un número");
+        i += 1;
+        break;
+      case "--hasta":
+        opciones.hasta = Number(valor);
+        if (!Number.isFinite(opciones.hasta)) throw new Error("--hasta acepta un número");
         i += 1;
         break;
       default:
@@ -165,8 +183,14 @@ async function mostrarVideo(publicId: string, opciones: Opciones): Promise<void>
 
   // El cintillo se pide con `--titulo`, igual que el titular del marco en las
   // imágenes: con `--titulo ""` sale la banda baja de solo crédito, y sin
-  // ninguno de los dos el video va únicamente con el sello.
-  const marca = { titulo: opciones.titulo || undefined, fuente: opciones.fuente || undefined };
+  // ninguno de los dos el video va únicamente con el sello. `--hasta` sin
+  // `--desde` arranca en el segundo 0, igual que en `ControlCintillo`.
+  const marca = {
+    titulo: opciones.titulo || undefined,
+    fuente: opciones.fuente || undefined,
+    inicio: opciones.hasta !== undefined ? opciones.desde : undefined,
+    fin: opciones.hasta,
+  };
 
   for (const { formato, titulo } of formatos) {
     bloque(titulo, [
@@ -190,7 +214,7 @@ async function main() {
   const opciones = leerOpciones(process.argv.slice(2));
   if (!opciones.archivo && !opciones.publicId) {
     console.error(
-      "Uso: npx tsx scripts/preview-marca.ts <archivo> [--titulo T] [--fuente F] [--proporcion 1:1|4:5] [--segundo N]",
+      "Uso: npx tsx scripts/preview-marca.ts <archivo> [--titulo T] [--fuente F] [--proporcion 1:1|4:5] [--segundo N] [--desde N --hasta N]",
     );
     console.error("     npx tsx scripts/preview-marca.ts --public-id <id> --tipo imagen|video");
     process.exit(1);

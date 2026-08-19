@@ -362,13 +362,28 @@ export interface MarcaVideo {
   titulo?: string;
   /** Crédito de quien grabó el clip. Solo sale si se pide. */
   fuente?: string;
-  /** Segundos que dura el cintillo en pantalla. Sin valor, dura todo el clip. */
-  segundos?: number;
+  /**
+   * Intervalo en el que se ve el cintillo, en segundos. Sin `fin`, dura todo
+   * el clip — `inicio` solo no basta para decidirlo porque 0 es un inicio
+   * válido. Sin `inicio`, el intervalo arranca en el segundo 0.
+   */
+  inicio?: number;
+  fin?: number;
 }
 
 /** ¿Hay algo que pintar? Sin título ni fuente, el video va solo con los sellos. */
 function llevaCintillo(marca: MarcaVideo): boolean {
   return Boolean(marca.titulo?.trim() || limpiarFuente(marca.fuente));
+}
+
+/**
+ * El intervalo que le toca pasarle a `transformacionMarca`: `undefined`
+ * cuando el cintillo dura todo el clip, que es justo lo que distingue `fin`
+ * sin valor de un intervalo real (0 es un `inicio` válido y no sirve para
+ * decidirlo).
+ */
+function intervaloDe(marca: MarcaVideo): { inicio?: number; fin: number } | undefined {
+  return marca.fin !== undefined ? { inicio: marca.inicio, fin: marca.fin } : undefined;
 }
 
 /**
@@ -391,7 +406,8 @@ function llevaCintillo(marca: MarcaVideo): boolean {
  *   logo y del cintillo se calculan contra el lienzo original y quedan
  *   descuadrados al escalar.
  * - Sin `so_`/`eo_`, Cloudinary aplica el overlay a toda la duración del clip.
- *   `segundos` es lo que lo acota para que el cintillo entre y salga.
+ *   `inicio`/`fin` es lo que lo acota para que el cintillo entre y salga en
+ *   el intervalo pedido, no solo desde el segundo 0.
  *
  * Se encaja con `pad` y no con `fill`: recortar perdería los bordes del
  * encuadre original del video, que es contenido que el usuario grabó.
@@ -403,7 +419,7 @@ function llevaCintillo(marca: MarcaVideo): boolean {
 function transformacionMarca(
   formato: FormatoVideo,
   cintilloPublicId?: string,
-  segundos?: number,
+  intervalo?: { inicio?: number; fin: number },
 ) {
   return [
     { ...LIENZO[formato], crop: "pad", background: "#0b1120" },
@@ -418,7 +434,9 @@ function transformacionMarca(
             y: yDelCintillo(LIENZO[formato].height),
             // Acotar la capa en el tiempo es lo que hace que el cintillo entre
             // y salga como en un noticiero, en vez de quedarse todo el clip.
-            ...(segundos ? { start_offset: "0", end_offset: String(segundos) } : {}),
+            ...(intervalo
+              ? { start_offset: String(intervalo.inicio ?? 0), end_offset: String(intervalo.fin) }
+              : {}),
           },
         ]
       : []),
@@ -462,7 +480,7 @@ export async function urlVideoConMarca(
     resource_type: "video",
     secure: true,
     format: FORMATO_VIDEO_ENTREGADO,
-    transformation: transformacionMarca(formato, cintillo, marca.segundos),
+    transformation: transformacionMarca(formato, cintillo, intervaloDe(marca)),
   });
 }
 
@@ -488,7 +506,7 @@ export async function urlDescargaVideo(
     resource_type: "video",
     secure: true,
     format: FORMATO_VIDEO_ENTREGADO,
-    transformation: [...transformacionMarca(formato, cintillo, marca.segundos), { flags: "attachment" }],
+    transformation: [...transformacionMarca(formato, cintillo, intervaloDe(marca)), { flags: "attachment" }],
   });
 }
 
@@ -512,7 +530,7 @@ export async function urlFotogramaConMarca(
     secure: true,
     format: "jpg",
     start_offset: String(segundo ?? 0),
-    transformation: transformacionMarca(formato, cintillo, marca.segundos),
+    transformation: transformacionMarca(formato, cintillo, intervaloDe(marca)),
   });
 }
 
