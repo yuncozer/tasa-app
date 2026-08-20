@@ -99,13 +99,25 @@ async function pedirA(modelo: string, sistema: string, usuario: string, maxToken
       }),
     });
 
-    if (!response.ok) return null;
+    if (!response.ok) {
+      // `redactar()` sigue sin lanzar —el caller solo ve `null`—, pero sin
+      // esto el motivo real (401 por clave inválida, 404 por política de
+      // datos del modelo, 429 por cuota) se perdía por completo: no había
+      // dónde mirarlo cuando "ningún modelo respondió" en /admin. Queda en
+      // los logs de la función de Vercel, acotado para no volcar HTML entero
+      // si OpenRouter responde con una página de error.
+      const detalle = await response.text().catch(() => "");
+      console.error(`[ia] ${modelo} respondió ${response.status}: ${detalle.slice(0, 300)}`);
+      return null;
+    }
 
     const body = await response.json();
     const texto = body?.choices?.[0]?.message?.content;
     return typeof texto === "string" && texto.trim() ? texto : null;
-  } catch {
-    // Timeout, red caída o JSON inesperado: para el caller son el mismo caso.
+  } catch (error) {
+    // Timeout, red caída o JSON inesperado: para el caller son el mismo caso,
+    // pero también queda registrado para poder distinguirlos en los logs.
+    console.error(`[ia] ${modelo} falló:`, error);
     return null;
   } finally {
     clearTimeout(reloj);
