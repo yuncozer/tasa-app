@@ -16,6 +16,14 @@ function sitioUrl(): string {
 const MARCA_PIE = "📲 ¿Quieres ver la publicación de hoy con las tasas actualizadas?";
 
 /**
+ * La línea con la que cierran las cifras antes del pie. La usan el post
+ * diario y el reporte semanal —cada uno con su propio pie después— y
+ * `quitarPieEnlaces` la reconoce como el otro punto de corte posible, junto a
+ * `MARCA_PIE`.
+ */
+const LINEA_CALCULADORA = "Convierte cualquier monto en la calculadora completa: link en la bio.";
+
+/**
  * El pie de enlaces que comparten el post diario y los de noticia: el post en
  * sí, la calculadora y el canal de WhatsApp. `destinoPost` es `/hoy` para el
  * diario y `/p/<slug>` para una noticia (ver `lib/enlaces.ts`) — en los dos
@@ -40,15 +48,21 @@ export function pieEnlaces(destinoPost: string): string {
 }
 
 /**
- * El cuerpo de un caption sin su pie de enlaces, si lo tenía. La usa
- * `conPieEnlaces` para no ir acumulando pies, y `lib/canal-whatsapp.ts` para
- * partir de un post ya publicado (con su propio pie, apuntando a `/hoy` o
- * `/p/<slug>`) y armar el mensaje del canal con el permalink real en su
+ * El cuerpo de un caption sin su pie, si lo tenía. La usa `conPieEnlaces`
+ * para no ir acumulando pies, y `lib/canal-whatsapp.ts` para partir de un
+ * post ya publicado y armar el mensaje del canal con el permalink real en su
  * lugar.
+ *
+ * Reconoce dos pies distintos: el de tres enlaces (`MARCA_PIE`, el que llevan
+ * las noticias) y el de "link en la bio" + hashtags del post diario (que
+ * empieza en `LINEA_CALCULADORA`, ver `buildCaption`) — ese post no lleva
+ * `pieEnlaces` porque Instagram no vuelve clicables los enlaces del caption.
+ * Da igual cuál traiga: el que llama siempre quiere sustituirlo por el pie de
+ * tres enlaces, así que corta desde el primero de los dos que encuentre.
  */
 export function quitarPieEnlaces(caption: string): string {
   const bloques = caption.split("\n\n");
-  const idx = bloques.findIndex((bloque) => bloque.startsWith(MARCA_PIE));
+  const idx = bloques.findIndex((bloque) => bloque.startsWith(MARCA_PIE) || bloque === LINEA_CALCULADORA);
   return (idx === -1 ? bloques : bloques.slice(0, idx)).join("\n\n").trimEnd();
 }
 
@@ -150,16 +164,19 @@ function lineasEnPesos(snapshot: RatesSnapshot): string[] {
 }
 
 /**
- * Caption del post diario: plantilla fija, sin llamar a ningún API de IA.
- *
- * El pie enlaza tres sitios: el post del día (`/hoy`, no el permalink
- * directo — igual que ese atajo, se resuelve a mano después de publicar y
- * puede escribirse aquí antes de conocer el permalink), la calculadora y el
- * canal de WhatsApp. El de WhatsApp se omite si `ENLACE_WHATSAPP` no está
- * configurado, mismo criterio que ya usa `enlaceWhatsapp()` en `next.config.ts`
- * — no publicar un enlace que no lleva a ningún sitio.
+ * Los hashtags del pie del post diario en Instagram. Los enlaces del pie
+ * compartido (`pieEnlaces`) no sirven ahí porque Instagram no los vuelve
+ * clicables dentro del caption — por eso el post diario no lo usa, al
+ * contrario que los de noticia. Va en su sitio, junto a `LINEA_CALCULADORA`
+ * más abajo, y no en la sección del reporte semanal, porque son dos listas
+ * distintas.
  */
-export function buildCaption(snapshot: RatesSnapshot, momento?: "manana" | "tarde"): string {
+const HASHTAGS_DIARIO =
+  "#Venezuela #Colombia #DolarBCV #DolarParalelo #TasaDeCambio #Cucuta " +
+  "#Binance #EuroVenezuela #TRM #PesoColombiano #LaTasaOnline";
+
+/** Cuerpo del caption del post diario, sin pie: título, subtítulo y las dos listas de cifras. */
+function cuerpoCaptionDiario(snapshot: RatesSnapshot, momento?: "manana" | "tarde"): string {
   const subtitulo = momento ? SUBTITULO_POR_MOMENTO[momento] : "Actualización del día";
 
   return [
@@ -171,8 +188,31 @@ export function buildCaption(snapshot: RatesSnapshot, momento?: "manana" | "tard
     "",
     "🇨🇴 EN PESOS COLOMBIANOS:",
     ...lineasEnPesos(snapshot),
+  ].join("\n");
+}
+
+/**
+ * Caption del post diario que de verdad se publica en Instagram: plantilla
+ * fija, sin llamar a ningún API de IA.
+ *
+ * El pie no lleva los tres enlaces de `pieEnlaces` —Instagram no los vuelve
+ * clicables dentro del caption, así que ahí solo estorban— y en su lugar
+ * cierra con "link en la bio" y los hashtags, que es lo que de verdad ayuda
+ * al alcance de un post normal.
+ *
+ * `formatMensajeCanal` (`lib/canal-whatsapp.ts`) arma la versión para el
+ * canal de WhatsApp a partir de este mismo caption ya publicado: le quita
+ * este pie de hashtags —`quitarPieEnlaces` reconoce `LINEA_CALCULADORA` como
+ * el otro punto de corte posible, junto a `MARCA_PIE`— y pone en su lugar el
+ * pie de tres enlaces, que en WhatsApp sí son clicables.
+ */
+export function buildCaption(snapshot: RatesSnapshot, momento?: "manana" | "tarde"): string {
+  return [
+    cuerpoCaptionDiario(snapshot, momento),
     "",
-    pieEnlaces(`${sitioUrl()}/hoy`),
+    LINEA_CALCULADORA,
+    "",
+    HASHTAGS_DIARIO,
   ].join("\n");
 }
 
@@ -188,9 +228,6 @@ const EMOJI_POR_FILA_SEMANAL: Record<FilaSemanalId, string> = {
 
 /** De dónde salen las tres cifras. En la imagen va en el pie; aquí, buscable y copiable. */
 const FUENTES_SEMANAL = "Fuentes: BCV, Binance P2P y Banco de la República (TRM).";
-
-/** La línea ante la que se inserta el análisis. Ver `conAnalisisSemanal`. */
-const LINEA_CALCULADORA = "Convierte cualquier monto en la calculadora completa: link en la bio.";
 
 /**
  * Mete el párrafo de análisis en su hueco: después de las cifras y antes de la
