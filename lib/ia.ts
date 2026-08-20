@@ -22,9 +22,9 @@ const ENDPOINT = "https://openrouter.ai/api/v1/chat/completions";
  * modelo no puede exigir un despliegue. Estos son solo el punto de partida.
  */
 const MODELOS_POR_DEFECTO = [
-  "meta-llama/llama-3.3-70b-instruct:free",
-  "google/gemma-3-27b-it:free",
-  "mistralai/mistral-small-3.2-24b-instruct:free",
+  "google/gemma-4-31b-it:free",
+  "openai/gpt-oss-20b:free",
+  "z-ai/glm-5.2:free",
 ];
 
 /**
