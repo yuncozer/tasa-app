@@ -96,6 +96,21 @@ export function formatDate(iso: string | null): string {
   return `${String(caracas.getUTCDate()).padStart(2, "0")}/${MESES[caracas.getUTCMonth()].toUpperCase()}/${caracas.getUTCFullYear()}`;
 }
 
+/**
+ * Fecha corta de un día calendario que **ya** está en Caracas —el "YYYY-MM-DD"
+ * que produce `diaCaracasISO()`, como el que guarda `historico_tasas`—, sin
+ * volver a restar el huso horario. Restarlo de nuevo, como hace `formatDate`
+ * con una fecha-hora completa, correría el día un día hacia atrás: aquí no
+ * hay hora que convertir, la conversión ya se hizo al escribir el dato.
+ */
+export function formatFecha(fecha: string): string {
+  const partes = /^(\d{4})-(\d{2})-(\d{2})$/.exec(fecha);
+  if (!partes) return "—";
+
+  const [, anio, mes, dia] = partes;
+  return `${dia}/${MESES[Number(mes) - 1].toUpperCase()}/${anio}`;
+}
+
 export function formatClock(iso: string | null): string {
   if (!iso) return "—";
 

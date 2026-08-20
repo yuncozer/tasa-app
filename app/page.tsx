@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Calculator } from "@/components/Calculator";
 import { Footer } from "@/components/Footer";
 import { InstallPrompt } from "@/components/InstallPrompt";
@@ -48,6 +49,14 @@ export default async function Home({
       <InstallPrompt />
 
       <RatePanel snapshot={snapshot} />
+
+      <Link
+        href="/historial"
+        className="self-center text-sm font-medium text-[color:var(--muted)] underline underline-offset-2"
+      >
+        Ver historial de tasas →
+      </Link>
+
       <Calculator snapshot={snapshot} />
       <Footer fetchedAt={snapshot.fetchedAt} />
     </main>

@@ -59,25 +59,31 @@ export async function GET(request: NextRequest) {
   try {
     const snapshot = await getRates();
 
-    // Archiva el snapshot del día para que el reporte semanal pueda calcular
-    // variaciones. Va en su propio `try` con el error tragado, igual que
-    // `guardarEnlace` más abajo y por el mismo motivo: si fuera dentro del
-    // `try` grande, un Supabase caído convertiría una publicación correcta en
-    // un 500 que invita a reintentar y duplica el post. Lo peor que pasa al
-    // fallar es un hueco de un día, que la ventana de tolerancia de
-    // `leerComparativa` ya absorbe.
+    const momento = momentoDesdeQuery(request);
+
+    // Archiva el snapshot de este disparo (mañana o tarde) para el reporte
+    // semanal y para el historial de `/historial`. Va en su propio `try` con
+    // el error tragado, igual que `guardarEnlace` más abajo y por el mismo
+    // motivo: si fuera dentro del `try` grande, un Supabase caído convertiría
+    // una publicación correcta en un 500 que invita a reintentar y duplica el
+    // post. Lo peor que pasa al fallar es un hueco en ese momento del día, que
+    // la ventana de tolerancia de `leerComparativa` ya absorbe.
     //
     // Se archiva aquí, y no en `getRates()` ni en `/api/rates`, porque este
-    // cron ya corre dos veces al día a hora fija y ya tiene el snapshot en la
-    // mano: en las otras dos sería una escritura por visitante. Y así lo que
-    // queda guardado es exactamente lo que se publicó.
-    try {
-      await registrarSnapshot(snapshot);
-    } catch {
-      // Sin histórico de hoy, el reporte semanal degrada solo.
+    // cron ya corre a hora fija y ya tiene el snapshot en la mano: en las
+    // otras dos sería una escritura por visitante. Y así lo que queda
+    // guardado es exactamente lo que se publicó. Sin `momento` (una prueba
+    // manual sin el parámetro) no hay bajo qué mitad del día archivarlo, así
+    // que se salta en vez de adivinar.
+    if (momento) {
+      try {
+        await registrarSnapshot(snapshot, momento);
+      } catch {
+        // Sin histórico de este disparo, el reporte semanal y /historial degradan solos.
+      }
     }
 
-    const caption = buildCaption(snapshot, momentoDesdeQuery(request));
+    const caption = buildCaption(snapshot, momento);
 
     // El orden es el orden en que se deslizan: bolívares primero.
     const { mediaId } = await publishCarouselPost(

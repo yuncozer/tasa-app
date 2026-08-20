@@ -36,15 +36,24 @@ const DIA_MS = 24 * 60 * 60 * 1000;
  */
 export type ClaveHistorico = RateKey | "TRM";
 
+/**
+ * Los dos disparos diarios del cron de tasas (9:00 am y 6:00 pm en Caracas).
+ * Viaja explícito desde la ruta que dispara el cron, igual que decide el
+ * subtítulo del caption — no se adivina de la hora de escritura.
+ */
+export type Momento = "manana" | "tarde";
+
 export interface PuntoHistorico {
   clave: ClaveHistorico;
   /** Día calendario en Caracas, "YYYY-MM-DD". */
   fecha: string;
+  momento: Momento;
   valor: number;
 }
 
 interface FilaHistorico {
   fecha: string;
+  momento: string;
   clave: string;
   valor: number | string;
 }
@@ -91,11 +100,12 @@ export function desplazarDia(fecha: string, dias: number): string {
 }
 
 /**
- * Anota el snapshot del día.
+ * Anota el snapshot de este disparo del cron (mañana o tarde).
  *
- * Idempotente: la clave primaria `(fecha, clave)` más
- * `resolution=merge-duplicates` hacen que el segundo disparo del día pise al
- * primero, así que lo que queda es el último dato conocido de la jornada.
+ * Idempotente: la clave primaria `(fecha, momento, clave)` más
+ * `resolution=merge-duplicates` hacen que reintentar el mismo disparo no
+ * duplique la fila, pero mañana y tarde ya no se pisan entre sí — cada una
+ * queda archivada por su cuenta.
  *
  * Las tasas que fallaron se saltan en vez de guardarse como cero o como hueco
  * explícito: una fuente caída no es un valor, y la ausencia de fila es lo que
@@ -104,19 +114,19 @@ export function desplazarDia(fecha: string, dias: number): string {
  * La fecha sale de `snapshot.fetchedAt` y no de `new Date()`: lo que se archiva
  * es la fecha del dato, no la del proceso que lo archiva.
  */
-export async function registrarSnapshot(snapshot: RatesSnapshot): Promise<void> {
+export async function registrarSnapshot(snapshot: RatesSnapshot, momento: Momento): Promise<void> {
   const fecha = diaCaracasISO(new Date(snapshot.fetchedAt).getTime());
 
-  const filas: Array<{ fecha: string; clave: ClaveHistorico; valor: number }> = [];
+  const filas: Array<{ fecha: string; momento: Momento; clave: ClaveHistorico; valor: number }> = [];
 
   for (const rate of Object.values(snapshot.rates)) {
     if (rate.bsPerUnit !== null && Number.isFinite(rate.bsPerUnit)) {
-      filas.push({ fecha, clave: rate.key, valor: rate.bsPerUnit });
+      filas.push({ fecha, momento, clave: rate.key, valor: rate.bsPerUnit });
     }
   }
 
   if (snapshot.trm !== null && Number.isFinite(snapshot.trm)) {
-    filas.push({ fecha, clave: "TRM", valor: snapshot.trm });
+    filas.push({ fecha, momento, clave: "TRM", valor: snapshot.trm });
   }
 
   if (filas.length === 0) return;
@@ -129,6 +139,39 @@ export async function registrarSnapshot(snapshot: RatesSnapshot): Promise<void> 
 }
 
 /**
+ * Las últimas lecturas de una clave, más recientes primero.
+ *
+ * Es la fuente del historial que consulta el usuario ("¿cómo estuvo el
+ * Binance venta antier a las 6:00 pm?"): a diferencia de `leerComparativa()`,
+ * que busca un solo punto cerca de una fecha objetivo para el reporte
+ * semanal, aquí se listan filas tal cual quedaron archivadas, con su momento.
+ *
+ * `momento.desc` basta para ordenar tarde antes que mañana dentro del mismo
+ * día porque "tarde" es alfabéticamente mayor que "manana" — no hace falta
+ * `capturado_en`.
+ */
+export async function listarHistorico(clave: ClaveHistorico, limite: number = 60): Promise<PuntoHistorico[]> {
+  const filas = await rest<FilaHistorico[]>(
+    `?clave=eq.${encodeURIComponent(clave)}` +
+      "&select=clave,fecha,momento,valor" +
+      "&order=fecha.desc,momento.desc" +
+      `&limit=${limite}`,
+    { method: "GET" },
+  );
+
+  const puntos: PuntoHistorico[] = [];
+  for (const fila of filas) {
+    const valor = Number(fila.valor);
+    if (!Number.isFinite(valor)) continue;
+    if (fila.momento !== "manana" && fila.momento !== "tarde") continue;
+
+    puntos.push({ clave: fila.clave as ClaveHistorico, fecha: fila.fecha, momento: fila.momento, valor });
+  }
+
+  return puntos;
+}
+
+/**
  * El valor de cada clave lo más cerca posible de `fechaObjetivo`, en un solo
  * viaje a Supabase.
  *
@@ -137,8 +180,10 @@ export async function registrarSnapshot(snapshot: RatesSnapshot): Promise<void> 
  * lunes pasado no se registró nada pero el martes sí, ese dato sirve igual y
  * está más cerca que el del viernes anterior.
  *
- * En caso de empate gana la fecha **más antigua**, para que la comparación no
- * se acorte por debajo de la semana que promete el reporte.
+ * En caso de empate entre dos días distintos gana la fecha **más antigua**,
+ * para que la comparación no se acorte por debajo de la semana que promete el
+ * reporte. Dentro del mismo día, entre mañana y tarde, gana la **tarde**: es
+ * el dato que mejor representa cómo cerró esa jornada.
  *
  * Cuando no hay dato para una clave, esa clave sencillamente no aparece en el
  * `Map`. No se devuelve un `valor: null` ni ningún centinela: quien consume
@@ -159,7 +204,7 @@ export async function leerComparativa(
   const filas = await rest<FilaHistorico[]>(
     `?clave=in.(${claves.map(encodeURIComponent).join(",")})` +
       `&fecha=gte.${desde}&fecha=lte.${hasta}` +
-      "&select=clave,fecha,valor",
+      "&select=clave,fecha,momento,valor",
     { method: "GET" },
   );
 
@@ -168,6 +213,7 @@ export async function leerComparativa(
 
   for (const fila of filas) {
     if (!permitidas.has(fila.clave)) continue;
+    if (fila.momento !== "manana" && fila.momento !== "tarde") continue;
 
     // PostgREST devuelve `numeric` como cadena para no perder precisión.
     const valor = Number(fila.valor);
@@ -180,11 +226,18 @@ export async function leerComparativa(
     if (actual) {
       const distanciaActual = Math.abs(Date.parse(`${actual.fecha}T00:00:00Z`) - objetivoMs);
       if (distancia > distanciaActual) continue;
-      // Empate: se queda la más antigua.
-      if (distancia === distanciaActual && fila.fecha >= actual.fecha) continue;
+      if (distancia === distanciaActual) {
+        if (fila.fecha !== actual.fecha) {
+          // Empate entre días distintos: se queda el más antiguo.
+          if (fila.fecha >= actual.fecha) continue;
+        } else if (!(fila.momento === "tarde" && actual.momento === "manana")) {
+          // Mismo día: solo la tarde reemplaza a la mañana.
+          continue;
+        }
+      }
     }
 
-    resultado.set(clave, { clave, fecha: fila.fecha, valor });
+    resultado.set(clave, { clave, fecha: fila.fecha, momento: fila.momento, valor });
   }
 
   return resultado;
