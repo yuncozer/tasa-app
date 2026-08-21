@@ -5,6 +5,7 @@ import { guardarEnlace } from "@/lib/enlaces";
 import { registrarSnapshot } from "@/lib/historico";
 import { permalinkDeMedia, publishCarouselPost } from "@/lib/instagram";
 import { getRates } from "@/lib/rates";
+import { guardarSnapshotHoy } from "@/lib/snapshot-hoy";
 
 /**
  * Se dispara dos veces al día, hora de Caracas: 9:00 am y 6:00 pm. Cada
@@ -81,6 +82,22 @@ export async function GET(request: NextRequest) {
       } catch {
         // Sin histórico de este disparo, el reporte semanal y /historial degradan solos.
       }
+    }
+
+    // Congela este snapshot como "lo último publicado", para que
+    // `/api/og/instagram-post` y `/api/og/instagram-post-pesos` —que Meta va a
+    // pedir en un momento, y que `/hoy` vuelve a pedir cada vez que alguien
+    // abre esa vista previa después— sirvan siempre esta misma fotografía en
+    // vez de volver a consultar las fuentes. Sin esto, una tasa de Binance que
+    // se mueve entre la publicación y esa visita deja la imagen diciendo un
+    // número distinto del que ya quedó escrito en el caption. Va en su propio
+    // `try` con el error tragado por el mismo motivo que `registrarSnapshot`
+    // arriba: lo peor que pasa al fallar es que la imagen vuelva a calcularse
+    // en vivo, degradación que ya contempla `snapshotDelDia()`.
+    try {
+      await guardarSnapshotHoy(snapshot);
+    } catch {
+      // Sin snapshot congelado, las imágenes del post caen a las tasas en vivo.
     }
 
     const caption = buildCaption(snapshot, momento);

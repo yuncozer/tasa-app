@@ -2,14 +2,17 @@ import { ImageResponse } from "next/og";
 import { formatClock, formatDate, formatRate } from "@/lib/format";
 import { AIRE_LATERAL, AVISO_TASAS, COLOR, Encabezado, FilaMoneda, Pie, leerFontBuffer, leerSvgComoDataUri } from "@/lib/og-shared";
 import { buildFilasPesos, type FilaPesosId } from "@/lib/pesos";
-import { getRates } from "@/lib/rates";
+import { snapshotDelDia } from "@/lib/snapshot-hoy";
 import type { RatesSnapshot } from "@/lib/types";
 
 /**
  * Imagen del post diario en **pesos**: la misma plantilla que
  * `app/api/og/instagram-post`, con las tasas vistas desde el lado colombiano de
  * la frontera. Igual que aquella, va sin autenticación porque Instagram
- * descarga la URL por su cuenta (`image_url` de la Graph API).
+ * descarga la URL por su cuenta (`image_url` de la Graph API), y por el mismo
+ * motivo lee `snapshotDelDia()` en vez de `getRates()`: esta ruta también
+ * sirve la vista previa de `/hoy`, pedida en cualquier momento después de
+ * publicar.
  */
 export const runtime = "nodejs";
 
@@ -94,7 +97,7 @@ function PostImage({
 
 export async function GET() {
   const [snapshot, geistRegular, geistBold, instagramIcon, browserIcon, ...banderasSvg] = await Promise.all([
-    getRates(),
+    snapshotDelDia(),
     leerFontBuffer("Geist-Regular.ttf"),
     leerFontBuffer("Geist-Bold.ttf"),
     leerSvgComoDataUri("instagram-icon.svg"),

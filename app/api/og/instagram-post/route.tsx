@@ -1,7 +1,7 @@
 import { ImageResponse } from "next/og";
 import { formatClock, formatDate, formatRate, vigenciaBcv } from "@/lib/format";
 import { AIRE_LATERAL, AVISO_TASAS, COLOR, Encabezado, FilaMoneda, Pie, leerFontBuffer, leerSvgComoDataUri } from "@/lib/og-shared";
-import { getRates } from "@/lib/rates";
+import { snapshotDelDia } from "@/lib/snapshot-hoy";
 import type { Rate, RateKey, RatesSnapshot } from "@/lib/types";
 
 /**
@@ -10,6 +10,12 @@ import type { Rate, RateKey, RatesSnapshot } from "@/lib/types";
  * que los montos y la fecha salgan siempre correctos. Instagram la busca
  * como una URL pública normal (`image_url` de la Graph API), así que esta
  * ruta va sin autenticación, a diferencia del cron que la dispara.
+ *
+ * Esta misma URL sirve dos peticiones distintas: la de Meta al publicar, y la
+ * de `/hoy` cada vez que alguien abre esa vista previa después. Por eso el
+ * snapshot sale de `snapshotDelDia()` (el que el cron congeló al publicar) y
+ * no de `getRates()` en vivo: si el dólar Binance se mueve entre medias, la
+ * imagen tiene que seguir diciendo lo mismo que el caption ya publicado.
  */
 export const runtime = "nodejs";
 
@@ -101,7 +107,7 @@ function PostImage({ snapshot, banderas, icons }: { snapshot: RatesSnapshot; ban
 
 export async function GET() {
   const [snapshot, geistRegular, geistBold, instagramIcon, browserIcon, ...banderasSvg] = await Promise.all([
-    getRates(),
+    snapshotDelDia(),
     leerFontBuffer("Geist-Regular.ttf"),
     leerFontBuffer("Geist-Bold.ttf"),
     leerSvgComoDataUri("instagram-icon.svg"),
