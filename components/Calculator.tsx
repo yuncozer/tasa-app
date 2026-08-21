@@ -13,6 +13,23 @@ import type { RateKey, RatesSnapshot } from "@/lib/types";
 const MAX_INTEGER_DIGITS = 12;
 const MAX_DECIMALS = 2;
 
+/**
+ * La primera base que hoy tiene precio, en el orden en que se muestran.
+ *
+ * El origen no puede quedarse apuntando a una tasa caída: sus botones se
+ * deshabilitan, así que el usuario no tendría cómo salir de ahí y la
+ * calculadora entera mostraría "—" (`convert()` devuelve `null` en todos los
+ * destinos cuando el origen es nulo). Pasaba con el arranque en `USD_BCV`, que
+ * es la tasa más frágil de todas: se raspa de la portada del BCV.
+ *
+ * Siempre encuentra alguna, porque `VES` vale 1 por construcción y nunca es
+ * nula; el `?? "USD_BCV"` es solo para no devolver `undefined` si algún día
+ * eso cambia.
+ */
+function primeraDisponible(snapshot: RatesSnapshot): RateKey {
+  return RATE_ORDER.find((key) => snapshot.rates[key].bsPerUnit !== null) ?? "USD_BCV";
+}
+
 /** Aplica una tecla al monto que se está escribiendo. */
 function applyKey(current: string, key: KeypadKey): string {
   if (key === "back") return current.slice(0, -1);
@@ -46,9 +63,16 @@ function displayValue(raw: string): string {
 
 export function Calculator({ snapshot }: { snapshot: RatesSnapshot }) {
   const [raw, setRaw] = useState("100");
-  const [from, setFrom] = useState<RateKey>("USD_BCV");
+  const [elegida, setElegida] = useState<RateKey | null>(null);
   const [isRefreshing, startRefresh] = useTransition();
   const router = useRouter();
+
+  // La moneda origen se **deriva** en vez de guardarse tal cual: así, si la
+  // tasa elegida se cae al actualizar, el origen se corrige solo en el mismo
+  // render en vez de quedar apuntando a un botón deshabilitado.
+  const candidata = elegida ?? "USD_BCV";
+  const from =
+    snapshot.rates[candidata].bsPerUnit !== null ? candidata : primeraDisponible(snapshot);
 
   const conversion = useMemo(
     () => convert(parseInput(raw), from, snapshot),
@@ -86,7 +110,7 @@ export function Calculator({ snapshot }: { snapshot: RatesSnapshot }) {
               <button
                 key={key}
                 type="button"
-                onClick={() => setFrom(key)}
+                onClick={() => setElegida(key)}
                 aria-pressed={selected}
                 disabled={rate.bsPerUnit === null}
                 className={`rounded-xl border px-2 py-2 text-sm font-semibold transition active:scale-95 disabled:opacity-40 ${

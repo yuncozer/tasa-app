@@ -56,6 +56,26 @@ const nextConfig: NextConfig = {
         ],
       },
       {
+        // El historial sale de `historico_tasas`, que solo cambia cuando corre
+        // el cron: dos veces al día. Sin esta cabecera cada visita —y cada
+        // cambio de pestaña o de tasa, que son navegaciones nuevas— sería un
+        // viaje a Supabase, porque `lib/historico.ts` consulta con `no-store` y
+        // eso vuelve dinámica la página. Es la misma consulta-por-visitante que
+        // el proyecto ya evita en la portada, y se resuelve igual: desde aquí,
+        // porque Next fuerza `no-store` en las páginas dinámicas.
+        //
+        // Diez minutos es holgado frente a dos actualizaciones diarias, y la
+        // CDN reparte por URL completa, así que `?vista=` y `?clave=` conservan
+        // cada una su copia.
+        source: "/historial",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=0, s-maxage=600, stale-while-revalidate=3600",
+          },
+        ],
+      },
+      {
         // Sin estas cabeceras el navegador puede quedarse con un service worker
         // antiguo y la app dejaría de actualizarse sola.
         source: "/sw.js",

@@ -10,7 +10,7 @@
  * respuesta de `/api/` desde la caché, porque ahí sí pasaría por fresca.
  */
 
-const VERSION = "v5";
+const VERSION = "v6";
 const ATAJOS = ["/hoy", "/ig", "/wa"];
 const CACHE_PAGINA = `latasa-pagina-${VERSION}`;
 const CACHE_ESTATICOS = `latasa-estaticos-${VERSION}`;
@@ -20,6 +20,25 @@ const PREFIJOS_VIEJOS = ["tasapp-", "latasa-"];
 
 /** Clave única para la portada: así `?actualizar=…` no llena la caché. */
 const CLAVE_PORTADA = "/";
+
+/**
+ * Bajo qué clave se guarda una navegación: **su ruta, sin la query**.
+ *
+ * Las dos mitades importan. Que sea la ruta y no una clave fija es lo que
+ * impide que visitar otra página sobreescriba la copia de la portada: con
+ * `CLAVE_PORTADA` para todo, abrir `/historial` con señal dejaba su HTML
+ * guardado como si fuera la portada, y sin conexión la app abría en el
+ * historial en vez de en la calculadora.
+ *
+ * Y que se descarte la query es la razón original de `CLAVE_PORTADA`: sin eso,
+ * cada `?actualizar=<marca>` —que cambia en cada pulsación del botón— dejaría
+ * una entrada nueva y la caché crecería sin fin. El costo asumido es que
+ * `/historial?vista=bs` y `?vista=cop` comparten copia, así que sin conexión se
+ * ve la última visitada; es el mismo criterio que ya se aplicaba a la portada.
+ */
+function claveDeNavegacion(request) {
+  return new URL(request.url).pathname;
+}
 
 /**
  * Guarda la portada y sus estáticos durante la instalación.
@@ -100,16 +119,25 @@ y a partir de entonces funcionará también sin señal.</p></div></body></html>`
   );
 }
 
-/** Red primero: si responde, se guarda copia; si no, se sirve la última buena. */
-async function portada(request) {
+/**
+ * Red primero: si responde, se guarda copia; si no, se sirve la última buena.
+ *
+ * Sin conexión se busca primero la copia de **esa misma ruta** y solo después
+ * se cae a la portada: así `/historial` offline muestra el historial que se vio
+ * la última vez —cada fila lleva su fecha a la vista, de modo que no hay riesgo
+ * de hacer pasar un dato viejo por fresco— y, sobre todo, abrir la app en `/`
+ * sigue mostrando la calculadora aunque antes se haya visitado otra página.
+ */
+async function navegacion(request) {
   const cache = await caches.open(CACHE_PAGINA);
+  const clave = claveDeNavegacion(request);
 
   try {
     const respuesta = await fetch(request);
-    if (respuesta.ok) await cache.put(CLAVE_PORTADA, respuesta.clone());
+    if (respuesta.ok) await cache.put(clave, respuesta.clone());
     return respuesta;
   } catch {
-    const guardada = await cache.match(CLAVE_PORTADA);
+    const guardada = (await cache.match(clave)) ?? (await cache.match(CLAVE_PORTADA));
     return guardada ?? paginaDeCortesia();
   }
 }
@@ -148,7 +176,7 @@ self.addEventListener("fetch", (event) => {
   if (ATAJOS.includes(url.pathname) || url.pathname.startsWith("/p/")) return;
 
   if (request.mode === "navigate") {
-    event.respondWith(portada(request));
+    event.respondWith(navegacion(request));
     return;
   }
 
