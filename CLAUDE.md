@@ -151,6 +151,48 @@ La conexión y la posibilidad de instalar son estado externo a React. Leerlos co
 hidratación; `useSyncExternalStore` además permite declarar un valor distinto para
 el servidor, que es lo que evita el desajuste.
 
+Por ahí se leen también la moneda origen recordada
+(`lib/preferencia-moneda.ts`) y si el navegador deja leer el portapapeles: las
+dos son estado del dispositivo y las dos necesitan un valor propio para el
+servidor. `localStorage` va envuelto en `try/catch` porque Safari en navegación
+privada lanza al tocarlo, y eso se lee desde `getSnapshot`: una excepción ahí
+tumbaría el render. La lectura se memoriza porque `getSnapshot` tiene que
+devolver siempre el mismo valor mientras nada cambie, o React vuelve a
+renderizar sin fin.
+
+### La calculadora acompaña cómo se usa de verdad
+
+- **La moneda origen se deriva, no se guarda tal cual.** Manda lo que se toque
+  en esta sesión; si no, la preferencia recordada; si no, el arranque por
+  defecto — y si esa tasa está caída, la primera que sí tenga precio. Ese
+  último eslabón no es teórico: arrancaba fija en `USD_BCV`, que es la tasa más
+  frágil de todas (se raspa de la portada del banco) y cuyo botón se
+  deshabilita al fallar, así que el origen quedaba apuntando a una tasa nula,
+  `convert()` devolvía `null` en **todos** los destinos y no había forma de
+  salir de ahí desde la interfaz. `VES` vale 1 por construcción, así que nunca
+  se queda sin salida.
+- **Se recuerda la moneda, nunca el monto.** Una cifra vieja reaparecida en
+  pantalla se confunde con el resultado de ahora, que es justo el daño que esta
+  app no puede causar.
+- **Copiar y pegar existen porque la cifra viaja por WhatsApp.** Sin copiar hay
+  que transcribir el número a mano, que es donde se cuela un dígito cambiado;
+  sin pegar no hay forma de meter un monto que llega por chat, porque el
+  teclado propio no da esa vía. El botón "Pegar" se oculta donde el navegador
+  no deja leer el portapapeles: uno que nunca funciona es peor que ninguno.
+- **`normalizarMontoPegado()` (`lib/format.ts`) no adivina el país.** Acepta
+  "1.234,56", "1,234.56" y "Bs 3.055,27" por igual: si aparecen los dos
+  separadores manda el último; si solo hay uno, es de miles **solo** con tres
+  cifras detrás y algo distinto de cero delante. Esa última condición es la que
+  salva `"0,2993"` —la tasa del peso frontera— de leerse como 2993.
+- **El teclado propio se queda**, aunque ahora también responda el físico: un
+  `<input>` levantaría el teclado del sistema tapando los resultados, y la
+  gracia es ver el monto y sus equivalentes a la vez.
+- **Los grid items llevan `min-w-0`.** Una celda de grid no se encoge por
+  debajo de su contenido salvo que se le diga, así que un monto largo ensanchaba
+  la columna de equivalencias y con ella la página entera —el teclado se
+  estiraba detrás sin tener la culpa—. Al tocar esa zona conviene comprobarlo a
+  390 px con el tope de 12 dígitos, que es donde se nota.
+
 ### Hay tres cachés y cada una resuelve algo distinto
 
 | Dónde | Alcance | Para qué |
@@ -170,7 +212,19 @@ Lo que hay que respetar:
 - Next fuerza `no-store` en las páginas dinámicas, así que la cabecera de caché de
   la portada se pone desde `next.config.ts`. Si tocas eso, comprueba que Next siga
   emitiendo `Vary` sobre las cabeceras RSC: sin ese `Vary`, la CDN devolvería HTML
-  donde el navegador espera la carga de navegación interna.
+  donde el navegador espera la carga de navegación interna. `/historial` lleva la
+  suya (`s-maxage=600`) por el mismo motivo.
+- **Cada navegación se cachea bajo su propia ruta**, no bajo una clave fija.
+  Durante un tiempo el service worker guardaba *toda* navegación como si fuera
+  la portada, así que visitar `/historial` con señal dejaba su HTML bajo `"/"`
+  y, sin conexión, la app abría en el historial en vez de en la calculadora.
+  Se comprobó comparando las dos versiones sobre perfiles limpios. Lo que sí
+  se conserva es descartar la **query**: esa era la razón de ser de la clave
+  fija —si no, cada `?actualizar=<marca>` dejaría una entrada nueva—, con el
+  costo asumido de que `/historial?vista=bs` y `?vista=cop` comparten copia.
+  Ojo al depurarlo: el `stale-while-revalidate` de la portada puede hacer que
+  el `fetch` interno del worker aún tenga éxito sin red, y eso enmascara el
+  fallo en una prueba rápida.
 
 ### El service worker precarga al instalarse
 
@@ -179,6 +233,11 @@ gobierna las peticiones, así que la navegación que la trae no pasa por él y n
 guarda nada. Los nombres de los archivos de Next llevan un hash que cambia en cada
 compilación, de modo que se leen del propio HTML en lugar de mantener una lista
 fija que quedaría obsoleta al primer despliegue.
+
+Solo precarga la portada; las demás rutas entran en la caché al visitarse.
+Servir `/historial` viejo sin conexión es correcto por definición: cada fila
+lleva su fecha a la vista, así que no hay riesgo de hacer pasar un dato
+caducado por fresco, que es la única regla dura de estas cachés.
 
 `VERSION` en `public/sw.js` se sube **a mano**: si cambias la estrategia y no lo
 haces, quedan copias viejas colgadas en los dispositivos.
@@ -372,19 +431,29 @@ una con su valor y **cuánto se movió en siete días**. Se dispara a mano desde
   duplica el post. Es el mismo criterio que `guardarEnlace` y `calentarVideo`.
   No lo muevas a `getRates()` ni a `/api/rates`: ahí sería una escritura por
   visitante.
-- **Una fila por `(fecha, clave)`, no un JSON por día.** La pregunta que se le
-  hace a la tabla es siempre "cuánto valía X alrededor del día D", y los huecos
-  son por clave y no por día —el BCV se raspa y puede caerse mientras Binance
-  responde—. Con un JSON habría que traer la semana entera y desenrollarla para
-  descubrir que justo esa clave venía nula. La clave primaria es lo que hace
-  idempotente el upsert: el cron dispara dos veces al día y el segundo disparo
-  **pisa** al primero, así que lo guardado es el último dato conocido de la
-  jornada. Verificado en vivo: dos escrituras, una sola fila.
+- **Una fila por `(fecha, momento, clave)`, no un JSON por día.** La pregunta
+  que se le hace a la tabla es siempre "cuánto valía X alrededor del día D", y
+  los huecos son por clave y no por día —el BCV se raspa y puede caerse
+  mientras Binance responde—. Con un JSON habría que traer la semana entera y
+  desenrollarla para descubrir que justo esa clave venía nula. La clave
+  primaria es lo que hace idempotente el upsert: reintentar el mismo disparo no
+  duplica nada.
+
+  El `momento` ('manana' o 'tarde') entró con la migración `0005`. Antes la
+  clave era `(fecha, clave)` y el disparo de las 6:00 pm **pisaba** al de las
+  9:00 am, así que del día solo quedaba la última lectura: suficiente para el
+  reporte semanal —que compara semana contra semana— pero no para responder
+  "¿cómo estuvo el Binance venta antier a las 6:00 pm?", que es lo que pide
+  `/historial`. No se adivina de `capturado_en`: viaja explícito desde el cron
+  (`?momento=`), igual que ya decidía el subtítulo del caption. Sin ese
+  parámetro —una prueba manual sin él— no se archiva, en vez de inventar bajo
+  qué mitad del día guardarlo.
 - **La ventana de tolerancia es simétrica** (±3 días). Si el cron falló el lunes
   pero corrió el martes, ese dato sirve y está más cerca que el del viernes
-  anterior. En empate gana la fecha más antigua, para que la comparación no se
-  acorte por debajo de la semana. No la amplíes a diez días: entonces "esta
-  semana" deja de ser una semana.
+  anterior. En empate entre dos días distintos gana la fecha más antigua, para
+  que la comparación no se acorte por debajo de la semana; dentro del mismo día
+  gana la **tarde**, que representa mejor cómo cerró esa jornada. No la amplíes
+  a diez días: entonces "esta semana" deja de ser una semana.
 - **Sin dato, la clave no aparece en el `Map`.** Nada de `valor: null` ni
   centinelas: quien consume tiene que distinguir "no hay comparación" de "el valor
   era cero". En la imagen eso se ve como `Sin comparación` en gris, sin flecha y
@@ -449,6 +518,44 @@ una con su valor y **cuánto se movió en siete días**. Se dispara a mano desde
   `npx tsx scripts/preview-semanal.ts --sin-historico`; ese flag vive **en el
   script y nunca en la ruta**, porque un parámetro que falsea datos en una URL
   pública es justo lo que la ausencia de firma no debe permitir.
+
+### `/historial` enseña lo archivado, y por eso el histórico guarda mañana y tarde
+
+El histórico nació para el reporte semanal, pero la pregunta que de verdad
+llega es otra: "¿a cómo estaba el Binance venta antier a las 6:00 pm?".
+`/historial` la responde, y es lo que obligó a que `historico_tasas` distinga
+los dos disparos del día (ver la sección anterior).
+
+- **Dos vistas, las mismas dos que se publican**: en bolívares —una tasa a la
+  vez, la que se elige arriba— y en pesos, con las cuatro filas de
+  `lib/pesos.ts` juntas. En pesos no hay selector de tasa suelta a propósito:
+  así es como salen en la diapositiva del post, y separarlas rompería la
+  comparación que esa vista propone. `listarHistoricoPesos()` las reconstruye
+  con la misma lógica que el post —la TRM tal cual, las tres de frontera
+  cruzando por `COP_FRONTERA`— así que el historial y lo publicado no pueden
+  decir cosas distintas. `VES` no se pide: vale 1 por construcción, y el
+  bolívar promedio se simplifica a `1 ÷ COP_FRONTERA`, el mismo atajo que ya
+  usa `buildFilasPesos()`.
+- **La vista y la tasa viajan por query string** (`?vista=` y `?clave=`), no en
+  estado de cliente: la página ya se renderiza en el servidor y un enlace
+  normal resuelve el caso sin JavaScript, mismo criterio que el `?actualizar=`
+  de la portada.
+- **Lleva cabecera de CDN** (`s-maxage=600` en `next.config.ts`, junto a la de
+  la portada y por el mismo motivo). `lib/historico.ts` consulta con
+  `no-store`, lo que vuelve dinámica la página, así que sin esa cabecera cada
+  visita —y cada cambio de pestaña o de tasa, que son navegaciones nuevas—
+  sería un viaje a Supabase para datos que solo cambian dos veces al día. Es la
+  misma consulta-por-visitante que la portada ya tiene prohibida.
+- **El sparkline es SVG a mano** (`components/Sparkline.tsx`), sin librería de
+  gráficos: añadir una costaría más de cien kilobytes en una app pensada para
+  señal intermitente. Es componente de servidor, así que no lleva ni una línea
+  de JavaScript al navegador. Va **solo en la vista en bolívares**: la de pesos
+  muestra cuatro series a la vez y una sola línea sin leyenda sería ambigua.
+  Con menos de dos puntos no dibuja nada, y una serie plana va centrada en vez
+  de dividir entre cero.
+- **El service worker la cachea aparte de la portada.** Ver la sección de las
+  tres cachés: cada navegación se guarda bajo su propia ruta justamente porque
+  esta página lo destapó.
 
 ### Los crons ya no son de Vercel, y por eso hay cola de programadas
 
@@ -580,12 +687,27 @@ Lo demás que hay que respetar:
   chats de gente que no va a volver a preguntar.
 - **Solo lo anota el cron de tasas.** Los posts de noticias de `/admin` no tocan
   `/hoy`: "el post del día" es el de tasas.
+- **La imagen de la vista previa es la que se publicó, no una recalculada.**
+  `/api/og/instagram-post` y `/api/og/instagram-post-pesos` sirven dos cosas
+  distintas: la descarga que hace Meta al publicar y la vista previa de `/hoy`,
+  que se vuelve a pedir cada vez que alguien abre ese enlace — por ejemplo al
+  pegar el mensaje en el canal media hora más tarde. Mientras leyeron
+  `getRates()` en vivo, un Binance que se moviera entre medias dejaba la imagen
+  diciendo una cifra distinta de la que ya estaba escrita en el caption
+  publicado: el mismo post afirmando dos números para la misma tasa. Ahora el
+  cron congela el snapshot con el que arma el caption (`lib/snapshot-hoy.ts`,
+  tabla `snapshot_hoy`, una sola fila que se sobreescribe en cada disparo) justo
+  antes de publicar, y las dos rutas leen `snapshotDelDia()`. Si no hay nada
+  congelado —arranque en frío, o Supabase caído— caen a las tasas en vivo, que
+  es peor que la consistencia buscada pero mejor que una imagen rota. No es
+  histórico: para eso está `historico_tasas`, que sí conserva mañana y tarde.
 - `/hoy` va con `Cache-Control: no-store` desde `next.config.ts`, junto a la cabecera
   de la portada. Si la CDN se queda una copia, el enlace lleva toda la tarde al post
   de la mañana.
-- **El service worker tiene que dejarla pasar.** Sirve *cualquier* navegación desde
-  la caché de la portada, así que sin la guarda de `ATAJOS` en `public/sw.js` `/hoy`
-  mostraría la portada en vez de abrir el post. Al tocar eso se sube `VERSION`.
+- **El service worker tiene que dejarla pasar.** Sin la guarda de `ATAJOS` en
+  `public/sw.js`, `/hoy` se serviría de la caché de navegación —su propia copia,
+  desde el cambio de clave por ruta— en vez de resolver en el servidor a dónde
+  lleva hoy. Al tocar eso se sube `VERSION`.
 - **`/wa` no tiene respaldo en el código**, al contrario que `/ig`: un número de
   WhatsApp no se adivina y uno inventado mandaría a un chat ajeno. Sin
   `ENLACE_WHATSAPP` la ruta simplemente no existe.
