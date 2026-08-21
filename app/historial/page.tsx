@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Logo } from "@/components/Logo";
+import { Sparkline } from "@/components/Sparkline";
 import { formatFecha, formatRate } from "@/lib/format";
 import { listarHistorico, listarHistoricoPesos, type Momento } from "@/lib/historico";
 import { RATE_ORDER, rateMeta } from "@/lib/rates";
@@ -119,23 +120,37 @@ async function HistorialBolivares({ clave }: { clave: RateKey }) {
       ) : puntos.length === 0 ? (
         <AvisoVacio texto={`Todavía no hay lecturas archivadas de ${rateMeta(clave).label}.`} />
       ) : (
-        <ul className="divide-y divide-[color:var(--border)] overflow-hidden rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface)]">
-          {puntos.map((punto) => (
-            <li
-              key={`${punto.fecha}-${punto.momento}`}
-              className="flex items-center justify-between gap-3 px-4 py-3"
-            >
-              <div className="flex flex-col">
-                <span className="text-sm font-medium">{formatFecha(punto.fecha)}</span>
-                <span className="text-xs text-[color:var(--muted)]">{MOMENTO_LABEL[punto.momento]}</span>
-              </div>
-              <p className="tabular text-lg font-semibold leading-none">
-                {formatRate(punto.valor)}
-                <span className="ml-1 text-sm font-normal text-[color:var(--muted)]">Bs</span>
-              </p>
-            </li>
-          ))}
-        </ul>
+        <>
+          {/* La serie llega de la más reciente a la más antigua, que es como se
+              lee la lista; el gráfico necesita el orden contrario, porque el
+              tiempo avanza hacia la derecha. */}
+          <div className="rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface)] px-4 py-3">
+            <Sparkline
+              valores={puntos.map((punto) => punto.valor).reverse()}
+              etiqueta={rateMeta(clave).label}
+            />
+          </div>
+
+          <ul className="divide-y divide-[color:var(--border)] overflow-hidden rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface)]">
+            {puntos.map((punto) => (
+              <li
+                key={`${punto.fecha}-${punto.momento}`}
+                className="flex items-center justify-between gap-3 px-4 py-3"
+              >
+                <div className="flex flex-col">
+                  <span className="text-sm font-medium">{formatFecha(punto.fecha)}</span>
+                  <span className="text-xs text-[color:var(--muted)]">
+                    {MOMENTO_LABEL[punto.momento]}
+                  </span>
+                </div>
+                <p className="tabular text-lg font-semibold leading-none">
+                  {formatRate(punto.valor)}
+                  <span className="ml-1 text-sm font-normal text-[color:var(--muted)]">Bs</span>
+                </p>
+              </li>
+            ))}
+          </ul>
+        </>
       )}
     </>
   );

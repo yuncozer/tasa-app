@@ -1,11 +1,17 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ConversionResults } from "@/components/ConversionResults";
 import { Keypad, type KeypadKey } from "@/components/Keypad";
 import { convert } from "@/lib/convert";
-import { parseInput } from "@/lib/format";
+import { normalizarMontoPegado, parseInput } from "@/lib/format";
+import {
+  guardarMoneda,
+  monedaEnServidor,
+  monedaGuardada,
+  suscribirMoneda,
+} from "@/lib/preferencia-moneda";
 import { RATE_ORDER } from "@/lib/rates";
 import type { RateKey, RatesSnapshot } from "@/lib/types";
 
@@ -29,6 +35,19 @@ const MAX_DECIMALS = 2;
 function primeraDisponible(snapshot: RatesSnapshot): RateKey {
   return RATE_ORDER.find((key) => snapshot.rates[key].bsPerUnit !== null) ?? "USD_BCV";
 }
+
+/**
+ * Si este navegador deja leer el portapapeles.
+ *
+ * Se consulta con `useSyncExternalStore` y no en el propio render porque en el
+ * servidor no existe `navigator`: declarar aparte el valor del servidor es lo
+ * que evita el desajuste de hidratación, el mismo motivo por el que se lee así
+ * la preferencia de moneda. No hay a qué suscribirse —la capacidad no cambia
+ * mientras la página vive—, de ahí la baja vacía.
+ */
+const sinCambios = () => () => {};
+const hayPortapapeles = () => typeof navigator?.clipboard?.readText === "function";
+const noEnServidor = () => false;
 
 /** Aplica una tecla al monto que se está escribiendo. */
 function applyKey(current: string, key: KeypadKey): string {
@@ -67,12 +86,72 @@ export function Calculator({ snapshot }: { snapshot: RatesSnapshot }) {
   const [isRefreshing, startRefresh] = useTransition();
   const router = useRouter();
 
-  // La moneda origen se **deriva** en vez de guardarse tal cual: así, si la
-  // tasa elegida se cae al actualizar, el origen se corrige solo en el mismo
-  // render en vez de quedar apuntando a un botón deshabilitado.
-  const candidata = elegida ?? "USD_BCV";
+  const guardada = useSyncExternalStore(suscribirMoneda, monedaGuardada, monedaEnServidor);
+  const puedePegar = useSyncExternalStore(sinCambios, hayPortapapeles, noEnServidor);
+
+  // La moneda origen se **deriva** en vez de guardarse tal cual, y de ahí salen
+  // tres comportamientos con una sola expresión: manda lo que se toque en esta
+  // sesión, si no la preferencia recordada, si no el arranque por defecto; y si
+  // esa tasa está caída se cae a la primera con precio, para no quedar
+  // apuntando a un botón deshabilitado.
+  const candidata = elegida ?? guardada ?? "USD_BCV";
   const from =
     snapshot.rates[candidata].bsPerUnit !== null ? candidata : primeraDisponible(snapshot);
+
+  const elegir = useCallback((key: RateKey) => {
+    setElegida(key);
+    guardarMoneda(key);
+  }, []);
+
+  const escribir = useCallback((key: KeypadKey) => {
+    setRaw((current) => applyKey(current, key));
+  }, []);
+
+  const limpiar = useCallback(() => setRaw(""), []);
+
+  const pegar = useCallback(async () => {
+    try {
+      const texto = await navigator.clipboard.readText();
+      const monto = normalizarMontoPegado(texto, MAX_INTEGER_DIGITS, MAX_DECIMALS);
+      // Sin monto reconocible no se toca lo que ya había: vaciar el display
+      // por pegar una cadena cualquiera sería peor que no hacer nada.
+      if (monto !== null) setRaw(monto);
+    } catch {
+      // El permiso de portapapeles se puede denegar en el momento; no hay nada
+      // que reportar más allá de que no pasa nada.
+    }
+  }, []);
+
+  // El teclado físico no hacía nada en escritorio, donde el teclado en pantalla
+  // es lo único que había. No se toca el del sistema en el teléfono: allí no
+  // hay eventos de teclado sin un campo enfocado.
+  useEffect(() => {
+    const alPulsar = (evento: KeyboardEvent) => {
+      if (evento.ctrlKey || evento.metaKey || evento.altKey) return;
+
+      // Si el foco está en algo donde se escribe, manda ese campo.
+      const activo = document.activeElement;
+      if (
+        activo instanceof HTMLInputElement ||
+        activo instanceof HTMLTextAreaElement ||
+        (activo instanceof HTMLElement && activo.isContentEditable)
+      ) {
+        return;
+      }
+
+      const { key } = evento;
+      if (/^\d$/.test(key)) setRaw((actual) => applyKey(actual, key));
+      else if (key === "," || key === ".") setRaw((actual) => applyKey(actual, ","));
+      else if (key === "Backspace") setRaw((actual) => applyKey(actual, "back"));
+      else if (key === "Escape") setRaw("");
+      else return;
+
+      evento.preventDefault();
+    };
+
+    window.addEventListener("keydown", alPulsar);
+    return () => window.removeEventListener("keydown", alPulsar);
+  }, []);
 
   const conversion = useMemo(
     () => convert(parseInput(raw), from, snapshot),
@@ -110,7 +189,7 @@ export function Calculator({ snapshot }: { snapshot: RatesSnapshot }) {
               <button
                 key={key}
                 type="button"
-                onClick={() => setElegida(key)}
+                onClick={() => elegir(key)}
                 aria-pressed={selected}
                 disabled={rate.bsPerUnit === null}
                 className={`rounded-xl border px-2 py-2 text-sm font-semibold transition active:scale-95 disabled:opacity-40 ${
@@ -136,8 +215,12 @@ export function Calculator({ snapshot }: { snapshot: RatesSnapshot }) {
         </output>
       </section>
 
-      <div className="grid gap-5 lg:grid-cols-2">
-        <Keypad onKey={(key) => setRaw((current) => applyKey(current, key))} onClear={() => setRaw("")} />
+      {/* `min-w-0` en los hijos: una celda de grid no se encoge por debajo de
+          su contenido salvo que se le diga, así que un monto largo en las
+          equivalencias ensanchaba la columna y, con ella, la página entera —el
+          teclado se estiraba detrás sin tener la culpa. */}
+      <div className="grid gap-5 [&>*]:min-w-0 lg:grid-cols-2">
+        <Keypad onKey={escribir} onClear={limpiar} onPaste={puedePegar ? pegar : undefined} />
         <ConversionResults conversion={conversion} snapshot={snapshot} />
       </div>
     </div>

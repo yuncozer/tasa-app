@@ -15,9 +15,11 @@ const KEYS: KeypadKey[] = ["7", "8", "9", "4", "5", "6", "1", "2", "3", ",", "0"
 interface KeypadProps {
   onKey: (key: KeypadKey) => void;
   onClear: () => void;
+  /** Pega el portapapeles en el monto. Ausente donde el navegador no deja leerlo. */
+  onPaste?: () => void;
 }
 
-export function Keypad({ onKey, onClear }: KeypadProps) {
+export function Keypad({ onKey, onClear, onPaste }: KeypadProps) {
   return (
     <div className="flex flex-col gap-2">
       <div className="grid grid-cols-3 gap-2">
@@ -34,13 +36,29 @@ export function Keypad({ onKey, onClear }: KeypadProps) {
         ))}
       </div>
 
-      <button
-        type="button"
-        onClick={onClear}
-        className="rounded-xl border border-[color:var(--border)] bg-[color:var(--surface)] py-3 text-sm font-semibold uppercase tracking-wide text-[color:var(--muted)] transition active:scale-95"
-      >
-        Limpiar
-      </button>
+      {/* "Pegar" solo aparece donde de verdad se puede leer el portapapeles:
+          un botón que nunca funciona es peor que no tenerlo. Va junto a
+          "Limpiar" porque ambos actúan sobre el monto entero, no sobre un
+          dígito. */}
+      <div className={onPaste ? "grid grid-cols-2 gap-2" : undefined}>
+        <button
+          type="button"
+          onClick={onClear}
+          className="w-full rounded-xl border border-[color:var(--border)] bg-[color:var(--surface)] py-3 text-sm font-semibold uppercase tracking-wide text-[color:var(--muted)] transition active:scale-95"
+        >
+          Limpiar
+        </button>
+
+        {onPaste && (
+          <button
+            type="button"
+            onClick={onPaste}
+            className="w-full rounded-xl border border-[color:var(--border)] bg-[color:var(--surface)] py-3 text-sm font-semibold uppercase tracking-wide text-[color:var(--muted)] transition active:scale-95"
+          >
+            Pegar
+          </button>
+        )}
+      </div>
     </div>
   );
 }

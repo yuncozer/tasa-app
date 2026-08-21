@@ -1,9 +1,10 @@
 import { Info } from "lucide-react";
+import { BotonCopiar } from "@/components/BotonCopiar";
 import { Flag } from "@/components/Flag";
 import { Tooltip } from "@/components/Tooltip";
 import { FLAGS } from "@/lib/flags";
 import { formatAmount, formatRate } from "@/lib/format";
-import { RATE_ORDER, rateHelp, equivalenceHelp } from "@/lib/rates";
+import { RATE_ORDER, equivalenceHelp } from "@/lib/rates";
 import type { ConversionResult, RatesSnapshot } from "@/lib/types";
 
 /**
@@ -30,12 +31,17 @@ export function ConversionResults({
         Equivalencias
       </h2>
 
-      <div className="rounded-2xl border border-[color:var(--accent)]/40 bg-[color:var(--accent)]/10 px-4 py-3">
-        <p className="text-xs text-[color:var(--muted)]">Son, en bolívares</p>
-        <p className="tabular text-2xl font-semibold text-[color:var(--accent)]">
-          {formatAmount(conversion.bs, "VES")}{" "}
-          <span className="text-base font-normal">Bs</span>
-        </p>
+      <div className="flex items-center justify-between gap-2 rounded-2xl border border-[color:var(--accent)]/40 bg-[color:var(--accent)]/10 px-4 py-3">
+        <div className="min-w-0">
+          <p className="text-xs text-[color:var(--muted)]">Son, en bolívares</p>
+          <p className="tabular text-2xl font-semibold text-[color:var(--accent)]">
+            {formatAmount(conversion.bs, "VES")}{" "}
+            <span className="text-base font-normal">Bs</span>
+          </p>
+        </div>
+        {conversion.bs !== null && (
+          <BotonCopiar texto={formatAmount(conversion.bs, "VES")} etiqueta="monto en bolívares" />
+        )}
       </div>
 
       <ul className="divide-y divide-[color:var(--border)] overflow-hidden rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface)]">
@@ -69,12 +75,19 @@ export function ConversionResults({
                     : `a ${formatRate(rate.bsPerUnit)} Bs`}
                 </p>
               </div>
-              <p className="tabular shrink-0 text-lg font-semibold">
-                <span className="mr-1 text-xs font-normal text-[color:var(--muted)]">
-                  {rate.symbol}
-                </span>
-                {formatAmount(value, key)}
-              </p>
+              <div className="flex shrink-0 items-center gap-1">
+                <p className="tabular text-lg font-semibold">
+                  <span className="mr-1 text-xs font-normal text-[color:var(--muted)]">
+                    {rate.symbol}
+                  </span>
+                  {formatAmount(value, key)}
+                </p>
+                {/* Sin valor no hay nada que copiar: el botón desaparece en vez
+                    de dejar copiar un guion. */}
+                {value !== null && (
+                  <BotonCopiar texto={formatAmount(value, key)} etiqueta={`monto en ${rate.label}`} />
+                )}
+              </div>
             </li>
           );
         })}

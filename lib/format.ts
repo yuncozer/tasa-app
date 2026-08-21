@@ -363,3 +363,65 @@ export function parseInput(raw: string): number {
   const value = Number(raw.replace(/\./g, "").replace(",", "."));
   return Number.isFinite(value) ? value : 0;
 }
+
+/**
+ * Traduce un monto pegado desde fuera al formato que teclea la calculadora
+ * ("1234,56": coma decimal y sin separadores de miles).
+ *
+ * Existe porque el teclado propio no permite pegar, y un monto llega casi
+ * siempre copiado de un chat: con símbolo delante ("Bs 1.234,56"), en formato
+ * venezolano ("1.234,56") o en el inglés que produce media internet
+ * ("1,234.56"). Los tres tienen que dar el mismo número.
+ *
+ * El separador decimal **no se decide por el carácter** —la coma es decimal
+ * aquí y de miles en inglés— sino por el contexto, en dos pasos:
+ *
+ * 1. Si aparecen los dos signos, el **último** es el decimal y el otro agrupa
+ *    miles. Vale para "1.234,56" y para "1,234.56" sin tener que saber de qué
+ *    país viene el texto, y también para "1.234,567", donde el punto anterior
+ *    ya delata que la coma no puede ser de miles.
+ * 2. Si solo aparece uno, es separador de miles **únicamente** cuando le siguen
+ *    exactamente tres cifras y delante hay algo distinto de cero: un grupo de
+ *    miles siempre tiene tres cifras, así que "1.234" son mil doscientos
+ *    treinta y cuatro (el caso que un `Number()` a secas lee al revés), pero
+ *    "0,2993" —la tasa del peso frontera— son cuatro cifras y no puede serlo,
+ *    y "0,123" tampoco, porque nadie agrupa miles detrás de un cero solo.
+ *
+ * Devuelve `null` cuando no queda nada aprovechable, para que quien llama
+ * distinga "no había un monto" de "el monto era cero".
+ */
+export function normalizarMontoPegado(
+  texto: string,
+  maxEnteros: number,
+  maxDecimales: number,
+): string | null {
+  // Fuera todo lo que no sea cifra o separador: símbolos, espacios (incluido el
+  // duro que arrastran algunos formatos) y cualquier texto que venga pegado.
+  const limpio = texto.replace(/[^\d.,]/g, "");
+  if (!limpio) return null;
+
+  const ultimaComa = limpio.lastIndexOf(",");
+  const ultimoPunto = limpio.lastIndexOf(".");
+  const ultimoSeparador = Math.max(ultimaComa, ultimoPunto);
+  const hayAmbos = ultimaComa !== -1 && ultimoPunto !== -1;
+  const cifrasDetras = ultimoSeparador === -1 ? 0 : limpio.length - ultimoSeparador - 1;
+  // Un grupo de miles son tres cifras y nunca va detrás de un cero solo.
+  const pareceMiles =
+    cifrasDetras === 3 && !/^0*$/.test(limpio.slice(0, ultimoSeparador).replace(/[.,]/g, ""));
+  const esDecimal =
+    ultimoSeparador !== -1 && cifrasDetras >= 1 && (hayAmbos || !pareceMiles);
+
+  const enteros = (esDecimal ? limpio.slice(0, ultimoSeparador) : limpio).replace(/[.,]/g, "");
+  const decimales = esDecimal ? limpio.slice(ultimoSeparador + 1) : "";
+
+  if (!enteros && !decimales) return null;
+
+  // Los ceros a la izquierda se caen solos, y un monto más largo que el tope se
+  // recorta por la derecha en vez de rechazarse: quien pega quiere ese número,
+  // no un campo vacío.
+  const enterosNormalizados = (enteros.replace(/^0+(?=\d)/, "") || "0").slice(0, maxEnteros);
+
+  return decimales
+    ? `${enterosNormalizados},${decimales.slice(0, maxDecimales)}`
+    : enterosNormalizados;
+}
