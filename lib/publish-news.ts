@@ -1,5 +1,5 @@
-import { buildNewsCaption, conPieEnlaces } from "@/lib/caption";
-import { generarSlugPost, guardarEnlace } from "@/lib/enlaces";
+import { buildNewsCaption } from "@/lib/caption";
+import { guardarEnlace } from "@/lib/enlaces";
 import type { ElementoCarrusel } from "@/lib/instagram";
 import { permalinkDeMedia, publishCarousel, publishDailyPost, publishReel } from "@/lib/instagram";
 import { signNewsImageParams } from "@/lib/news-signature";
@@ -43,31 +43,23 @@ export async function anotarEnlacePost(slug: string, mediaId: string): Promise<v
   }
 }
 
-/**
- * Agrega el pie de enlaces (post + calculadora + canal) a un payload de
- * `manual`, `carrusel` o `reel`, con un slug fresco de `/p/<slug>` — `articulo`
- * y `semanal` no pasan por aquí: el primero resuelve su propio pie dentro de
- * `prepararPublicacion()` (necesita scrapear antes de tener un caption que
- * envolver) y el segundo no lleva enlace a un post propio.
- *
- * Es el único punto donde esto ocurre para estos tres tipos, y se llama
- * exactamente una vez por publicación real: al ejecutarla de un tirón
- * (`ejecutarPublicacion`) o al congelarla para la cola
- * (`materializarParaProgramar`). `conPieEnlaces` quita cualquier pie previo
- * antes de poner uno nuevo, así que llamarlo de nuevo sobre un payload editado
- * no va acumulando pies.
- */
-async function conEnlacePost(payload: PublicacionPayload): Promise<PublicacionPayload> {
-  if (payload.tipo === "articulo" || payload.tipo === "semanal") return payload;
-
-  const slug = generarSlugPost();
-  const destino = `${sitioUrl()}/p/${slug}`;
-
-  if (payload.tipo === "manual") {
-    return { ...payload, slugEnlace: slug, datos: { ...payload.datos, caption: conPieEnlaces(payload.datos.caption, destino) } };
-  }
-  return { ...payload, slugEnlace: slug, caption: conPieEnlaces(payload.caption, destino) };
-}
+// Nota: aquí vivía `conEnlacePost()`, que añadía el pie de tres enlaces
+// (post + calculadora + canal) al caption de `manual`, `carrusel` y `reel`,
+// con un slug fresco de `/p/<slug>`.
+//
+// Se retiró porque en Instagram ese pie no sirve: la plataforma no vuelve
+// clicables los enlaces dentro del caption, así que solo ocupaba sitio detrás
+// de los hashtags —que es donde de verdad termina un post—. Es el mismo
+// motivo por el que el post diario dejó de llevarlo. El pie sigue existiendo,
+// pero solo en el mensaje que arma `/admin/canal` (`formatMensajeCanal`),
+// donde WhatsApp sí los deja tocar y además puede usar el permalink real en
+// vez de un atajo.
+//
+// Con ello los posts nuevos ya no generan slug. `/p/<slug>` y
+// `anotarEnlacePost()` se conservan porque los posts **ya publicados** llevan
+// ese enlace en su caption y tienen que seguir resolviendo, y porque las
+// programadas que quedaron en la cola con `slugEnlace` congelado se siguen
+// anotando al salir.
 
 /**
  * Arma la URL firmada de `instagram-post-news`. El título es opcional: las
@@ -138,6 +130,12 @@ export async function previewNewsPost(
  * `captionOverride` existe para `/admin/noticia`: ahí se puede editar el
  * caption a mano (agregar párrafos que el scraper no trajo, por ejemplo)
  * antes de publicar. Sin ella, se usa el caption armado por plantilla.
+ *
+ * El caption se publica **tal cual**, terminando en sus hashtags: los del
+ * admin si escribió el suyo, los de `buildNewsCaption` si no. Ya no se le
+ * añade el pie de tres enlaces —Instagram no los vuelve clicables dentro del
+ * caption—; ese pie vive ahora solo en el mensaje del canal de WhatsApp que
+ * arma `/admin/canal`.
  */
 export async function publishNewsPost(
   url: string,
@@ -145,12 +143,8 @@ export async function publishNewsPost(
   imagenPropiaPublicId?: string,
 ): Promise<{ mediaId: string }> {
   const { imageUrl, caption } = await buildNewsPost(url, imagenPropiaPublicId);
-  const slug = generarSlugPost();
-  const captionFinal = conPieEnlaces(captionOverride ?? caption, `${sitioUrl()}/p/${slug}`);
 
-  const resultado = await publishDailyPost(imageUrl, captionFinal);
-  await anotarEnlacePost(slug, resultado.mediaId);
-  return resultado;
+  return publishDailyPost(imageUrl, captionOverride ?? caption);
 }
 
 /**
@@ -545,10 +539,10 @@ export type PublicacionPreparada =
 export async function prepararPublicacion(payload: PublicacionPayload): Promise<PublicacionPreparada> {
   switch (payload.tipo) {
     case "articulo": {
+      // El caption sale tal cual, cerrando en sus hashtags: los que escribió
+      // el admin si sobreescribió el texto, los de `buildNewsCaption` si no.
       const { imageUrl, caption } = await buildNewsPost(payload.url, payload.imagenPublicId);
-      const slug = generarSlugPost();
-      const captionFinal = conPieEnlaces(payload.caption ?? caption, `${sitioUrl()}/p/${slug}`);
-      return { tipo: "imagen", imageUrl, caption: captionFinal, slugEnlace: slug };
+      return { tipo: "imagen", imageUrl, caption: payload.caption ?? caption };
     }
     case "manual":
       return {
@@ -594,7 +588,7 @@ export function urlReporteSemanal(proporcion: "1:1" | "9:16"): string {
  * cron, porque un carrusel con video no cabe en el tope de una función.
  */
 export async function ejecutarPublicacion(payload: PublicacionPayload): Promise<{ mediaId: string }> {
-  const preparada = await prepararPublicacion(await conEnlacePost(payload));
+  const preparada = await prepararPublicacion(payload);
 
   let resultado: { mediaId: string };
   switch (preparada.tipo) {
@@ -724,8 +718,8 @@ export async function materializarParaProgramar(
       datos: {
         title: article.title,
         sourceHost: article.sourceHost,
-        // Sin pie todavía: lo agrega `conEnlacePost` más abajo, igual que al
-        // resto de los tipos, con un slug propio.
+        // Ya cierra en sus hashtags, así que se congela tal cual: no queda
+        // ningún pie que añadir después.
         caption: payload.caption ?? buildNewsCaption(article),
         imagenPublicId: payload.imagenPublicId ?? (await subirDesdeUrl(article.imageUrl)),
       },
@@ -744,11 +738,11 @@ export async function materializarParaProgramar(
     resuelto = payload;
   }
 
-  // Último paso, para los tres tipos por igual: el pie de enlaces con un slug
-  // fresco de `/p/<slug>`, que viaja dentro del payload congelado para que el
-  // disparo del cron que por fin publique esta fila sepa bajo qué slug anotar
-  // el permalink real.
-  return conEnlacePost(resuelto);
+  // El caption se congela tal como se publicará, cerrando en sus hashtags. Ya
+  // no se le añade nada aquí: el pie de tres enlaces dejó de ir en el post
+  // (ver la nota donde vivía `conEnlacePost`) y ahora solo se arma para el
+  // canal de WhatsApp, al momento de copiarlo desde `/admin/canal`.
+  return resuelto;
 }
 
 /**

@@ -48,10 +48,12 @@ function modelos(): string[] {
 /**
  * Deja un texto del modelo en condiciones de entrar en un caption.
  *
- * Quita las URLs a propósito: el pie de tres enlaces lo pone `conPieEnlaces()`
- * en un solo sitio (`lib/publish-news.ts`), y un enlace inventado —o el propio
- * pie repetido de memoria— rompería esa regla y mandaría al lector a cualquier
- * parte. Por lo mismo pasa por `quitarPieEnlaces()`.
+ * Quita las URLs a propósito: un enlace inventado por el modelo mandaría al
+ * lector a cualquier parte, y el único pie con enlaces que existe lo arma
+ * `formatMensajeCanal()` para el canal de WhatsApp, en un solo sitio. Por lo
+ * mismo pasa por `quitarPieEnlaces()`, que además corta el bloque de hashtags
+ * si el modelo lo puso pese a pedírsele que no: los hashtags se añaden después
+ * (`lib/ia-textos.ts`), no se dejan a su criterio.
  *
  * Devuelve `null` si no queda nada, para que el caller caiga a la plantilla en
  * vez de publicar un hueco.

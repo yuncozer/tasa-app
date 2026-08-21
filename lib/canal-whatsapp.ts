@@ -10,12 +10,17 @@ import { conPieEnlaces } from "@/lib/caption";
  * envío es manual. Esta función solo da formato: el admin copia el resultado
  * y lo pega a mano en el canal.
  *
- * Todo caption ya publicado (diario o de noticia) termina con el mismo pie de
- * enlaces (`pieEnlaces` en `lib/caption.ts`), pero apuntando a `/hoy` o
- * `/p/<slug>` — un atajo, porque al armar el caption el permalink real
- * todavía no existe. Aquí sí lo tenemos (`permalinkPost` sale de la Graph
- * API, del post que se está mirando), así que `conPieEnlaces` reconstruye el
- * mismo pie pero con el enlace directo en vez del atajo.
+ * **Este es el único sitio donde vive el pie de tres enlaces.** En Instagram
+ * no se publica: la plataforma no vuelve clicables los enlaces dentro del
+ * caption, así que allí los posts cierran en sus hashtags (o en "link en la
+ * bio", el diario y el semanal). En WhatsApp sí se pueden tocar, y además
+ * aquí ya se conoce el permalink real —`permalinkPost` sale de la Graph API,
+ * del post que se está mirando—, de modo que el enlace va directo al post en
+ * vez de pasar por un atajo como `/hoy` o `/p/<slug>`.
+ *
+ * `conPieEnlaces` corta antes el cierre que traiga el caption publicado
+ * —hashtags, "link en la bio", o el pie de enlaces de los posts anteriores a
+ * este cambio— y pone el suyo en su lugar.
  */
 export function formatMensajeCanal(input: { caption: string | null; permalinkPost: string }): string {
   return conPieEnlaces(input.caption ?? "", input.permalinkPost);

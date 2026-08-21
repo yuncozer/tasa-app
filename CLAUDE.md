@@ -258,10 +258,10 @@ pesos después.
   abajo sobre `/p/<slug>`: el mismo mecanismo lo comparte con los posts de
   noticia.
 
-### Cada post enlaza al post, a la calculadora y al canal — con `/p/<slug>`
+### El pie de tres enlaces es solo para WhatsApp; en Instagram se cierra con hashtags
 
-Todo caption que no sea el reporte semanal termina con el mismo pie de tres
-enlaces (`pieEnlaces()` en `lib/caption.ts`):
+Existe un pie de tres enlaces —el post, la calculadora y el canal—
+(`pieEnlaces()` en `lib/caption.ts`):
 
 ```
 📲 ¿Quieres ver la publicación de hoy con las tasas actualizadas?
@@ -274,9 +274,42 @@ enlaces (`pieEnlaces()` en `lib/caption.ts`):
 👉 <SITE_URL>/wa
 ```
 
+**Pero no se publica en Instagram.** Ahí no sirve de nada: la plataforma no
+vuelve clicables los enlaces dentro del caption, así que solo ocupaban sitio
+detrás de los hashtags. Lo que se publica cierra así:
+
+| Post | Cierra con |
+| --- | --- |
+| Diario de tasas y reporte semanal | "link en la bio" + sus hashtags |
+| Noticia (articulo, manual, carrusel, reel) | **hashtags** |
+
+Los hashtags de una noticia son los que el admin escribe en `/admin/noticia`;
+en las scrapeadas los pone `buildNewsCaption()` (`HASHTAGS_NOTICIA`), y en las
+que redacta la IA los añade `lib/ia-textos.ts` después —igual que el crédito de
+la fuente, no se dejan a criterio del modelo, que además tiene instrucciones de
+no ponerlos—.
+
+El único sitio donde vive el pie es **`formatMensajeCanal()`**
+(`lib/canal-whatsapp.ts`), que arma el mensaje para copiar al canal desde
+`/admin/canal`. Ahí los enlaces sí se tocan, y además ya se conoce el permalink
+real, así que va directo al post en vez de pasar por un atajo.
+`quitarPieEnlaces()` reconoce los tres cierres posibles —hashtags, "link en la
+bio" y el pie de los posts anteriores a este cambio— y los sustituye. Los
+hashtags se detectan por su forma (un bloque de una línea que empieza con `#`)
+y no por una constante, porque cada noticia lleva los suyos.
+
 El bloque del canal se omite si `ENLACE_WHATSAPP` no está configurado, mismo
 criterio que ya usaba `enlaceWhatsapp()` para la ruta `/wa` — no publicar un
 enlace que no lleva a ningún sitio.
+
+#### `/p/<slug>` se conserva, pero ya no se generan slugs nuevos
+
+Mientras las noticias llevaron el pie, cada una necesitaba un enlace propio al
+post que pudiera escribirse *antes* de publicar. De ahí `/p/<slug>`. Al retirar
+el pie del caption, los posts nuevos ya no generan slug — pero la ruta se queda:
+los posts **ya publicados** lo llevan escrito en su caption y tienen que seguir
+resolviendo, y las programadas que quedaron en la cola con `slugEnlace`
+congelado se siguen anotando al salir. Lo que sigue vale para todo eso:
 
 - **El enlace del post nunca es el permalink directo.** El caption se manda a
   Meta *antes* de publicar, y el permalink (`instagram.com/p/…`) no existe
@@ -303,24 +336,13 @@ enlace que no lleva a ningún sitio.
   salir de este dominio. A diferencia de `/hoy`, no lleva una imagen propia de
   vista previa (evita otra vuelta de columnas en Supabase); es una tarjeta
   genérica de "La Tasa".
-- **El pie se agrega en un solo sitio para los cuatro tipos de post**
-  (articulo, manual, carrusel, reel): `conEnlacePost()` en
-  `lib/publish-news.ts`, llamada exactamente una vez por publicación real —al
-  ejecutarla de un tirón (`ejecutarPublicacion`) o al congelarla para la cola
-  (`materializarParaProgramar`). Ninguna función de caption (`buildNewsCaption`,
-  ni el `caption` que el admin teclea a mano en `/admin/noticia` para
-  manual/carrusel/reel) lo incluye por su cuenta: así no hay que duplicar la
-  lógica del pie ni el criterio de cuándo omitir el canal en cada plantilla.
-  `conPieEnlaces()` quita cualquier pie anterior antes de poner uno nuevo
-  (busca el bloque que empieza con la primera línea del pie), así que se
-  puede llamar de nuevo sobre un caption editado sin ir acumulando pies.
-- **Para el post diario y `articulo` con `captionOverride`, el pie también se
-  agrega siempre**, sin excepción — a diferencia de los hashtags que llevaba
-  antes el caption de noticia, que si el admin sobreescribía el texto
-  desaparecían con él. Se decidió así por simplicidad: un caption sin estos
-  tres enlaces es la excepción que nadie pidió, y mantener dos comportamientos
-  distintos según haya o no `captionOverride` habría sido más código para un
-  caso que no vale la pena.
+- **El caption se publica tal cual, sin envolverlo en nada.** Aquí vivía
+  `conEnlacePost()` (`lib/publish-news.ts`), el único sitio donde se le añadía
+  el pie a los cuatro tipos de post. Se retiró: lo que arma la plantilla —o
+  teclea el admin— ya es el caption final, y así lo que se previsualiza es
+  literalmente lo que sale. Si se reintroduce cualquier cosa que envuelva el
+  caption al publicar, tiene que hacerlo también `materializarParaProgramar`,
+  o lo programado dejará de coincidir con lo que se probó con "Publicar".
 - **La cola de programadas necesita el slug de vuelta.** `avanzarPublicacion()`
   en `lib/worker-programadas.ts` obtiene el `mediaId` en un disparo del cron
   que puede ser horas después de haberse programado, así que el slug generado
@@ -603,13 +625,16 @@ Todo lo demás sigue saliendo de las plantillas de `lib/caption.ts`.
   consume cuota— y también lo que garantiza que alguien está mirando cuando el
   texto aparece. El reintento es volver a pulsar, así que `lib/ia.ts` tampoco
   lleva reintentos ni caché propios.
-- **`sanearTextoIa()` quita las URLs y el markdown.** Las primeras porque el pie
-  de tres enlaces lo pone `conPieEnlaces()` en un solo sitio, y un enlace
-  inventado por el modelo rompería esa regla mandando al lector a cualquier
-  parte; el segundo porque Instagram no lo interpreta y saldrían los asteriscos
-  a la vista. El crédito de la noticia (`Fuente: <host>`) tampoco se deja al
-  criterio del modelo: se añade después si no está, con el hostname de la URL
-  que se pidió publicar, igual que hace `buildNewsCaption()`.
+- **`sanearTextoIa()` quita las URLs y el markdown.** Las primeras porque un
+  enlace inventado por el modelo mandaría al lector a cualquier parte, y el
+  único pie con enlaces que existe lo arma `formatMensajeCanal()` para el canal;
+  el segundo porque Instagram no lo interpreta y saldrían los asteriscos a la
+  vista. Ni el crédito de la noticia (`Fuente: <host>`) ni los hashtags se dejan
+  al criterio del modelo: los dos se añaden después en `lib/ia-textos.ts` —el
+  crédito con el hostname de la URL que se pidió publicar, igual que hace
+  `buildNewsCaption()`, y los hashtags con la misma constante que esa
+  plantilla—, de modo que el caption de la IA cierre exactamente igual que el
+  de plantilla.
 - **Del navegador solo viaja la prosa.** `/api/admin/publish-semanal` sigue
   componiendo el caption en el servidor con las tasas del momento —esa es su
   razón de ser— y del cliente acepta únicamente `analisis`, que vuelve a sanear
@@ -1042,14 +1067,14 @@ pegar a mano en el canal. El envío lo sigue haciendo el admin.
   junte tasas diarias, noticias y reporte semanal en un solo lugar: la cuenta
   de Instagram ya es esa lista.
 - **`formatMensajeCanal` (`lib/canal-whatsapp.ts`) solo dice formato, no
-  contenido.** Todo caption ya publicado termina con el mismo pie de tres
-  enlaces (`pieEnlaces()` en `lib/caption.ts` — ver la sección sobre
-  `/p/<slug>`), pero apuntando a un atajo (`/hoy` o `/p/<slug>`) porque al
-  armar el caption el permalink real todavía no existe. Aquí sí lo tenemos
-  —sale de la Graph API, del post que se está mirando—, así que
-  `formatMensajeCanal` es solo `conPieEnlaces(caption, permalinkPost)`:
-  reconstruye el mismo pie pero con el enlace directo en vez del atajo. No hay
-  IA de por medio, igual que los captions de origen.
+  contenido, y es el único sitio donde vive el pie de tres enlaces.** En
+  Instagram los posts cierran con hashtags (o con "link en la bio", el diario y
+  el semanal) porque allí los enlaces del caption no son clicables; en WhatsApp
+  sí, y además aquí ya se conoce el permalink real —sale de la Graph API, del
+  post que se está mirando—, así que el enlace va directo en vez de pasar por
+  un atajo. `formatMensajeCanal` es solo `conPieEnlaces(caption,
+  permalinkPost)`: corta el cierre que traiga el caption publicado y pone el
+  pie en su lugar. No hay IA de por medio, igual que los captions de origen.
 - **El texto se muestra editable, no de solo lectura**
   (`components/BotonCopiarTexto.tsx`). Es el mismo criterio que
   `captionOverride` en noticias: lo que arma la plantilla es un punto de

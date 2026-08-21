@@ -53,16 +53,32 @@ export function pieEnlaces(destinoPost: string): string {
  * post ya publicado y armar el mensaje del canal con el permalink real en su
  * lugar.
  *
- * Reconoce dos pies distintos: el de tres enlaces (`MARCA_PIE`, el que llevan
- * las noticias) y el de "link en la bio" + hashtags del post diario (que
- * empieza en `LINEA_CALCULADORA`, ver `buildCaption`) — ese post no lleva
- * `pieEnlaces` porque Instagram no vuelve clicables los enlaces del caption.
- * Da igual cuál traiga: el que llama siempre quiere sustituirlo por el pie de
- * tres enlaces, así que corta desde el primero de los dos que encuentre.
+ * Reconoce los tres cierres posibles, porque para el canal todos sobran igual
+ * —lo que va en su lugar es el pie de tres enlaces, que en WhatsApp sí son
+ * clicables—:
+ *
+ * - `MARCA_PIE`, el pie de tres enlaces, en los posts publicados antes de que
+ *   las noticias dejaran de llevarlo.
+ * - `LINEA_CALCULADORA`, el "link en la bio" del post diario y del semanal,
+ *   que arrastra sus hashtags detrás.
+ * - Un bloque de **hashtags**, que es como cierran ahora las noticias: los
+ *   escribe el admin en `/admin/noticia`, o los pone `buildNewsCaption` en las
+ *   scrapeadas.
+ *
+ * Corta desde el primero que encuentre. Que los hashtags se detecten por su
+ * forma y no por una constante es a propósito: cada noticia lleva los suyos,
+ * así que no hay texto fijo con el que comparar.
  */
+function esBloqueDeHashtags(bloque: string): boolean {
+  return bloque.startsWith("#") && !bloque.includes("\n");
+}
+
 export function quitarPieEnlaces(caption: string): string {
   const bloques = caption.split("\n\n");
-  const idx = bloques.findIndex((bloque) => bloque.startsWith(MARCA_PIE) || bloque === LINEA_CALCULADORA);
+  const idx = bloques.findIndex(
+    (bloque) =>
+      bloque.startsWith(MARCA_PIE) || bloque === LINEA_CALCULADORA || esBloqueDeHashtags(bloque),
+  );
   return (idx === -1 ? bloques : bloques.slice(0, idx)).join("\n\n").trimEnd();
 }
 
@@ -344,18 +360,37 @@ export function buildCaptionSemanal(reporte: ReporteSemanal, analisis?: string):
 }
 
 /**
- * Cuerpo del caption de un post ocasional de noticia: plantilla fija, sin IA
- * — igual que `buildCaption`. El aviso legal tampoco se repite aquí por la
- * misma razón: ya vive completo en la imagen.
+ * Los hashtags con los que cierra una noticia. Son más generales que los del
+ * post diario porque el tema cambia con cada artículo; los posts cuyo caption
+ * se escribe a mano en `/admin/noticia` llevan los suyos, más pegados a la
+ * noticia concreta.
  *
- * No lleva el pie de enlaces ni slug propio: a diferencia del post diario
- * (que siempre enlaza a `/hoy`, conocido de antemano), una noticia necesita
- * un slug por post que solo existe una vez armado el `PublicacionPayload`
- * completo —con carrusel, reel o contenido propio pueden no venir de aquí en
- * absoluto—. Por eso el pie se agrega en un solo sitio para los cuatro casos:
- * `conEnlacePost()` en `lib/publish-news.ts`, justo antes de publicar o de
- * programar.
+ * Se exporta para `lib/ia-textos.ts`, que los pone al final del caption que
+ * redacta el modelo por el mismo motivo por el que le repone el crédito de la
+ * fuente: no se dejan a su criterio, y así el caption de la IA cierra igual
+ * que el de plantilla.
+ */
+export const HASHTAGS_NOTICIA = "#Venezuela #Colombia #Economía #Noticias #DolarBCV #LaTasaOnline";
+
+/**
+ * Caption de un post ocasional de noticia: plantilla fija, sin IA — igual que
+ * `buildCaption`. El aviso legal tampoco se repite aquí por la misma razón:
+ * ya vive completo en la imagen.
+ *
+ * Cierra con hashtags y **no** con el pie de tres enlaces, por el mismo motivo
+ * que el post diario: Instagram no vuelve clicables los enlaces dentro del
+ * caption, así que ahí solo ocupan sitio. El pie sigue existiendo para el
+ * mensaje que se arma en `/admin/canal` (`formatMensajeCanal`), donde WhatsApp
+ * sí los deja tocar, y allí se pone con el permalink real en vez de un atajo.
  */
 export function buildNewsCaption(article: ArticleData): string {
-  return [`📰 ${article.title}`, "", article.description, "", `Fuente: ${article.sourceHost}`].join("\n");
+  return [
+    `📰 ${article.title}`,
+    "",
+    article.description,
+    "",
+    `Fuente: ${article.sourceHost}`,
+    "",
+    HASHTAGS_NOTICIA,
+  ].join("\n");
 }

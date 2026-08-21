@@ -1,3 +1,4 @@
+import { HASHTAGS_NOTICIA } from "@/lib/caption";
 import { redactar, sanearTextoIa } from "@/lib/ia";
 import type { ReporteSemanal } from "@/lib/semanal";
 
@@ -78,7 +79,15 @@ export async function redactarCaptionNoticia(datos: {
   // El crédito de la fuente no se deja al criterio del modelo: es el mismo dato
   // que `buildNewsCaption()` pone siempre, y sale del hostname de la URL que se
   // pidió publicar, nunca de lo que el artículo dice de sí mismo.
-  return limpio.includes(`Fuente: ${datos.sourceHost}`) ? limpio : `${limpio}\n\nFuente: ${datos.sourceHost}`;
+  const conFuente = limpio.includes(`Fuente: ${datos.sourceHost}`)
+    ? limpio
+    : `${limpio}\n\nFuente: ${datos.sourceHost}`;
+
+  // Y los hashtags tampoco, por lo mismo: el prompt le pide al modelo que no
+  // los ponga —`sanearTextoIa` cortaría el texto ahí si lo hiciera— y se
+  // añaden aquí, de modo que el caption de la IA cierre igual que el de
+  // plantilla. Sin esto, usar el botón de redactar dejaba el post sin ellos.
+  return `${conFuente}\n\n${HASHTAGS_NOTICIA}`;
 }
 
 /**
