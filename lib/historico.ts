@@ -172,6 +172,82 @@ export async function listarHistorico(clave: ClaveHistorico, limite: number = 60
 }
 
 /**
+ * Las claves que hacen falta para reconstruir las cuatro filas del post en
+ * pesos (`lib/pesos.ts`) en un momento pasado: la TRM se archiva tal cual, y
+ * las tres filas de frontera cruzan por `COP_FRONTERA` igual que
+ * `buildFilasPesos()`. `VES` no hace falta pedirla: su `bsPerUnit` es siempre
+ * 1 por construcción (`buildRate("VES", 1, ...)` en `lib/rates.ts`), así que
+ * el bolívar promedio se simplifica a `1 ÷ COP_FRONTERA` sin archivar nada
+ * aparte — el mismo atajo que ya usa `buildFilasPesos()` para el snapshot de
+ * hoy.
+ */
+const CLAVES_PESOS: readonly ClaveHistorico[] = ["TRM", "USD_BINANCE_BUY", "USD_BINANCE_SELL", "COP_FRONTERA"];
+
+export interface FilaHistoricoPesos {
+  fecha: string;
+  momento: Momento;
+  /** Cuántos pesos vale cada cosa, o `null` si ese día faltó algún dato. */
+  trm: number | null;
+  fronteraBuy: number | null;
+  fronteraSell: number | null;
+  vesPromedio: number | null;
+}
+
+/**
+ * Las últimas lecturas archivadas, vistas como el post en pesos: una fila por
+ * `(fecha, momento)` con las cuatro cifras juntas, igual que se publican.
+ *
+ * Se piden las cuatro claves en un solo viaje y se agrupan aquí en vez de
+ * hacer cuatro llamadas a `listarHistorico()`, una por clave, que además
+ * podrían traer ventanas de fechas distintas si algún día faltó un dato.
+ *
+ * El orden de llegada de PostgREST (`fecha.desc,momento.desc`) es el mismo
+ * orden en que hay que mostrar los grupos, y un `Map` conserva el orden de
+ * inserción: no hace falta reordenar después de agrupar.
+ */
+export async function listarHistoricoPesos(limite: number = 30): Promise<FilaHistoricoPesos[]> {
+  const filas = await rest<FilaHistorico[]>(
+    `?clave=in.(${CLAVES_PESOS.map(encodeURIComponent).join(",")})` +
+      "&select=clave,fecha,momento,valor" +
+      "&order=fecha.desc,momento.desc" +
+      `&limit=${limite * CLAVES_PESOS.length}`,
+    { method: "GET" },
+  );
+
+  const grupos = new Map<string, { fecha: string; momento: Momento; valores: Partial<Record<ClaveHistorico, number>> }>();
+
+  for (const fila of filas) {
+    if (fila.momento !== "manana" && fila.momento !== "tarde") continue;
+
+    const valor = Number(fila.valor);
+    if (!Number.isFinite(valor)) continue;
+
+    const clave = fila.clave as ClaveHistorico;
+    const llave = `${fila.fecha}_${fila.momento}`;
+    const grupo = grupos.get(llave) ?? { fecha: fila.fecha, momento: fila.momento, valores: {} };
+    grupo.valores[clave] = valor;
+    grupos.set(llave, grupo);
+  }
+
+  const resultado: FilaHistoricoPesos[] = [];
+  for (const { fecha, momento, valores } of grupos.values()) {
+    const cop_frontera = valores.COP_FRONTERA;
+    resultado.push({
+      fecha,
+      momento,
+      trm: valores.TRM ?? null,
+      fronteraBuy: cop_frontera && valores.USD_BINANCE_BUY ? valores.USD_BINANCE_BUY / cop_frontera : null,
+      fronteraSell: cop_frontera && valores.USD_BINANCE_SELL ? valores.USD_BINANCE_SELL / cop_frontera : null,
+      vesPromedio: cop_frontera ? 1 / cop_frontera : null,
+    });
+
+    if (resultado.length >= limite) break;
+  }
+
+  return resultado;
+}
+
+/**
  * El valor de cada clave lo más cerca posible de `fechaObjetivo`, en un solo
  * viaje a Supabase.
  *

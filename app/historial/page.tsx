@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Logo } from "@/components/Logo";
 import { formatFecha, formatRate } from "@/lib/format";
-import { listarHistorico, type Momento } from "@/lib/historico";
+import { listarHistorico, listarHistoricoPesos, type Momento } from "@/lib/historico";
 import { RATE_ORDER, rateMeta } from "@/lib/rates";
 import type { RateKey } from "@/lib/types";
 
@@ -18,32 +18,42 @@ function claveValida(valor: string | undefined): RateKey {
   return CLAVES_HISTORIAL.find((key) => key === valor) ?? "USD_BINANCE_SELL";
 }
 
+type Vista = "bs" | "cop";
+
+function vistaValida(valor: string | undefined): Vista {
+  return valor === "cop" ? "cop" : "bs";
+}
+
+function claseTab(seleccionada: boolean): string {
+  return `rounded-full border px-4 py-1.5 text-sm font-medium transition active:scale-95 ${seleccionada
+    ? "border-[color:var(--accent)] bg-[color:var(--accent)]/15 text-[color:var(--accent)]"
+    : "border-[color:var(--border)] bg-[color:var(--surface)] text-[color:var(--muted)]"
+    }`;
+}
+
 /**
  * Historial de las lecturas que el cron de tasas archiva dos veces al día
  * (9:00 am y 6:00 pm en Caracas, ver `lib/historico.ts`). Responde lo que el
  * panel de "hoy" no puede: cómo estuvo una tasa en un momento concreto de un
  * día pasado — "¿cómo estuvo el Binance venta antier a las 6:00 pm?".
  *
- * La tasa elegida viaja por query string (`?clave=`), no por estado de
- * cliente: mismo criterio que el botón "Actualizar tasas" de la portada, la
- * página ya se renderiza en el servidor y un enlace normal resuelve el caso
- * sin JavaScript de por medio.
+ * Dos vistas, igual que el carrusel diario que se publica en Instagram: en
+ * bolívares (una tasa a la vez, la que se elige arriba) y en pesos (las
+ * cuatro filas del post juntas, porque así es como salen publicadas — verlas
+ * sueltas rompería la comparación que esa diapositiva propone). La vista y la
+ * tasa elegida viajan por query string (`?vista=` y `?clave=`), no por estado
+ * de cliente: mismo criterio que el botón "Actualizar tasas" de la portada,
+ * la página ya se renderiza en el servidor y un enlace normal resuelve el
+ * caso sin JavaScript de por medio.
  */
 export default async function Historial({
   searchParams,
 }: {
-  searchParams: Promise<{ clave?: string }>;
+  searchParams: Promise<{ clave?: string; vista?: string }>;
 }) {
-  const { clave: claveParam } = await searchParams;
+  const { clave: claveParam, vista: vistaParam } = await searchParams;
+  const vista = vistaValida(vistaParam);
   const clave = claveValida(claveParam);
-
-  let puntos: Awaited<ReturnType<typeof listarHistorico>> = [];
-  let error = false;
-  try {
-    puntos = await listarHistorico(clave);
-  } catch {
-    error = true;
-  }
 
   return (
     <main className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-6 px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(1.5rem,env(safe-area-inset-top))] sm:px-6">
@@ -57,18 +67,47 @@ export default async function Historial({
         </div>
       </header>
 
+      <div className="flex gap-2">
+        <Link href="/historial?vista=bs" className={claseTab(vista === "bs")}>
+          En bolívares
+        </Link>
+        <Link href="/historial?vista=cop" className={claseTab(vista === "cop")}>
+          En pesos
+        </Link>
+      </div>
+
+      {vista === "bs" ? (
+        <HistorialBolivares clave={clave} />
+      ) : (
+        <HistorialPesos />
+      )}
+
+      <Link
+        href="/"
+        className="self-center text-sm font-medium text-[color:var(--muted)] underline underline-offset-2"
+      >
+        ← Volver a la calculadora
+      </Link>
+    </main>
+  );
+}
+
+async function HistorialBolivares({ clave }: { clave: RateKey }) {
+  let puntos: Awaited<ReturnType<typeof listarHistorico>> = [];
+  let error = false;
+  try {
+    puntos = await listarHistorico(clave);
+  } catch {
+    error = true;
+  }
+
+  return (
+    <>
       <nav aria-label="Elegir tasa" className="flex flex-wrap gap-2">
         {CLAVES_HISTORIAL.map((key) => {
           const seleccionada = key === clave;
           return (
-            <Link
-              key={key}
-              href={`/historial?clave=${key}`}
-              className={`rounded-full border px-3 py-1.5 text-sm font-medium transition active:scale-95 ${seleccionada
-                ? "border-[color:var(--accent)] bg-[color:var(--accent)]/15 text-[color:var(--accent)]"
-                : "border-[color:var(--border)] bg-[color:var(--surface)] text-[color:var(--muted)]"
-                }`}
-            >
+            <Link key={key} href={`/historial?vista=bs&clave=${key}`} className={claseTab(seleccionada)}>
               {rateMeta(key).shortLabel}
             </Link>
           );
@@ -76,13 +115,9 @@ export default async function Historial({
       </nav>
 
       {error ? (
-        <p className="rounded-2xl border border-[color:var(--warning)]/40 bg-[color:var(--warning)]/5 px-4 py-3 text-sm text-[color:var(--warning)]">
-          El historial no está disponible ahora mismo.
-        </p>
+        <AvisoError />
       ) : puntos.length === 0 ? (
-        <p className="rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface)] px-4 py-3 text-sm text-[color:var(--muted)]">
-          Todavía no hay lecturas archivadas de {rateMeta(clave).label}.
-        </p>
+        <AvisoVacio texto={`Todavía no hay lecturas archivadas de ${rateMeta(clave).label}.`} />
       ) : (
         <ul className="divide-y divide-[color:var(--border)] overflow-hidden rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface)]">
           {puntos.map((punto) => (
@@ -102,13 +137,71 @@ export default async function Historial({
           ))}
         </ul>
       )}
+    </>
+  );
+}
 
-      <Link
-        href="/"
-        className="self-center text-sm font-medium text-[color:var(--muted)] underline underline-offset-2"
-      >
-        ← Volver a la calculadora
-      </Link>
-    </main>
+/**
+ * La vista en pesos: las cuatro filas de `lib/pesos.ts` (la diapositiva que
+ * se publica) para cada momento archivado, en vez de una tasa suelta — no hay
+ * selector de clave porque no hay nada que elegir, siempre son las mismas
+ * cuatro.
+ */
+async function HistorialPesos() {
+  let filas: Awaited<ReturnType<typeof listarHistoricoPesos>> = [];
+  let error = false;
+  try {
+    filas = await listarHistoricoPesos();
+  } catch {
+    error = true;
+  }
+
+  if (error) return <AvisoError />;
+  if (filas.length === 0) return <AvisoVacio texto="Todavía no hay lecturas archivadas en pesos." />;
+
+  return (
+    <ul className="divide-y divide-[color:var(--border)] overflow-hidden rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface)]">
+      {filas.map((fila) => (
+        <li key={`${fila.fecha}-${fila.momento}`} className="flex flex-col gap-2 px-4 py-3">
+          <div className="flex items-baseline justify-between">
+            <span className="text-sm font-medium">{formatFecha(fila.fecha)}</span>
+            <span className="text-xs text-[color:var(--muted)]">{MOMENTO_LABEL[fila.momento]}</span>
+          </div>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+            <ValorPesos label="Dólar TRM" valor={fila.trm} />
+            <ValorPesos label="Bolívar (promedio)" valor={fila.vesPromedio} />
+            <ValorPesos label="Frontera (compra)" valor={fila.fronteraBuy} />
+            <ValorPesos label="Frontera (venta)" valor={fila.fronteraSell} />
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function ValorPesos({ label, valor }: { label: string; valor: number | null }) {
+  return (
+    <div>
+      <p className="text-xs text-[color:var(--muted)]">{label}</p>
+      <p className="tabular text-sm font-semibold leading-tight">
+        {formatRate(valor)} <span className="text-xs font-normal text-[color:var(--muted)]">COP</span>
+      </p>
+    </div>
+  );
+}
+
+function AvisoError() {
+  return (
+    <p className="rounded-2xl border border-[color:var(--warning)]/40 bg-[color:var(--warning)]/5 px-4 py-3 text-sm text-[color:var(--warning)]">
+      El historial no está disponible ahora mismo.
+    </p>
+  );
+}
+
+function AvisoVacio({ texto }: { texto: string }) {
+  return (
+    <p className="rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface)] px-4 py-3 text-sm text-[color:var(--muted)]">
+      {texto}
+    </p>
   );
 }
