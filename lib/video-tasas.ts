@@ -1,12 +1,13 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { brechaDelSnapshot } from "@/lib/brecha";
 import { buildCaption } from "@/lib/caption";
 import { formatClock, formatFechaLarga, horaCaracasDesdeIso } from "@/lib/format";
 import { buildFilasPesos } from "@/lib/pesos";
-import { snapshotDelDia } from "@/lib/snapshot-hoy";
+import { leerSnapshotHoy } from "@/lib/snapshot-hoy";
 import type { RatesSnapshot } from "@/lib/types";
 
 /**
@@ -22,10 +23,55 @@ import type { RatesSnapshot } from "@/lib/types";
  * importarse desde un componente de cliente.
  */
 
-/** La carpeta del proyecto de HyperFrames, relativa a la raíz del repo. */
-export const DIR_VIDEO = path.join("videos", "tasas-del-dia");
+/**
+ * Las rutas se resuelven desde **este archivo**, no desde el directorio de
+ * trabajo. Con rutas relativas, ejecutar el script desde otra carpeta no
+ * fallaba: escribía las variables en otro sitio y se quedaba sin `.env.local`,
+ * con lo que el snapshot publicado no se leía y el video salía con las tasas
+ * del momento — cifras distintas de las del post, en silencio. Verificado:
+ * desde `videos/` daba 913,12 donde el post decía 913,50.
+ */
+const RAIZ_REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+
+export const DIR_VIDEO = path.join(RAIZ_REPO, "videos", "tasas-del-dia");
 export const RUTA_VARIABLES = path.join(DIR_VIDEO, "variables.json");
 export const RUTA_VIDEO = path.join(DIR_VIDEO, "renders", "video.mp4");
+
+/**
+ * El snapshot exacto con el que se publicó el último post, o un error que dice
+ * por qué no se pudo leer.
+ *
+ * **No usa `snapshotDelDia()` a propósito.** Aquella se traga el fallo de
+ * Supabase y sigue con `getRates()`, que para la imagen de `/hoy` es la
+ * degradación correcta —mejor una imagen algo desfasada que una rota—, pero
+ * aquí sería el error que todo esto existe para evitar: el video saldría con
+ * las tasas del momento y afirmaría cifras distintas de las que la gente ya
+ * tiene en el feed, sin que nadie se entere. Y peor, el hueco reaparecía más
+ * tarde como "falta la brecha", culpando al dato en vez de nombrar la causa.
+ */
+export async function snapshotPublicado(): Promise<RatesSnapshot> {
+  let congelado: RatesSnapshot | null;
+
+  try {
+    congelado = await leerSnapshotHoy();
+  } catch (error) {
+    const detalle = error instanceof Error ? error.message : String(error);
+    throw new Error(
+      `No se pudo leer el snapshot del último post en Supabase (${detalle}). ` +
+        `El video no cae a las tasas en vivo a propósito: diría cifras distintas ` +
+        `de las del post. Reintenta en un momento.`,
+    );
+  }
+
+  if (!congelado) {
+    throw new Error(
+      "Todavía no hay ningún post de tasas congelado: la tabla snapshot_hoy está vacía. " +
+        "Sale con el cron de las 9:00 y el de las 18:00.",
+    );
+  }
+
+  return congelado;
+}
 
 export interface ResumenTasas {
   /** El caption tal como salió publicado, reconstruido del mismo snapshot. */
@@ -60,7 +106,7 @@ export function momentoDelSnapshot(snapshot: RatesSnapshot): "manana" | "tarde" 
  * Instagram responda para enseñar lo que ya se publicó.
  */
 export async function resumenTasas(): Promise<ResumenTasas> {
-  const snapshot = await snapshotDelDia();
+  const snapshot = await snapshotPublicado();
   const momento = momentoDelSnapshot(snapshot);
 
   return {
@@ -224,7 +270,7 @@ export async function generarVideo(): Promise<VideoGenerado> {
   renderEnCurso = true;
 
   try {
-    const snapshot = await snapshotDelDia();
+    const snapshot = await snapshotPublicado();
     writeFileSync(RUTA_VARIABLES, `${JSON.stringify(armarVariablesVideo(snapshot), null, 2)}\n`, "utf8");
 
     // Orden única y no un array de argumentos: en Windows `npx` es un `.cmd`,

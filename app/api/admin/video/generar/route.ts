@@ -2,9 +2,13 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
 import { COOKIE_SESION, esSesionValida } from "@/lib/admin-session";
-import { snapshotDelDia } from "@/lib/snapshot-hoy";
 import { encolarRender, nubeConfigurada } from "@/lib/video-nube";
-import { armarVariablesVideo, generarVideo, motivoNoDisponible } from "@/lib/video-tasas";
+import {
+  armarVariablesVideo,
+  generarVideo,
+  motivoNoDisponible,
+  snapshotPublicado,
+} from "@/lib/video-tasas";
 
 /**
  * Pone en marcha el render del Reel de tasas del día.
@@ -35,7 +39,7 @@ export async function POST() {
 
   try {
     if (nubeConfigurada()) {
-      const snapshot = await snapshotDelDia();
+      const snapshot = await snapshotPublicado();
       const renderId = await encolarRender(armarVariablesVideo(snapshot));
       return NextResponse.json({ modo: "nube", renderId });
     }

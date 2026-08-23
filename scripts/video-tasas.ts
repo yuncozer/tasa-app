@@ -2,8 +2,13 @@ import { execSync } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
 
 import { getRates } from "../lib/rates";
-import { snapshotDelDia } from "../lib/snapshot-hoy";
-import { armarVariablesVideo, DIR_VIDEO, RUTA_VARIABLES, RUTA_VIDEO } from "../lib/video-tasas";
+import {
+  armarVariablesVideo,
+  DIR_VIDEO,
+  RUTA_VARIABLES,
+  RUTA_VIDEO,
+  snapshotPublicado,
+} from "../lib/video-tasas";
 import { cargarEnvLocal } from "./_env";
 
 /**
@@ -36,7 +41,7 @@ async function main() {
   const enVivo = process.argv.includes("--en-vivo");
   const renderizar = process.argv.includes("--render");
 
-  const snapshot = enVivo ? await getRates() : await snapshotDelDia();
+  const snapshot = enVivo ? await getRates() : await snapshotPublicado();
 
   if (enVivo) {
     console.warn(

@@ -83,7 +83,7 @@ export async function guardarSnapshotHoy(snapshot: RatesSnapshot): Promise<void>
 }
 
 /** El snapshot congelado, o `null` si no se ha publicado ninguno todavía. */
-async function leerSnapshotHoy(): Promise<RatesSnapshot | null> {
+export async function leerSnapshotHoy(): Promise<RatesSnapshot | null> {
   const filas = await rest<FilaSnapshot[]>(`?clave=eq.${CLAVE}&select=snapshot&limit=1`, { method: "GET" });
   return filas[0]?.snapshot ?? null;
 }
