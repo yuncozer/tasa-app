@@ -158,18 +158,31 @@ export function armarVariablesVideo(snapshot: RatesSnapshot): Record<string, str
 /**
  * Por qué no se puede renderizar aquí, o `null` si sí se puede.
  *
- * El render necesita el CLI de HyperFrames, su Chromium y `ffmpeg`, y los tres
- * corren en la máquina que sirve la app. En un despliegue serverless eso no
+ * El render local necesita el CLI de HyperFrames, su Chromium y `ffmpeg`, y los
+ * tres corren en la máquina que sirve la app. En un despliegue serverless eso no
  * existe — es la misma razón por la que la marca de los videos se hace en
- * Cloudinary y no aquí—, así que la pantalla lo dice en vez de dejar un botón
- * que devuelve un 500 sin explicación.
+ * Cloudinary y no aquí.
+ *
+ * **El mensaje cambia según dónde corra**, y eso no es un adorno: en Vercel no
+ * se puede instalar `ffmpeg`, así que decirle al admin que lo instale lo manda a
+ * un callejón sin salida. Ahí el problema real es siempre el mismo —falta
+ * configurar el render en la nube—, y eso es lo que tiene que leer.
  */
 export function motivoNoDisponible(): string | null {
+  // `VERCEL` la define la propia plataforma en todos sus entornos.
+  if (process.env.VERCEL) {
+    return (
+      "El render en la nube no está configurado. Añade HEYGEN_API_KEY y " +
+      "HYPERFRAMES_ASSET_ID en las variables de entorno de Vercel y vuelve a " +
+      "desplegar. Aquí no se puede renderizar en local: una función serverless " +
+      "no tiene Chromium ni ffmpeg."
+    );
+  }
+
   if (!existsSync(path.join(DIR_VIDEO, "index.html"))) {
     return (
       "No se encuentra la plantilla del video (videos/tasas-del-dia/index.html). " +
-      "El generador solo funciona con el repositorio completo en disco, es decir " +
-      "corriendo la app en local; en el despliegue de Vercel no está."
+      "El render local necesita el repositorio completo en disco."
     );
   }
 
@@ -177,8 +190,9 @@ export function motivoNoDisponible(): string | null {
     execFileSync("ffmpeg", ["-version"], { stdio: "ignore" });
   } catch {
     return (
-      "Falta ffmpeg en esta máquina, y el render lo necesita para escribir el MP4. " +
-      "Instálalo y vuelve a intentarlo."
+      "Falta ffmpeg en esta máquina, y el render local lo necesita para escribir " +
+      "el MP4. Instálalo, o configura HEYGEN_API_KEY y HYPERFRAMES_ASSET_ID para " +
+      "renderizar en la nube."
     );
   }
 
