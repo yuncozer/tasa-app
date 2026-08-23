@@ -26,6 +26,11 @@ const SECCIONES = [
     titulo: "Enviar al canal",
     descripcion: "Arma el mensaje de WhatsApp a partir de un post ya publicado.",
   },
+  {
+    href: "/admin/video",
+    titulo: "Generador de videos",
+    descripcion: "El Reel de tasas del día, con el copy del último post.",
+  },
 ] as const;
 
 export default async function AdminPage() {

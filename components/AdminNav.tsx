@@ -14,6 +14,7 @@ const PAGINAS = [
   { id: "noticia", href: "/admin/noticia", label: "Noticias" },
   { id: "semanal", href: "/admin/semanal", label: "Semanal" },
   { id: "canal", href: "/admin/canal", label: "Canal" },
+  { id: "video", href: "/admin/video", label: "Videos" },
 ] as const;
 
 export type PaginaAdmin = (typeof PAGINAS)[number]["id"];

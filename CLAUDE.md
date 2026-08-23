@@ -776,6 +776,86 @@ Todo lo demás sigue saliendo de las plantillas de `lib/caption.ts`.
   también el texto de plantilla: lo que hay que comparar no es la IA contra la
   nada, sino contra lo que ya se publicaba.
 
+### El video de tasas se genera de la publicación, no de las tasas en vivo
+
+Además de los posts, hay un **Reel vertical** (1080×1920, 10 s) con las cuatro
+tasas del día y la brecha de remate. Vive en `videos/tasas-del-dia/` —una
+composición de HyperFrames, que renderiza video desde HTML— y se dispara a mano
+con `npx tsx scripts/video-tasas.ts --render`, nunca por cron: sale los domingos
+o cuando convenga, y conviene mirarlo antes.
+
+- **Lee `snapshot_hoy`, no `getRates()`.** El video se comparte junto al post de
+  esa jornada, así que tiene que decir exactamente lo mismo. Leyendo las tasas en
+  vivo, un Binance que se moviera entre el post y el render dejaría el video
+  afirmando una cifra distinta de la que la gente ya tiene en el feed — el mismo
+  fallo que obligó a congelar el snapshot para `/api/og/instagram-post`. El flag
+  `--en-vivo` existe solo para probar el diseño fuera de las horas de
+  publicación, y avisa por consola de que lo generado no corresponde a ningún
+  post.
+- **El script no calcula ni una cifra.** La brecha sale de `calcularBrecha()` y
+  la fila en pesos de `buildFilasPesos()`; las etiquetas y las fuentes se leen
+  del snapshot. Es la regla de siempre llevada a un consumidor más: si el video
+  hiciera su propia cuenta, podría publicar un porcentaje distinto del que la app
+  lleva todo el día en pantalla.
+- **La fila en pesos nombra la venta.** Se probó con el `mid` de Binance y es
+  justo el promedio que este proyecto prohíbe. Vale el mismo criterio que la
+  brecha: una cifra suelta tiene que nombrar un lado del mercado.
+- **Si falta una tasa, no se genera el video.** Aquí no vale la degradación a
+  `Sin dato` de la portada o el semanal: aquellas muestran un estado y esto
+  produce un archivo que se sube a Instagram y no se corrige después.
+- **La fecha y la hora salen del snapshot, no del reloj de la máquina.** Lo que
+  fecha la pieza es el instante en que se capturaron las tasas, que es el que el
+  lector puede contrastar con el post. Un video generado el lunes sobre el post
+  del domingo dice la hora del domingo, y eso es lo correcto.
+- **Los datos entran por variables de HyperFrames**, declaradas en
+  `data-composition-variables`; los números escritos en el HTML son solo el
+  respaldo para abrir el archivo suelto. Ojo: **el Studio reescribe ese atributo**
+  convirtiendo sus comillas en `&quot;`, y aunque el navegador lo entiende, `lint`
+  lee el archivo en crudo y lo rechaza. Si sale
+  `invalid_composition_variables_declaration`, la causa es esa.
+- **La voz no se genera aquí.** El TTS local solo tiene una voz en español,
+  documentada como peninsular y sin control de emoción — mal encaje para el
+  público de la frontera. El guion y la dirección de voz están en
+  `videos/tasas-del-dia/GUION.md` y se pegan en CapCut. Los efectos sí van
+  incrustados, mezclados bajos (pico −6,4 dB) para dejarle cabecera a esa voz.
+- `formatFechaLarga()` se añadió a `lib/format.ts` en vez de duplicar los meses
+  en el script: las fechas se arman en un solo sitio, por lo mismo que están
+  hechas a mano y no con `Intl`.
+
+#### El generador de `/admin/video` y por qué el render va a la nube
+
+La misma pieza se genera desde el teléfono, en `/admin` → **Generador de
+videos** → *Resumen de tasas*: enseña el copy del último post y, debajo, el
+botón que arma el Reel con esas mismas cifras, su vista previa y su descarga.
+
+- **El copy se reconstruye, no se pide a Instagram.** `buildCaption()` sobre el
+  snapshot congelado es la misma función y el mismo snapshot que usó el cron, así
+  que sale idéntico al publicado — y la pantalla no depende de que la Graph API
+  responda para enseñar algo que ya ocurrió. El `momento` se deduce de la hora de
+  captura, porque `snapshot_hoy` guarda una sola fila y no lo lleva.
+- **El render lo hace HeyGen, no Vercel.** Necesita Chromium y `ffmpeg`, que no
+  caben en una función serverless — la misma restricción que llevó a marcar los
+  videos en Cloudinary. `lib/video-nube.ts` habla con su API por `fetch`, sin el
+  CLI: cabecera `x-api-key`, `POST /v3/hyperframes/renders` y sondeo de
+  `GET /v3/hyperframes/renders/{id}`. El esquema no está adivinado, sale del
+  cliente del propio CLI.
+- **La plantilla se sube una sola vez** y su `asset_id` vive en
+  `HYPERFRAMES_ASSET_ID`; cada generación reenvía solo las variables del día. Sin
+  eso habría que subir el proyecto entero en cada petición, que ni cabe en el
+  minuto de la función ni tiene sentido para unos números que cambian.
+- **Encolar y sondear van separados**, como la cola de programadas y por el mismo
+  motivo: el render ronda el minuto y una función de Vercel muere ahí.
+  `/generar` devuelve el `renderId` y la interfaz pregunta por `/estado` cada
+  cinco segundos.
+- **La URL firmada de HeyGen no llega al navegador.** El video se pide siempre a
+  `/api/admin/video/archivo`, que exige la cookie de sesión y hace de
+  intermediaria — mismo criterio que las credenciales de Cloudinary. Nada se
+  escribe en `public/`: ahí quedaría accesible sin sesión, y en Vercel el disco
+  es de solo lectura.
+- **Sin las dos variables de entorno cae al render local**, que es lo cómodo en
+  desarrollo y no gasta créditos. Se prefiere la nube cuando está configurada
+  para que lo que se prueba sea lo que va a pasar en producción.
+
 ### El aviso legal se queda
 
 El pie declara que los datos son de terceros, que La Tasa no fija ni certifica
@@ -1247,6 +1327,7 @@ tres scripts se reparten el trabajo:
 | `scripts/preview-marca.ts <archivo>` | Material propio: marcos, video en sus tres lienzos, sello y cintillo | Solo para las de imagen |
 | `scripts/preview-semanal.ts` | El reporte semanal: caption y las dos URLs (1:1 y 9:16) | Sí |
 | `scripts/preview-ia.ts <tipo>` | Los dos textos que redacta la IA, junto a su plantilla | No |
+| `scripts/video-tasas.ts` | El Reel de tasas del día, desde el snapshot publicado | No |
 
 ```bash
 # Artículo real: imprime el caption y una URL firmada de la imagen
