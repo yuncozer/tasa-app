@@ -16,6 +16,7 @@
  * exponerse con prefijo `NEXT_PUBLIC_`.
  */
 
+import { calcularBrecha } from "@/lib/brecha";
 import { diaCaracasISO } from "@/lib/format";
 import type { RateKey, RatesSnapshot } from "@/lib/types";
 
@@ -239,6 +240,68 @@ export async function listarHistoricoPesos(limite: number = 30): Promise<FilaHis
       fronteraBuy: cop_frontera && valores.USD_BINANCE_BUY ? valores.USD_BINANCE_BUY / cop_frontera : null,
       fronteraSell: cop_frontera && valores.USD_BINANCE_SELL ? valores.USD_BINANCE_SELL / cop_frontera : null,
       vesPromedio: cop_frontera ? 1 / cop_frontera : null,
+    });
+
+    if (resultado.length >= limite) break;
+  }
+
+  return resultado;
+}
+
+/**
+ * Las claves que hacen falta para reconstruir la brecha BCV/Binance
+ * (`calcularBrecha()` en `lib/brecha.ts`) en un momento pasado: la misma
+ * venta de Binance con la que se mide en la portada y en el reporte semanal,
+ * nunca el `mid`.
+ */
+const CLAVES_BRECHA: readonly ClaveHistorico[] = ["USD_BCV", "USD_BINANCE_SELL"];
+
+export interface FilaHistoricoBrecha {
+  fecha: string;
+  momento: Momento;
+  /** `null` cuando falta cualquiera de las dos tasas ese momento — nunca 0. */
+  brecha: number | null;
+}
+
+/**
+ * Las últimas lecturas archivadas, vistas como la brecha entre el dólar BCV y
+ * la venta de Binance — la misma cuenta que `brechaDelSnapshot()`, pero sobre
+ * lo ya archivado en vez del snapshot de hoy.
+ *
+ * Mismo patrón que `listarHistoricoPesos()`: se piden las dos claves en un
+ * solo viaje y se agrupan por `(fecha, momento)` en vez de dos llamadas a
+ * `listarHistorico()` que podrían traer ventanas de fechas distintas.
+ */
+export async function listarHistoricoBrecha(limite: number = 60): Promise<FilaHistoricoBrecha[]> {
+  const filas = await rest<FilaHistorico[]>(
+    `?clave=in.(${CLAVES_BRECHA.map(encodeURIComponent).join(",")})` +
+      "&select=clave,fecha,momento,valor" +
+      "&order=fecha.desc,momento.desc" +
+      `&limit=${limite * CLAVES_BRECHA.length}`,
+    { method: "GET" },
+  );
+
+  const grupos = new Map<string, { fecha: string; momento: Momento; valores: Partial<Record<ClaveHistorico, number>> }>();
+
+  for (const fila of filas) {
+    if (fila.momento !== "manana" && fila.momento !== "tarde") continue;
+
+    const valor = Number(fila.valor);
+    if (!Number.isFinite(valor)) continue;
+
+    const clave = fila.clave as ClaveHistorico;
+    const llave = `${fila.fecha}_${fila.momento}`;
+    const grupo = grupos.get(llave) ?? { fecha: fila.fecha, momento: fila.momento, valores: {} };
+    grupo.valores[clave] = valor;
+    grupos.set(llave, grupo);
+  }
+
+  const resultado: FilaHistoricoBrecha[] = [];
+  for (const { fecha, momento, valores } of grupos.values()) {
+    resultado.push({
+      fecha,
+      momento,
+      brecha: calcularBrecha(valores.USD_BCV ?? null, valores.USD_BINANCE_SELL ?? null),
     });
 
     if (resultado.length >= limite) break;

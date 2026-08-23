@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { Logo } from "@/components/Logo";
 import { Sparkline } from "@/components/Sparkline";
-import { formatFecha, formatRate } from "@/lib/format";
-import { listarHistorico, listarHistoricoPesos, type Momento } from "@/lib/historico";
+import { formatFecha, formatPercent, formatRate } from "@/lib/format";
+import { listarHistorico, listarHistoricoBrecha, listarHistoricoPesos, type Momento } from "@/lib/historico";
 import { RATE_ORDER, rateMeta } from "@/lib/rates";
 import type { RateKey } from "@/lib/types";
 
@@ -19,10 +19,11 @@ function claveValida(valor: string | undefined): RateKey {
   return CLAVES_HISTORIAL.find((key) => key === valor) ?? "USD_BINANCE_SELL";
 }
 
-type Vista = "bs" | "cop";
+type Vista = "bs" | "cop" | "brecha";
 
 function vistaValida(valor: string | undefined): Vista {
-  return valor === "cop" ? "cop" : "bs";
+  if (valor === "cop" || valor === "brecha") return valor;
+  return "bs";
 }
 
 function claseTab(seleccionada: boolean): string {
@@ -75,12 +76,17 @@ export default async function Historial({
         <Link href="/historial?vista=cop" className={claseTab(vista === "cop")}>
           En pesos
         </Link>
+        <Link href="/historial?vista=brecha" className={claseTab(vista === "brecha")}>
+          Brecha BCV/Binance
+        </Link>
       </div>
 
       {vista === "bs" ? (
         <HistorialBolivares clave={clave} />
-      ) : (
+      ) : vista === "cop" ? (
         <HistorialPesos />
+      ) : (
+        <HistorialBrecha />
       )}
 
       <Link
@@ -188,6 +194,50 @@ async function HistorialPesos() {
             <ValorPesos label="Frontera (compra)" valor={fila.fronteraBuy} />
             <ValorPesos label="Frontera (venta)" valor={fila.fronteraSell} />
           </div>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/**
+ * La brecha entre el dólar BCV y la venta de Binance, para cada momento
+ * archivado — la misma cuenta que la franja de la portada y la tarjeta del
+ * reporte semanal (`calcularBrecha()` en `lib/brecha.ts`), sobre lo ya
+ * archivado en vez del snapshot de hoy.
+ *
+ * Sin sparkline a propósito: `Sparkline` da por hecho una serie en bolívares
+ * en su etiqueta de accesibilidad, y una brecha es un porcentaje — reusarla
+ * diría "bolívares" sobre una cifra que no lo es.
+ */
+async function HistorialBrecha() {
+  let filas: Awaited<ReturnType<typeof listarHistoricoBrecha>> = [];
+  let error = false;
+  try {
+    filas = await listarHistoricoBrecha();
+  } catch {
+    error = true;
+  }
+
+  if (error) return <AvisoError />;
+  if (filas.length === 0) return <AvisoVacio texto="Todavía no hay lecturas archivadas de la brecha." />;
+
+  return (
+    <ul className="divide-y divide-[color:var(--border)] overflow-hidden rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface)]">
+      {filas.map((fila) => (
+        <li
+          key={`${fila.fecha}-${fila.momento}`}
+          className="flex items-center justify-between gap-3 px-4 py-3"
+        >
+          <div className="flex flex-col">
+            <span className="text-sm font-medium">{formatFecha(fila.fecha)}</span>
+            <span className="text-xs text-[color:var(--muted)]">{MOMENTO_LABEL[fila.momento]}</span>
+          </div>
+          {fila.brecha === null ? (
+            <p className="text-sm text-[color:var(--warning)]">Sin dato</p>
+          ) : (
+            <p className="tabular text-lg font-semibold leading-none">{formatPercent(fila.brecha)}</p>
+          )}
         </li>
       ))}
     </ul>
