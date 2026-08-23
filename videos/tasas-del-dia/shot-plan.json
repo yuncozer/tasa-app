@@ -1,0 +1,103 @@
+{
+  "category": "stat",
+  "duration_s": 10,
+  "fps": 30,
+  "canvas": {
+    "w": 1080,
+    "h": 1920,
+    "aspect": "9:16"
+  },
+  "style": "Panel de tasas de La Tasa: tema oscuro fijo, el número manda, contexto en gris. Llegada escalonada de cada fila con su conteo, y la brecha como remate. Sin adornos: se lee de pie, en un teléfono, de pasada en el feed.",
+  "palette": [
+    "#0b1120",
+    "#131c2f",
+    "#1b273f",
+    "#26324c",
+    "#f1f5f9",
+    "#94a3b8",
+    "#34d399",
+    "#fbbf24"
+  ],
+  "font": "Geist (embebida como data URI, subconjunto latin)",
+  "beats": [
+    0.15,
+    0.95,
+    1.7,
+    2.45,
+    3.2,
+    4.8,
+    5.65,
+    5.78,
+    5.87
+  ],
+  "export": "mp4",
+  "asset_needs": [],
+  "block": null,
+  "customize": null,
+  "content": {
+    "value": 16.4,
+    "prefix": "",
+    "suffix": " %",
+    "label": "de brecha: lo que se paga de más fuera del BCV",
+    "ring": false,
+    "filas": [
+      {
+        "id": "bcv",
+        "label": "Dólar BCV",
+        "fuente": "BCV",
+        "valor": 784.66,
+        "unidad": "Bs",
+        "decimales": 2,
+        "peso": "ancla"
+      },
+      {
+        "id": "bin-c",
+        "label": "Dólar Binance (compra)",
+        "fuente": "Binance P2P",
+        "valor": 922.5,
+        "unidad": "Bs",
+        "decimales": 2,
+        "peso": "normal"
+      },
+      {
+        "id": "bin-v",
+        "label": "Dólar Binance (venta)",
+        "fuente": "Binance P2P",
+        "valor": 913.5,
+        "unidad": "Bs",
+        "decimales": 2,
+        "peso": "normal"
+      },
+      {
+        "id": "front",
+        "label": "Dólar frontera (venta)",
+        "fuente": "Binance P2P",
+        "valor": 3022.83,
+        "unidad": "COP",
+        "decimales": 2,
+        "peso": "normal"
+      }
+    ],
+    "fecha": "23 de agosto de 2026 · 06:00 PM",
+    "marca": "@latasa.online",
+    "origen_brecha": "Dólar BCV 784,66 → Binance venta 913,50 Bs"
+  },
+  "motion": {
+    "ruta_sostenida": "staged reveals — cada fila llega con su conteo en marcha; el cuadro gana información en todo momento, sin idle wobble",
+    "entrada": "waterfall entry (§6): eje Y desde abajo, una sola dirección, opacidad binaria por tl.set, power4.out",
+    "conteo": "count-up guiado por la timeline (proxy {v:0}→objetivo con onUpdate), decelerando, tabular-nums",
+    "quietud_antes_del_climax": "0.60 s entre el fin del último conteo (4.20) y la entrada de la brecha (4.80)",
+    "climax": "la brecha entra con scale_punch + underline_sweep en acento",
+    "sin_costuras": "una sola escena, sin cortes: no aplica ledger de vectores ni Seam Gate",
+    "cierre": "Ultimo movimiento en 6.00 s y 2.0 s exactos de sostenido (verificado: los fotogramas de 6.0, 7.0, 7.76 y 7.9 s son identicos byte a byte). Antes eran 1.5 s y el video se cortaba justo al acabar de decir lo que venia a decir.",
+    "lienzo": "9:16 (Reel). Los 840 px extra no se reparten proporcionalmente: van a reservas de interfaz (130 arriba, 300 abajo) y a tipografia mas grande. La reserva inferior supera la de una Story porque un Reel carga caption, handle y ticker de audio.",
+    "origen": "La brecha declara de donde sale con la resta a la vista, no con una frase: son las dos cifras que el espectador acaba de ver contar en las filas de arriba, asi que la derivacion se verifica sola."
+  },
+  "datos": {
+    "origen": "Supabase, tabla snapshot_hoy (clave \"hoy\") — el snapshot que el cron congelo justo antes de publicar el carrusel de las 6:00 PM.",
+    "fetchedAt": "2026-08-23T22:00:03.876Z (18:00:03 en Caracas)",
+    "corroboracion": "historico_tasas fecha=2026-08-23 momento=tarde trae las mismas siete claves con el mismo capturado_en.",
+    "nota": "Se leen de lo publicado y no de la API en vivo para que el video no contradiga al post. La brecha usa la formula de lib/brecha.ts contra USD_BINANCE_SELL: (913,50/784,66-1)*100 = 16,42 -> 16,4 %. El dolar frontera (venta) cruza por COP_FRONTERA como lib/pesos.ts: 913,50/0,3022 = 3.022,83.",
+    "formato_hora": "06:00 PM, el mismo que produce formatClock() en lib/format.ts."
+  }
+}

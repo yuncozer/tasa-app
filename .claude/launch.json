@@ -4,11 +4,15 @@
     {
       "name": "tasa-app-dev",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
       "port": 3000,
       "env": {
         "NODE_OPTIONS": "--use-system-ca"
-      }
+      },
+      "autoPort": true
     }
   ]
 }

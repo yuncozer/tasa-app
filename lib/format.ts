@@ -278,6 +278,25 @@ const MESES_LARGOS = [
 ];
 
 /**
+ * Fecha larga en hora de Caracas, p. ej. "23 de agosto de 2026".
+ *
+ * Existe para que el video de tasas (`scripts/video-tasas.ts`) feche la pieza
+ * con el mismo calendario que la app en vez de llevarse una copia de los
+ * meses. Se arma a mano por el mismo motivo que `formatDate` y `formatClock`:
+ * dos versiones de ICU devuelven textos distintos.
+ */
+export function formatFechaLarga(iso: string | null): string {
+  if (!iso) return "—";
+
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "—";
+
+  const caracas = new Date(date.getTime() - CARACAS_OFFSET_MS);
+
+  return `${caracas.getUTCDate()} de ${MESES_LARGOS[caracas.getUTCMonth()]} de ${caracas.getUTCFullYear()}`;
+}
+
+/**
  * Un porcentaje ya calculado, con su símbolo: "1,4 %".
  *
  * No usa `style: "percent"` de `Intl` porque ese espera una fracción (0,014) y
