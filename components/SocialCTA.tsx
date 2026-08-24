@@ -21,7 +21,7 @@ export function SocialCTA() {
   return (
     <div className="flex flex-col gap-3 rounded-2xl border border-accent/40 bg-accent/10 px-4 py-3">
       <p className="text-center text-sm font-medium text-foreground">
-        📲 Tasas del día y noticias de la frontera, en tus redes
+        📲 Tasas del día y noticias clave de interés económico
       </p>
 
       <div className={`grid gap-2 ${whatsapp ? "grid-cols-2" : "grid-cols-1"}`}>
