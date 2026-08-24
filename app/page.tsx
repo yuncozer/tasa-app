@@ -5,6 +5,7 @@ import { InstallPrompt } from "@/components/InstallPrompt";
 import { Logo } from "@/components/Logo";
 import { OfflineNotice } from "@/components/OfflineNotice";
 import { RatePanel } from "@/components/RatePanel";
+import { SocialCTA } from "@/components/SocialCTA";
 import { clearCache } from "@/lib/cache";
 import { getRates } from "@/lib/rates";
 
@@ -58,6 +59,7 @@ export default async function Home({
       </Link>
 
       <Calculator snapshot={snapshot} />
+      <SocialCTA />
       <Footer fetchedAt={snapshot.fetchedAt} />
     </main>
   );
