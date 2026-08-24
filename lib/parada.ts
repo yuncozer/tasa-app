@@ -1,6 +1,7 @@
 /**
  * Borrador detectado del post diario "Dólar en La Parada" (lanacionweb.com),
- * sobre la tabla que crea `supabase/migrations/0007_parada_pendiente.sql`.
+ * sobre la tabla que crean `supabase/migrations/0007_parada_pendiente.sql`
+ * y `0008_parada_campos.sql`.
  *
  * Se habla con PostgREST por `fetch`, sin `@supabase/supabase-js`, mismo
  * criterio que `lib/enlaces.ts` y `lib/snapshot-hoy.ts`.
@@ -14,11 +15,18 @@ const TIMEOUT_MS = 10_000;
 const TABLA = "parada_pendiente";
 const CLAVE = "parada";
 
+/** Lugar por defecto del badge de ubicación, con el mismo texto que el resto del proyecto usa para esta fuente. */
+export const LUGAR_PARADA_DEFECTO = "La Parada, Villa del Rosario";
+
 export interface ParadaBorrador {
   url: string;
   titulo: string;
   imagenUrl: string;
   caption: string;
+  lugar: string;
+  /** `null` hasta que el admin la confirma en `/admin/parada` — nunca se adivina de la prosa scrapeada. */
+  compra: string | null;
+  venta: string | null;
   publicado: boolean;
   detectadoEn: string;
 }
@@ -28,6 +36,9 @@ interface FilaParada {
   titulo: string;
   imagen_url: string;
   caption: string;
+  lugar: string;
+  compra: string | null;
+  venta: string | null;
   publicado: boolean;
   detectado_en: string;
 }
@@ -72,6 +83,9 @@ function desdeFila(fila: FilaParada): ParadaBorrador {
     titulo: fila.titulo,
     imagenUrl: fila.imagen_url,
     caption: fila.caption,
+    lugar: fila.lugar,
+    compra: fila.compra,
+    venta: fila.venta,
     publicado: fila.publicado,
     detectadoEn: fila.detectado_en,
   };
@@ -87,7 +101,10 @@ export async function leerParadaPendiente(): Promise<ParadaBorrador | null> {
  * Guarda un borrador nuevo, reemplazando el anterior. Lo llama el cron de
  * vigilancia en cuanto detecta un artículo distinto del que ya tenía
  * guardado — `publicado` arranca en `false` porque es, por definición, un
- * artículo que todavía no se revisó.
+ * artículo que todavía no se revisó, y `compra`/`venta` arrancan vacíos: se
+ * extraen con una expresión regular sobre prosa libre, y ya se vio fallar
+ * ese enfoque (texto de otro artículo colándose en el cuerpo scrapeado). El
+ * admin las confirma a mano en `/admin/parada` antes de publicar.
  */
 export async function guardarParadaPendiente(borrador: {
   url: string;
@@ -104,8 +121,35 @@ export async function guardarParadaPendiente(borrador: {
       titulo: borrador.titulo,
       imagen_url: borrador.imagenUrl,
       caption: borrador.caption,
+      lugar: LUGAR_PARADA_DEFECTO,
+      compra: null,
+      venta: null,
       publicado: false,
       detectado_en: new Date().toISOString(),
+    }),
+  });
+}
+
+/**
+ * Guarda los campos que el admin edita en `/admin/parada` antes de publicar
+ * (lugar, compra, venta y el caption, si lo tocó). Separado de
+ * `guardarParadaPendiente()` porque ese lo llama el cron para un borrador
+ * *nuevo*, y este actualiza el que ya existe.
+ */
+export async function guardarCamposParada(campos: {
+  lugar: string;
+  compra: string | null;
+  venta: string | null;
+  caption: string;
+}): Promise<void> {
+  await rest<undefined>(`?clave=eq.${CLAVE}`, {
+    method: "PATCH",
+    prefer: "return=minimal",
+    body: JSON.stringify({
+      lugar: campos.lugar,
+      compra: campos.compra,
+      venta: campos.venta,
+      caption: campos.caption,
     }),
   });
 }

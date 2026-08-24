@@ -68,7 +68,6 @@ function Portada({
   imageDataUri,
   icons,
   proporcion,
-  variante,
 }: {
   /** Ausente en las diapositivas secundarias de un carrusel. */
   title?: string;
@@ -76,23 +75,12 @@ function Portada({
   imageDataUri: string;
   icons: { instagram: string; browser: string };
   proporcion: "1:1" | "4:5";
-  /**
-   * Marca visual para una serie propia dentro del marco de noticia —hoy solo
-   * "Dólar en La Parada"— sin duplicar la plantilla. Sin ella, el marco es
-   * exactamente el de cualquier otra noticia.
-   */
-  variante?: "parada";
 }) {
   const altoFoto = title
     ? ALTO_FOTO.principal
     : proporcion === "4:5"
       ? ALTO_FOTO.secundariaAncha
       : ALTO_FOTO.secundaria;
-  // El kicker en azul (el mismo tono que ya usa el reporte semanal para su
-  // propio kicker) y el borde de la foto a juego: dos señales que se leen
-  // juntas de un vistazo en la cuadrícula del perfil, sin tocar el resto del
-  // marco ni inventar un color nuevo.
-  const colorAcento = variante === "parada" ? COLOR.kicker : COLOR.accent;
 
   return (
     <div
@@ -107,33 +95,18 @@ function Portada({
         fontFamily: "Geist",
       }}
     >
-      <div style={{ display: "flex", flexDirection: "column" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-          <Encabezado subtitulo="Noticias" />
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", marginTop: 15 }}>
-            <span style={{ fontSize: 24, color: COLOR.muted, fontWeight: 700 }}>{`@latasa.online`}</span>
-          </div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+        <Encabezado subtitulo="Noticias" />
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", marginTop: 15 }}>
+          <span style={{ fontSize: 24, color: COLOR.muted, fontWeight: 700 }}>{`@latasa.online`}</span>
         </div>
-        {variante === "parada" && (
-          <span
-            style={{
-              fontSize: 26,
-              fontWeight: 700,
-              color: COLOR.kicker,
-              letterSpacing: 4,
-              marginTop: 10,
-            }}
-          >
-            DÓLAR EN LA PARADA
-          </span>
-        )}
       </div>
 
       <div
         style={{
           display: "flex",
           flexDirection: "column",
-          border: `2px solid ${colorAcento}`,
+          border: `2px solid ${COLOR.accent}`,
           borderRadius: 24,
           overflow: "hidden",
           padding: 0,
@@ -179,7 +152,6 @@ export async function GET(request: NextRequest) {
   const source = params.get("source");
   const sig = params.get("sig");
   const proporcion = params.get("proporcion") === "4:5" ? "4:5" : "1:1";
-  const variante = params.get("variante") === "parada" ? "parada" : undefined;
 
   if (!image || !source || !sig) {
     return new Response("Faltan parámetros", { status: 400 });
@@ -189,14 +161,12 @@ export async function GET(request: NextRequest) {
    * El título sólo viaja en la diapositiva principal; en las secundarias de
    * un carrusel no se repite. La firma se calcula sobre exactamente los
    * parámetros presentes, así que quitar o añadir `title` (o cambiar
-   * `proporcion`/`variante`) a una URL ya firmada la invalida — no hay forma
-   * de colar un titular ajeno, de estirar un lienzo, ni de pedir la marca
-   * visual de "Dólar en La Parada" sobre una noticia cualquiera sin permiso.
+   * `proporcion`) a una URL ya firmada la invalida — no hay forma de colar
+   * un titular ajeno ni de estirar un lienzo sin permiso.
    */
-  const base: Record<string, string> = title
+  const firmados: Record<string, string> = title
     ? { title, image, source, proporcion }
     : { image, source, proporcion };
-  const firmados = variante ? { ...base, variante } : base;
   if (!verifyNewsImageParams(firmados, sig)) {
     return new Response("Firma inválida", { status: 403 });
   }
@@ -224,7 +194,6 @@ export async function GET(request: NextRequest) {
         imageDataUri={imageDataUri}
         icons={{ instagram: instagramIcon, browser: browserIcon }}
         proporcion={proporcion}
-        variante={variante}
       />
     ),
     {

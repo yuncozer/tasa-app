@@ -3,22 +3,30 @@
 import { useState } from "react";
 
 /**
- * Panel de `/admin/parada`: revisa el borrador que detectó el cron y lo
- * publica. El caption se muestra editable, como `captionOverride` en
- * `/admin/noticia` — el crédito a @lanacionweb y @ponchogocho lo arma la
- * plantilla, pero si algún día firma otro reportero hay que poder
- * corregirlo antes de publicar.
+ * Panel de `/admin/parada`: revisa el borrador que detectó el cron, confirma
+ * lugar/compra/venta a mano —nunca se adivinan de la prosa scrapeada, ver
+ * `lib/parada.ts`— y publica.
+ *
+ * La imagen la sirve `/api/og/instagram-post-parada`, que lee estos campos
+ * directo de Supabase sin recibir nada por query string. Por eso "Actualizar
+ * vista previa" primero guarda (PATCH a `/api/admin/parada`) y solo después
+ * refresca el `<img>` con un parámetro que cambia — mismo truco que el
+ * `?actualizar=` de la portada: sin un parámetro que cambie, el navegador
+ * serviría su propia copia.
  */
 
 interface Borrador {
-  url: string;
   titulo: string;
+  url: string;
+  lugar: string;
+  compra: string | null;
+  venta: string | null;
   caption: string;
-  detectadoEn: string;
 }
 
 type Estado =
   | { paso: "inicial" }
+  | { paso: "guardando" }
   | { paso: "publicando" }
   | { paso: "publicado"; mediaId: string }
   | { paso: "error"; mensaje: string };
@@ -28,32 +36,53 @@ async function leerError(response: Response): Promise<string> {
   return body?.error ? `${body.error}${body.detail ? `: ${body.detail}` : ""}` : `Error ${response.status}`;
 }
 
-export function ParadaPanel({
-  borrador,
-  imagenUrl,
-  errorPreview,
-}: {
-  borrador: Borrador | null;
-  imagenUrl: string | null;
-  errorPreview: string | null;
-}) {
+export function ParadaPanel({ borrador }: { borrador: Borrador | null }) {
+  const [lugar, setLugar] = useState(borrador?.lugar ?? "");
+  const [compra, setCompra] = useState(borrador?.compra ?? "");
+  const [venta, setVenta] = useState(borrador?.venta ?? "");
   const [caption, setCaption] = useState(borrador?.caption ?? "");
+  const [marca, setMarca] = useState("");
   const [estado, setEstado] = useState<Estado>({ paso: "inicial" });
-  const publicando = estado.paso === "publicando";
 
   if (!borrador) {
     return (
       <section className="flex flex-col gap-2 rounded-2xl border border-border-soft bg-surface px-4 py-4">
         <p className="text-sm text-muted">
           Todavía no hay ningún borrador pendiente. Un cron revisa la categoría Frontera de lanacionweb.com cada
-          pocos minutos y arma el post en cuanto sale el artículo de hoy — vuelve a mirar más tarde.
+          pocos minutos y te avisa por correo en cuanto sale el artículo de hoy.
         </p>
       </section>
     );
   }
 
+  const guardando = estado.paso === "guardando";
+  const publicando = estado.paso === "publicando";
+  const publicado = estado.paso === "publicado";
+  const camposCompletos = compra.trim() !== "" && venta.trim() !== "";
+
+  async function guardarVistaPrevia() {
+    setEstado({ paso: "guardando" });
+    try {
+      const response = await fetch("/api/admin/parada", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lugar, compra, venta, caption }),
+      });
+      if (!response.ok) {
+        setEstado({ paso: "error", mensaje: await leerError(response) });
+        return;
+      }
+      setMarca(String(Date.now()));
+      setEstado({ paso: "inicial" });
+    } catch (error) {
+      setEstado({ paso: "error", mensaje: error instanceof Error ? error.message : "Fallo de red" });
+    }
+  }
+
   async function publicar() {
-    if (!window.confirm("Esto publica el post en la cuenta real de Instagram. No se puede deshacer. ¿Publicar ahora?")) {
+    if (
+      !window.confirm("Esto publica el post en la cuenta real de Instagram. No se puede deshacer. ¿Publicar ahora?")
+    ) {
       return;
     }
 
@@ -62,7 +91,7 @@ export function ParadaPanel({
       const response = await fetch("/api/admin/publish-parada", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ caption }),
+        body: JSON.stringify({ lugar, compra, venta, caption }),
       });
       if (!response.ok) {
         setEstado({ paso: "error", mensaje: await leerError(response) });
@@ -74,8 +103,6 @@ export function ParadaPanel({
       setEstado({ paso: "error", mensaje: error instanceof Error ? error.message : "Fallo de red" });
     }
   }
-
-  const publicado = estado.paso === "publicado";
 
   return (
     <div className="flex flex-col gap-6">
@@ -91,19 +118,73 @@ export function ParadaPanel({
         </a>
       </section>
 
-      {imagenUrl && (
+      <section className="flex flex-col gap-3">
+        <div className="flex flex-col gap-2">
+          <label htmlFor="lugar-parada" className="text-sm font-semibold uppercase tracking-wide text-muted">
+            Lugar
+          </label>
+          <input
+            id="lugar-parada"
+            value={lugar}
+            onChange={(e) => setLugar(e.target.value)}
+            className="rounded-xl border border-border-soft bg-surface-strong px-4 py-3 text-sm text-foreground outline-none"
+          />
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div className="flex flex-col gap-2">
+            <label htmlFor="compra-parada" className="text-sm font-semibold uppercase tracking-wide text-muted">
+              Compran
+            </label>
+            <input
+              id="compra-parada"
+              inputMode="numeric"
+              value={compra}
+              onChange={(e) => setCompra(e.target.value)}
+              placeholder="Sin confirmar"
+              className="rounded-xl border border-border-soft bg-surface-strong px-4 py-3 text-sm tabular text-foreground outline-none placeholder:text-muted"
+            />
+          </div>
+          <div className="flex flex-col gap-2">
+            <label htmlFor="venta-parada" className="text-sm font-semibold uppercase tracking-wide text-muted">
+              Venden
+            </label>
+            <input
+              id="venta-parada"
+              inputMode="numeric"
+              value={venta}
+              onChange={(e) => setVenta(e.target.value)}
+              placeholder="Sin confirmar"
+              className="rounded-xl border border-border-soft bg-surface-strong px-4 py-3 text-sm tabular text-foreground outline-none placeholder:text-muted"
+            />
+          </div>
+        </div>
+        {!camposCompletos && (
+          <p className="text-xs leading-relaxed text-warning">
+            Confirmá compra y venta (billete de 100) leyendo el artículo — no se extraen solas del texto.
+          </p>
+        )}
+
+        <button
+          type="button"
+          onClick={guardarVistaPrevia}
+          disabled={guardando}
+          className="rounded-full border border-border-soft px-3 py-1 text-xs font-medium text-muted transition active:scale-95 disabled:opacity-60"
+        >
+          {guardando ? "Guardando…" : "Actualizar vista previa"}
+        </button>
+      </section>
+
+      {marca && (
         // eslint-disable-next-line @next/next/no-img-element -- Se genera al vuelo; next/image obligaría a declarar el host.
         <img
-          src={imagenUrl}
+          src={`/api/og/instagram-post-parada?t=${marca}`}
           alt={`Vista previa del post: ${borrador.titulo}`}
           className="h-auto w-full rounded-2xl border border-border-soft"
         />
       )}
-      {errorPreview && (
-        <p className="text-xs leading-relaxed text-warning">
-          No se pudo generar la vista previa ({errorPreview}). Publicar volvería a intentar scrapear el artículo, así
-          que puede fallar igual — revisá el enlace de arriba antes de publicar.
-        </p>
+      {!marca && (
+        <p className="text-xs text-muted">Tocá &quot;Actualizar vista previa&quot; para generar la imagen con estos datos.</p>
       )}
 
       <section className="flex flex-col gap-2">
@@ -122,7 +203,7 @@ export function ParadaPanel({
       <button
         type="button"
         onClick={publicar}
-        disabled={publicando || publicado}
+        disabled={publicando || publicado || !camposCompletos}
         className="rounded-2xl bg-accent px-4 py-3 text-sm font-semibold text-background transition active:scale-95 disabled:opacity-60"
       >
         {publicando ? "Publicando…" : publicado ? "Publicado" : "Publicar ahora"}

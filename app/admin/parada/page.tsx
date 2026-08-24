@@ -6,7 +6,6 @@ import { Logo } from "@/components/Logo";
 import { ParadaPanel } from "@/components/ParadaPanel";
 import { COOKIE_SESION, esSesionValida } from "@/lib/admin-session";
 import { leerParadaPendiente } from "@/lib/parada";
-import { previewNewsPost } from "@/lib/publish-news";
 
 export const metadata: Metadata = {
   title: "Dólar en La Parada — La Tasa",
@@ -16,14 +15,12 @@ export const metadata: Metadata = {
  * Borrador del post "Dólar en La Parada" que detectó
  * `app/api/cron/vigilar-parada/route.ts`, listo para revisar y publicar con
  * un toque. No tiene formulario de URL como `/admin/noticia`: la fuente es
- * siempre la misma columna de lanacionweb.com, y lo único que decide el
- * admin es si publicar el caption sugerido tal cual o editarlo antes.
+ * siempre la misma columna de lanacionweb.com.
  *
- * La imagen se previsualiza volviendo a scrapear el artículo
- * (`previewNewsPost`, la misma función que arma el post de verdad al
- * publicar) en vez de mostrar la foto cruda que guardó el cron: así lo que
- * se ve es lo que saldría, marco de marca incluido. Si el portal cambió o
- * cayó desde que se detectó, el error sale aquí en vez de al publicar.
+ * La imagen la sirve `/api/og/instagram-post-parada`, una plantilla propia
+ * (no el marco genérico de noticia) que lee el borrador directo de
+ * Supabase — no hace falta pasarle nada por props aquí, el `<img>` del panel
+ * apunta a esa ruta y ella misma resuelve el estado actual.
  */
 export default async function AdminParadaPage() {
   const cookieStore = await cookies();
@@ -33,17 +30,6 @@ export default async function AdminParadaPage() {
 
   const pendiente = await leerParadaPendiente().catch(() => null);
   const borrador = pendiente && !pendiente.publicado ? pendiente : null;
-
-  let imagenUrl: string | null = null;
-  let errorPreview: string | null = null;
-  if (borrador) {
-    try {
-      const previa = await previewNewsPost(borrador.url, undefined, "parada");
-      imagenUrl = previa.imageUrl;
-    } catch (error) {
-      errorPreview = error instanceof Error ? error.message : "No se pudo previsualizar el artículo";
-    }
-  }
 
   return (
     <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-6 px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(1.5rem,env(safe-area-inset-top))] sm:px-6">
@@ -57,7 +43,7 @@ export default async function AdminParadaPage() {
         <AdminNav activa="parada" />
       </header>
 
-      <ParadaPanel borrador={borrador} imagenUrl={imagenUrl} errorPreview={errorPreview} />
+      <ParadaPanel borrador={borrador} />
     </main>
   );
 }

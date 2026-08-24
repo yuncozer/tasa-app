@@ -149,3 +149,20 @@ export async function destinoDePost(slug: string): Promise<string> {
 
   return perfilInstagram();
 }
+
+/**
+ * A dónde manda `/laparada`. Mismos dos respaldos que `/p/<slug>` y no los
+ * tres de `/hoy`: no hay una variable de entorno que tenga sentido antes de
+ * la primera publicación de esta serie. Lo anota
+ * `app/api/admin/publish-parada/route.ts` justo después de publicar.
+ */
+export async function destinoDeLaParada(): Promise<string> {
+  try {
+    const anotado = await leerEnlace("laparada");
+    if (esUrlValida(anotado)) return anotado;
+  } catch {
+    // Un Supabase caído no debe tumbar el enlace: se sigue al perfil.
+  }
+
+  return perfilInstagram();
+}

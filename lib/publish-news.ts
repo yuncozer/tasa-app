@@ -75,21 +75,13 @@ function armarUrlImagenFirmada(params: {
   image: string;
   source: string;
   proporcion?: ProporcionCarrusel;
-  /**
-   * Marca visual opcional para distinguir una serie propia dentro del marco
-   * de noticia — hoy solo "Dólar en La Parada" — de una noticia cualquiera,
-   * sin duplicar la plantilla. Se omite del todo cuando no aplica, por el
-   * mismo motivo que `title`: la ruta firma exactamente lo que recibe.
-   */
-  variante?: "parada";
 }): string {
   const proporcion = params.proporcion ?? "1:1";
   // Sin título, la clave se omite del todo en vez de ir vacía: la ruta firma
   // exactamente los parámetros que recibe, y un `title=` de más no cuadraría.
-  const base: Record<string, string> = params.title
+  const firmados: Record<string, string> = params.title
     ? { title: params.title, image: params.image, source: params.source, proporcion }
     : { image: params.image, source: params.source, proporcion };
-  const firmados = params.variante ? { ...base, variante: params.variante } : base;
 
   const sig = signNewsImageParams(firmados);
   const url = new URL(`${sitioUrl()}/api/og/instagram-post-news`);
@@ -107,25 +99,15 @@ function armarUrlImagenFirmada(params: {
  * `imagenPropiaPublicId`, si viene, reemplaza la foto scrapeada por una que
  * el usuario subió desde `/admin/noticia` (quiere sumar contenido visual
  * propio a una noticia real, sin perder el título/fuente/caption scrapeados).
- *
- * `variante`, si viene, marca visualmente el marco (hoy solo `"parada"`, para
- * "Dólar en La Parada") sin cambiar el caption: ese ya sale distinto porque lo
- * arma `buildParadaCaption()` en vez de `buildNewsCaption()`, antes de llegar
- * aquí.
  */
 async function buildNewsPost(
   url: string,
-  opciones?: { imagenPropiaPublicId?: string; variante?: "parada" },
+  imagenPropiaPublicId?: string,
 ): Promise<{ article: ArticleData; caption: string; imageUrl: string }> {
   const article = await fetchArticle(url);
   const caption = buildNewsCaption(article);
-  const imagenFuente = opciones?.imagenPropiaPublicId ? urlImagen(opciones.imagenPropiaPublicId) : article.imageUrl;
-  const imageUrl = armarUrlImagenFirmada({
-    title: article.title,
-    image: imagenFuente,
-    source: article.sourceHost,
-    variante: opciones?.variante,
-  });
+  const imagenFuente = imagenPropiaPublicId ? urlImagen(imagenPropiaPublicId) : article.imageUrl;
+  const imageUrl = armarUrlImagenFirmada({ title: article.title, image: imagenFuente, source: article.sourceHost });
 
   return { article, caption, imageUrl };
 }
@@ -134,9 +116,8 @@ async function buildNewsPost(
 export async function previewNewsPost(
   url: string,
   imagenPropiaPublicId?: string,
-  variante?: "parada",
 ): Promise<{ article: ArticleData; caption: string; imageUrl: string }> {
-  return buildNewsPost(url, { imagenPropiaPublicId, variante });
+  return buildNewsPost(url, imagenPropiaPublicId);
 }
 
 /**
@@ -161,7 +142,7 @@ export async function publishNewsPost(
   captionOverride?: string,
   imagenPropiaPublicId?: string,
 ): Promise<{ mediaId: string }> {
-  const { imageUrl, caption } = await buildNewsPost(url, { imagenPropiaPublicId });
+  const { imageUrl, caption } = await buildNewsPost(url, imagenPropiaPublicId);
 
   return publishDailyPost(imageUrl, captionOverride ?? caption);
 }
@@ -483,7 +464,7 @@ export async function publishNewsCarouselPost(
  * bajo qué slug anotar el permalink real.
  */
 export type PublicacionPayload =
-  | { tipo: "articulo"; url: string; caption?: string; imagenPublicId?: string; variante?: "parada" }
+  | { tipo: "articulo"; url: string; caption?: string; imagenPublicId?: string }
   | { tipo: "manual"; datos: NoticiaManual; slugEnlace?: string }
   | { tipo: "carrusel"; datos: CarruselEntrada; caption: string; slugEnlace?: string }
   | ({ tipo: "reel"; videoPublicId: string; caption: string } & MarcaVideo & { slugEnlace?: string })
@@ -560,10 +541,7 @@ export async function prepararPublicacion(payload: PublicacionPayload): Promise<
     case "articulo": {
       // El caption sale tal cual, cerrando en sus hashtags: los que escribió
       // el admin si sobreescribió el texto, los de `buildNewsCaption` si no.
-      const { imageUrl, caption } = await buildNewsPost(payload.url, {
-        imagenPropiaPublicId: payload.imagenPublicId,
-        variante: payload.variante,
-      });
+      const { imageUrl, caption } = await buildNewsPost(payload.url, payload.imagenPublicId);
       return { tipo: "imagen", imageUrl, caption: payload.caption ?? caption };
     }
     case "manual":

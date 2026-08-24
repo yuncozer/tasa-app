@@ -43,6 +43,12 @@ const nextConfig: NextConfig = {
         headers: [{ key: "Cache-Control", value: "no-store" }],
       },
       {
+        // El destino cambia cada vez que se publica un post nuevo de "Dólar
+        // en La Parada" — mismo motivo que `/hoy`.
+        source: "/laparada",
+        headers: [{ key: "Cache-Control", value: "no-store" }],
+      },
+      {
         // La portada es donde de verdad llega el tráfico, y Next la marca como
         // dinámica —los proveedores se consultan con `no-store`—, así que sin
         // esto cada visita despertaría una función y repetiría la ronda de

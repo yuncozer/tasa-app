@@ -10,8 +10,8 @@
  * respuesta de `/api/` desde la caché, porque ahí sí pasaría por fresca.
  */
 
-const VERSION = "v6";
-const ATAJOS = ["/hoy", "/ig", "/wa"];
+const VERSION = "v7";
+const ATAJOS = ["/hoy", "/laparada", "/ig", "/wa"];
 const CACHE_PAGINA = `latasa-pagina-${VERSION}`;
 const CACHE_ESTATICOS = `latasa-estaticos-${VERSION}`;
 const VIGENTES = [CACHE_PAGINA, CACHE_ESTATICOS];
