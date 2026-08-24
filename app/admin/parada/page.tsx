@@ -38,7 +38,7 @@ export default async function AdminParadaPage() {
   let errorPreview: string | null = null;
   if (borrador) {
     try {
-      const previa = await previewNewsPost(borrador.url);
+      const previa = await previewNewsPost(borrador.url, undefined, "parada");
       imagenUrl = previa.imageUrl;
     } catch (error) {
       errorPreview = error instanceof Error ? error.message : "No se pudo previsualizar el artículo";

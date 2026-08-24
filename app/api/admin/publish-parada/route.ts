@@ -34,7 +34,12 @@ export async function POST(request: NextRequest) {
   const caption = typeof body?.caption === "string" && body.caption.trim() ? body.caption : pendiente.caption;
 
   try {
-    const { mediaId } = await ejecutarPublicacion({ tipo: "articulo", url: pendiente.url, caption });
+    const { mediaId } = await ejecutarPublicacion({
+      tipo: "articulo",
+      url: pendiente.url,
+      caption,
+      variante: "parada",
+    });
 
     // El post ya está en la cuenta y eso es lo irreversible: un fallo al
     // marcarlo publicado no puede convertir un éxito en un error que invite
