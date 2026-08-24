@@ -11,6 +11,8 @@
  * exponerse con prefijo `NEXT_PUBLIC_`.
  */
 
+import { withCache } from "@/lib/cache";
+
 const TIMEOUT_MS = 10_000;
 const TABLA = "parada_pendiente";
 const CLAVE = "parada";
@@ -161,4 +163,31 @@ export async function marcarParadaPublicada(): Promise<void> {
     prefer: "return=minimal",
     body: JSON.stringify({ publicado: true }),
   });
+}
+
+/**
+ * La tarjeta de "Dólar en La Parada" que se muestra en la portada, o `null`
+ * si no hay nada que enseñar todavía.
+ *
+ * Solo cuenta un borrador ya **publicado**: uno a medio revisar en
+ * `/admin/parada` puede tener cifras que el admin todavía está corrigiendo, y
+ * la portada no es el lugar para mostrar un número sin confirmar — mismo
+ * criterio que ya rige el resto del proyecto ("revisión humana antes de que
+ * se vea al público").
+ *
+ * Va detrás de `withCache`, con el mismo TTL que `getRates()`: sin esto,
+ * cada visita a la portada sería una consulta a Supabase por visitante, la
+ * misma regla que ya prohíbe leer `historico_tasas` desde ahí.
+ */
+export async function paradaDelDia(): Promise<ParadaBorrador | null> {
+  try {
+    return await withCache("parada-del-dia", 5 * 60 * 1000, async () => {
+      const borrador = await leerParadaPendiente();
+      if (!borrador?.publicado || !borrador.compra || !borrador.venta) return null;
+      return borrador;
+    });
+  } catch {
+    // Un Supabase caído no puede tumbar la portada: la tarjeta simplemente no sale.
+    return null;
+  }
 }

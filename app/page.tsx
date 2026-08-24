@@ -4,9 +4,11 @@ import { Footer } from "@/components/Footer";
 import { InstallPrompt } from "@/components/InstallPrompt";
 import { Logo } from "@/components/Logo";
 import { OfflineNotice } from "@/components/OfflineNotice";
+import { ParadaCard } from "@/components/ParadaCard";
 import { RatePanel } from "@/components/RatePanel";
 import { SocialCTA } from "@/components/SocialCTA";
 import { clearCache } from "@/lib/cache";
+import { paradaDelDia } from "@/lib/parada";
 import { getRates } from "@/lib/rates";
 
 /**
@@ -27,7 +29,7 @@ export default async function Home({
   const { actualizar } = await searchParams;
   if (actualizar) clearCache();
 
-  const snapshot = await getRates();
+  const [snapshot, parada] = await Promise.all([getRates(), paradaDelDia()]);
 
   // El margen superior respeta el área segura porque, instalada en iPhone, la app
   // se dibuja por debajo de la barra de estado: sin eso, la hora y la batería se
@@ -50,6 +52,8 @@ export default async function Home({
       <InstallPrompt />
 
       <RatePanel snapshot={snapshot} />
+
+      <ParadaCard parada={parada} />
 
       <Link
         href="/historial"
