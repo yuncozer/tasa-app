@@ -12,6 +12,7 @@ import Link from "next/link";
 const PAGINAS = [
   { id: "inicio", href: "/admin", label: "Inicio" },
   { id: "hoy", href: "/admin/hoy", label: "Publicar tasas" },
+  { id: "parada", href: "/admin/parada", label: "La Parada" },
   { id: "noticia", href: "/admin/noticia", label: "Noticias" },
   { id: "semanal", href: "/admin/semanal", label: "Semanal" },
   { id: "canal", href: "/admin/canal", label: "Canal" },

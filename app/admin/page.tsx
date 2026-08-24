@@ -17,6 +17,11 @@ const SECCIONES = [
     descripcion: "Dispara el carrusel del día fuera de las 9:00 am y las 6:00 pm del cron.",
   },
   {
+    href: "/admin/parada",
+    titulo: "Dólar en La Parada",
+    descripcion: "Revisa y publica el borrador que detecta el cron de lanacionweb.com.",
+  },
+  {
     href: "/admin/noticia",
     titulo: "Publicar noticia",
     descripcion: "Artículo externo o contenido propio, en post, carrusel o Reel.",

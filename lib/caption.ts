@@ -394,3 +394,36 @@ export function buildNewsCaption(article: ArticleData): string {
     HASHTAGS_NOTICIA,
   ].join("\n");
 }
+
+/**
+ * Cuentas de Instagram a las que se les acredita "Dólar en La Parada": el
+ * portal y el reportero que lo firma la mayoría de los días. Van como
+ * constantes y no se leen del artículo —lanacionweb no expone un identificador
+ * de Instagram en sus meta tags—, así que si un día lo firma otra persona el
+ * crédito queda incorrecto hasta que se edite a mano en `/admin/parada` antes
+ * de publicar. Es el mismo trato que ya tiene cualquier borrador detectado por
+ * un cron en este proyecto: se revisa, no se publica a ciegas.
+ */
+const FUENTE_PARADA = "@lanacionweb";
+const REPORTERO_PARADA = "@ponchogocho";
+
+const HASHTAGS_PARADA = "#LaParada #VillaDelRosario #Cúcuta #DolarHoy #Frontera #LaTasaOnline";
+
+/**
+ * Caption del post de "Dólar en La Parada", la nota diaria de lanacionweb
+ * sobre el cambio informal en la frontera de Cúcuta. Mismo criterio que
+ * `buildNewsCaption` —plantilla fija, cuerpo scrapeado, sin IA— pero con un
+ * crédito de fuente distinto: en vez del hostname, las dos cuentas de
+ * Instagram a las que hay que citar.
+ */
+export function buildParadaCaption(article: ArticleData): string {
+  return [
+    `💵 ${article.title}`,
+    "",
+    article.description,
+    "",
+    `Fuente: ${FUENTE_PARADA} · Reportero: ${REPORTERO_PARADA}`,
+    "",
+    HASHTAGS_PARADA,
+  ].join("\n");
+}
