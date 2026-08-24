@@ -1,11 +1,6 @@
 import type { NextRequest } from "next/server";
 import { apiError, apiJson } from "@/lib/api";
-import { buildCaption } from "@/lib/caption";
-import { guardarEnlace } from "@/lib/enlaces";
-import { registrarSnapshot } from "@/lib/historico";
-import { permalinkDeMedia, publishCarouselPost } from "@/lib/instagram";
-import { getRates } from "@/lib/rates";
-import { guardarSnapshotHoy } from "@/lib/snapshot-hoy";
+import { publicarTasasDelDia } from "@/lib/publish-hoy";
 
 /**
  * Se dispara dos veces al día, hora de Caracas: 9:00 am y 6:00 pm. Cada
@@ -25,6 +20,11 @@ import { guardarSnapshotHoy } from "@/lib/snapshot-hoy";
  * aparte. De paso desaparece el estado a medias: un carrusel sale entero o no
  * sale, mientras que dos publicaciones seguidas pueden dejar la primera
  * publicada y la segunda no.
+ *
+ * La publicación en sí vive en `publicarTasasDelDia()` (`lib/publish-hoy.ts`),
+ * compartida con el botón "Publicar ahora" de `/admin/hoy` — ahí no hay
+ * `momento` porque el admin puede disparar a cualquier hora, y esta ruta es la
+ * única que sí lo pasa explícito.
  *
  * A diferencia del resto de las rutas de la API, esta sí exige autenticación:
  * publica en una cuenta real y no debe poder dispararla cualquiera que
@@ -58,70 +58,8 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const snapshot = await getRates();
-
     const momento = momentoDesdeQuery(request);
-
-    // Archiva el snapshot de este disparo (mañana o tarde) para el reporte
-    // semanal y para el historial de `/historial`. Va en su propio `try` con
-    // el error tragado, igual que `guardarEnlace` más abajo y por el mismo
-    // motivo: si fuera dentro del `try` grande, un Supabase caído convertiría
-    // una publicación correcta en un 500 que invita a reintentar y duplica el
-    // post. Lo peor que pasa al fallar es un hueco en ese momento del día, que
-    // la ventana de tolerancia de `leerComparativa` ya absorbe.
-    //
-    // Se archiva aquí, y no en `getRates()` ni en `/api/rates`, porque este
-    // cron ya corre a hora fija y ya tiene el snapshot en la mano: en las
-    // otras dos sería una escritura por visitante. Y así lo que queda
-    // guardado es exactamente lo que se publicó. Sin `momento` (una prueba
-    // manual sin el parámetro) no hay bajo qué mitad del día archivarlo, así
-    // que se salta en vez de adivinar.
-    if (momento) {
-      try {
-        await registrarSnapshot(snapshot, momento);
-      } catch {
-        // Sin histórico de este disparo, el reporte semanal y /historial degradan solos.
-      }
-    }
-
-    // Congela este snapshot como "lo último publicado", para que
-    // `/api/og/instagram-post` y `/api/og/instagram-post-pesos` —que Meta va a
-    // pedir en un momento, y que `/hoy` vuelve a pedir cada vez que alguien
-    // abre esa vista previa después— sirvan siempre esta misma fotografía en
-    // vez de volver a consultar las fuentes. Sin esto, una tasa de Binance que
-    // se mueve entre la publicación y esa visita deja la imagen diciendo un
-    // número distinto del que ya quedó escrito en el caption. Va en su propio
-    // `try` con el error tragado por el mismo motivo que `registrarSnapshot`
-    // arriba: lo peor que pasa al fallar es que la imagen vuelva a calcularse
-    // en vivo, degradación que ya contempla `snapshotDelDia()`.
-    try {
-      await guardarSnapshotHoy(snapshot);
-    } catch {
-      // Sin snapshot congelado, las imágenes del post caen a las tasas en vivo.
-    }
-
-    const caption = buildCaption(snapshot, momento);
-
-    // El orden es el orden en que se deslizan: bolívares primero.
-    const { mediaId } = await publishCarouselPost(
-      [`${siteUrl}/api/og/instagram-post`, `${siteUrl}/api/og/instagram-post-pesos`],
-      caption,
-    );
-
-    // Deja `/hoy` apuntando al post que acaba de salir. Va aparte del
-    // `try` de la publicación y con su error tragado a propósito: el post ya
-    // está en la cuenta y eso es lo irreversible, así que un fallo al anotar
-    // el enlace no puede convertir una publicación exitosa en una respuesta
-    // de error que invite a reintentar y duplique el post. Si falla, `/hoy`
-    // cae a su respaldo y lo peor que pasa es que apunte al post anterior.
-    let enlace: string | null = null;
-    try {
-      enlace = await permalinkDeMedia(mediaId);
-      await guardarEnlace("hoy", enlace);
-    } catch {
-      enlace = null;
-    }
-
+    const { mediaId, enlace } = await publicarTasasDelDia(siteUrl, momento);
     return apiJson({ ok: true, mediaId, enlace }, { cachear: false });
   } catch (error) {
     return apiError("No se pudo publicar el post de Instagram", error);

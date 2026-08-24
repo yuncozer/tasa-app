@@ -12,6 +12,11 @@ export const metadata: Metadata = {
 
 const SECCIONES = [
   {
+    href: "/admin/hoy",
+    titulo: "Publicar tasas",
+    descripcion: "Dispara el carrusel del día fuera de las 9:00 am y las 6:00 pm del cron.",
+  },
+  {
     href: "/admin/noticia",
     titulo: "Publicar noticia",
     descripcion: "Artículo externo o contenido propio, en post, carrusel o Reel.",
