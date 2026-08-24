@@ -24,6 +24,16 @@ import { buscarArticuloParada } from "@/lib/providers/parada";
  */
 export const runtime = "nodejs";
 
+/**
+ * Sin esto, Vercel corta la función a los 10 s por defecto — antes de que
+ * termine ni el fetch del listado. El disparo real (listado + artículo +
+ * lectura/escritura en Supabase) rara vez tarda tanto, pero cron-job.org ya
+ * da por fallida cualquier respuesta que pase de 30 s en su plan gratuito;
+ * dejar el mismo margen que las demás rutas que hablan con servicios
+ * externos (60 s) evita que Vercel sea el primero en cortar.
+ */
+export const maxDuration = 60;
+
 export async function GET(request: Request) {
   const auth = request.headers.get("authorization");
   if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
