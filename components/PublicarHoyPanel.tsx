@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Spinner } from "@/components/admin/Spinner";
 
 /**
  * Botón de `/admin/hoy`: dispara el carrusel diario de tasas fuera de las
@@ -89,8 +90,9 @@ export function PublicarHoyPanel({
           type="button"
           onClick={publicar}
           disabled={publicando}
-          className="rounded-2xl bg-accent px-4 py-3 text-sm font-semibold text-background transition active:scale-95 disabled:opacity-60"
+          className="flex items-center justify-center gap-2 rounded-2xl bg-accent px-4 py-3 text-sm font-semibold text-background transition active:scale-95 disabled:opacity-60"
         >
+          {publicando && <Spinner className="size-4" />}
           {publicando ? "Publicando…" : "Publicar ahora"}
         </button>
 

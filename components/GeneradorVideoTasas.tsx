@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { Spinner } from "@/components/admin/Spinner";
 
 /**
  * Botón de generar + vista previa del Reel de tasas.
@@ -113,8 +114,9 @@ export function GeneradorVideoTasas({ motivoNoDisponible, enNube }: Props) {
         type="button"
         onClick={generar}
         disabled={generando}
-        className="rounded-2xl bg-accent px-4 py-3 text-sm font-semibold text-background transition active:scale-95 disabled:opacity-60"
+        className="flex items-center justify-center gap-2 rounded-2xl bg-accent px-4 py-3 text-sm font-semibold text-background transition active:scale-95 disabled:opacity-60"
       >
+        {generando && <Spinner className="size-4" />}
         {generando ? "Generando video…" : video ? "Generar de nuevo" : "Generar video"}
       </button>
 

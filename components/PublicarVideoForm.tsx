@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { PublicacionPayload } from "@/lib/publish-news";
+import { Spinner } from "@/components/admin/Spinner";
 import { BarraProgreso } from "@/components/BarraProgreso";
 import type { Cintillo } from "@/components/ControlCintillo";
 import { ControlCintillo } from "@/components/ControlCintillo";
@@ -342,8 +343,9 @@ export function PublicarVideoForm({
                 type="button"
                 onClick={() => void actualizarPreview(conVideo.videoPublicId)}
                 disabled={refrescando}
-                className="rounded-xl border border-accent bg-accent/15 px-4 py-3 text-sm font-semibold text-accent transition active:scale-95 disabled:opacity-50"
+                className="flex items-center justify-center gap-2 rounded-xl border border-accent bg-accent/15 px-4 py-3 text-sm font-semibold text-accent transition active:scale-95 disabled:opacity-50"
               >
+                {refrescando && <Spinner className="size-4" />}
                 {refrescando ? "Actualizando…" : "Actualizar vista previa"}
               </button>
             </div>
@@ -407,8 +409,9 @@ export function PublicarVideoForm({
                   })
                 }
                 disabled={!caption.trim() || publicando || desactualizado || refrescando}
-                className="rounded-xl border border-warning bg-warning/15 px-4 py-3 text-base font-semibold text-warning transition active:scale-95 disabled:opacity-50"
+                className="flex items-center justify-center gap-2 rounded-xl border border-warning bg-warning/15 px-4 py-3 text-base font-semibold text-warning transition active:scale-95 disabled:opacity-50"
               >
+                {publicando && <Spinner className="size-4" />}
                 {publicando ? "Publicando…" : "Publicar Reel"}
               </button>
             ))}

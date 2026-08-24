@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Spinner } from "@/components/admin/Spinner";
 
 /**
  * Botón que le pide a la IA un texto y lo entrega para revisarlo.
@@ -76,8 +77,9 @@ export function BotonRedactarIa({
         type="button"
         onClick={redactar}
         disabled={pidiendo || deshabilitado}
-        className="self-start rounded-full border border-border-soft px-3 py-1 text-xs font-medium text-muted transition active:scale-95 disabled:opacity-50"
+        className="flex items-center gap-1.5 self-start rounded-full border border-border-soft px-3 py-1 text-xs font-medium text-muted transition active:scale-95 disabled:opacity-50"
       >
+        {pidiendo && <Spinner className="size-3.5" />}
         {pidiendo ? "Redactando…" : etiqueta}
       </button>
 
