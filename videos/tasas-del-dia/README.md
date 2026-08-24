@@ -52,6 +52,20 @@ fecha la pieza es el instante en que se capturaron las tasas, que es el que el
 lector puede contrastar con el post. Por eso un video generado el lunes por la
 mañana sobre el post del domingo dice la hora del domingo, que es lo correcto.
 
+## Qué se versiona y qué no
+
+Al repositorio sube solo lo que hace falta para **reconstruir** el video en otra
+máquina o en la nube: la plantilla (`index.html`, con la fuente embebida), los
+efectos de sonido de `.media/` y el `.woff2`. Son 652 KB una sola vez, y no
+crecen aunque se generen mil videos.
+
+Todo lo **generado** queda fuera —`renders/`, `snapshots/`, `variables.json`, y
+la caché del Studio— por `videos/.gitignore`. Ese archivo vive un nivel por
+encima y sin rutas ancladas a propósito: así cubre también cualquier proyecto de
+video que se cree después, sin tener que acordarse de nada. No añadas un MP4 al
+repositorio por comodidad: cada uno pesa cerca de 1 MB y se rehace con un
+comando.
+
 ## Tocar el diseño
 
 `index.html` es la plantilla. Los números que trae escritos son **solo el

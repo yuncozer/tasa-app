@@ -1,0 +1,23 @@
+# Reglas para TODOS los proyectos de video, presentes y futuros.
+#
+# Van sin barra inicial a proposito: anclarlas (`/renders/`) las ataria a esta
+# carpeta y un proyecto nuevo en `videos/otro/` naceria sin ninguna, con lo que
+# sus renders —cerca de 1 MB cada uno— acabarian en el remoto. Asi cada proyecto
+# queda cubierto el dia que se crea, sin acordarse de nada.
+
+# Salidas del render, no fuentes: se regeneran con
+# `npx tsx scripts/video-tasas.ts --render`.
+renders/
+snapshots/
+
+# Las variables del dia las escribe el script en cada corrida; versionarlas
+# dejaria las tasas de un dia suelto en el repositorio.
+variables.json
+
+# Respaldos y miniaturas que el Studio deja al editar: cache de la herramienta,
+# se rehacen solas.
+.hyperframes/
+.thumbnails/
+
+# Base64 intermedio de las fuentes: ya van embebidas dentro del HTML.
+*.b64
