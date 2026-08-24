@@ -419,7 +419,7 @@ const HASHTAGS_PARADA =
  */
 export function buildParadaCaption(article: ArticleData): string {
   return [
-    `🇨🇴 ${article.title}`,
+    `🇨🇴💵${article.title}`,
     "",
     article.description,
     "",
