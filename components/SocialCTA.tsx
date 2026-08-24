@@ -8,6 +8,12 @@ import { enlaceWhatsapp, perfilInstagram } from "@/lib/atajos";
  * letra pequeña que nadie viene a leer, y meter aquí la invitación a Instagram
  * la enterraba al fondo de la página. El canal de WhatsApp solo aparece si
  * `ENLACE_WHATSAPP` está configurado — mismo respaldo que ya usa `/wa`.
+ *
+ * El copy no promete "tiempo real": el Binance de esta misma pantalla puede
+ * moverse entre visita y visita, así que decir que las redes "avisan" apenas
+ * cambia sería una promesa que la app no cumple. Lo que sí es cierto es que
+ * ahí se publican los posts del día y las noticias de la economía fronteriza,
+ * que es lo que de verdad se gana siguiendo la cuenta.
  */
 export function SocialCTA() {
   const whatsapp = enlaceWhatsapp();
@@ -15,7 +21,7 @@ export function SocialCTA() {
   return (
     <div className="flex flex-col gap-3 rounded-2xl border border-accent/40 bg-accent/10 px-4 py-3">
       <p className="text-center text-sm font-medium text-foreground">
-        📲 Recibe la tasa apenas se actualiza
+        📲 Tasas del día y noticias de la frontera, en tus redes
       </p>
 
       <div className={`grid gap-2 ${whatsapp ? "grid-cols-2" : "grid-cols-1"}`}>
