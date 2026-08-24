@@ -1,10 +1,6 @@
 import type { Metadata } from "next";
-import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
-import { AdminNav } from "@/components/AdminNav";
-import { Logo } from "@/components/Logo";
+import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { ReporteSemanalPanel } from "@/components/ReporteSemanalPanel";
-import { COOKIE_SESION, esSesionValida } from "@/lib/admin-session";
 import { buildCaptionSemanal } from "@/lib/caption";
 import { iaDisponible } from "@/lib/ia";
 import { getRates } from "@/lib/rates";
@@ -26,27 +22,17 @@ export const metadata: Metadata = {
  * `setState` dentro de un efecto, el patrón que el proyecto evita.
  */
 export default async function AdminSemanalPage() {
-  const cookieStore = await cookies();
-  if (!esSesionValida(cookieStore.get(COOKIE_SESION)?.value)) {
-    redirect("/admin/login");
-  }
-
   // `construirReporteSemanal` ya degrada sola si Supabase falla: devuelve el
   // reporte sin variaciones en vez de tumbar la página.
   const snapshot = await getRates();
   const reporte = await construirReporteSemanal(snapshot);
 
   return (
-    <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-6 px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(1.5rem,env(safe-area-inset-top))] sm:px-6">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <Logo className="h-8 w-8 shrink-0 text-accent" />
-          <h1 className="text-xl font-bold leading-none tracking-tight">
-            Reporte <span className="text-accent">semanal</span>
-          </h1>
-        </div>
-        <AdminNav activa="semanal" />
-      </header>
+    <>
+      <AdminPageHeader
+        titulo="Reporte semanal"
+        descripcion="Cómo se movieron las tasas en los últimos 7 días."
+      />
 
       <ReporteSemanalPanel
         rangoTexto={reporte.rangoTexto}
@@ -54,6 +40,6 @@ export default async function AdminSemanalPage() {
         caption={buildCaptionSemanal(reporte)}
         iaDisponible={iaDisponible()}
       />
-    </main>
+    </>
   );
 }

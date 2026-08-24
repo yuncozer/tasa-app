@@ -1,11 +1,7 @@
 import type { Metadata } from "next";
-import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
-import { AdminNav } from "@/components/AdminNav";
+import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import type { ProgramadaVista } from "@/components/ColaProgramadas";
-import { Logo } from "@/components/Logo";
 import { PublicarPanel } from "@/components/PublicarPanel";
-import { COOKIE_SESION, esSesionValida } from "@/lib/admin-session";
 import { iaDisponible } from "@/lib/ia";
 import { listarProgramadas } from "@/lib/programadas";
 import { resumenPublicacion } from "@/lib/publish-news";
@@ -41,29 +37,19 @@ async function leerCola(): Promise<ProgramadaVista[]> {
 }
 
 export default async function AdminNoticiaPage() {
-  const cookieStore = await cookies();
-  if (!esSesionValida(cookieStore.get(COOKIE_SESION)?.value)) {
-    redirect("/admin/login");
-  }
-
   const programadas = await leerCola();
 
   return (
-    <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-6 px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(1.5rem,env(safe-area-inset-top))] sm:px-6">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <Logo className="h-8 w-8 shrink-0 text-accent" />
-          <h1 className="text-xl font-bold leading-none tracking-tight">
-            Publicar <span className="text-accent">noticia</span>
-          </h1>
-        </div>
-        <AdminNav activa="noticia" />
-      </header>
+    <>
+      <AdminPageHeader
+        titulo="Publicar noticia"
+        descripcion="Artículo externo o contenido propio, en post, carrusel o Reel."
+      />
 
       {/* Si hay clave de OpenRouter se decide en el servidor y baja por props:
           `lib/ia.ts` corre solo ahí, y ninguna variable de entorno del modelo
           tiene por qué llegar al navegador. */}
       <PublicarPanel programadas={programadas} iaDisponible={iaDisponible()} />
-    </main>
+    </>
   );
 }

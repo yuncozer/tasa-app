@@ -1,11 +1,7 @@
 import type { Metadata } from "next";
-import { cookies } from "next/headers";
 import Link from "next/link";
-import { redirect } from "next/navigation";
-import { AdminNav } from "@/components/AdminNav";
+import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { BotonCopiarTexto } from "@/components/BotonCopiarTexto";
-import { Logo } from "@/components/Logo";
-import { COOKIE_SESION, esSesionValida } from "@/lib/admin-session";
 import { formatMensajeCanal } from "@/lib/canal-whatsapp";
 import { formatRelative } from "@/lib/format";
 import { listarMediaSemana, type MediaReciente } from "@/lib/instagram";
@@ -47,26 +43,16 @@ export default async function AdminCanalPage({
 }: {
   searchParams: Promise<{ post?: string }>;
 }) {
-  const cookieStore = await cookies();
-  if (!esSesionValida(cookieStore.get(COOKIE_SESION)?.value)) {
-    redirect("/admin/login");
-  }
-
   const { post } = await searchParams;
   const posts = await leerPosts();
   const seleccionado = posts?.find((item) => item.id === post) ?? null;
 
   return (
-    <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-6 px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(1.5rem,env(safe-area-inset-top))] sm:px-6">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <Logo className="h-8 w-8 shrink-0 text-accent" />
-          <h1 className="text-xl font-bold leading-none tracking-tight">
-            Enviar al <span className="text-accent">canal</span>
-          </h1>
-        </div>
-        <AdminNav activa="canal" />
-      </header>
+    <>
+      <AdminPageHeader
+        titulo="Enviar al canal"
+        descripcion="Arma el mensaje de WhatsApp a partir de un post ya publicado."
+      />
 
       {posts === null && (
         <p className="rounded-2xl border border-warning/40 bg-warning/5 px-4 py-3 text-sm text-warning">
@@ -106,6 +92,6 @@ export default async function AdminCanalPage({
           ))}
         </div>
       )}
-    </main>
+    </>
   );
 }

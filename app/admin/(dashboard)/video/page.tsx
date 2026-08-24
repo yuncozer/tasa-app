@@ -1,12 +1,8 @@
 import type { Metadata } from "next";
-import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
 
-import { AdminNav } from "@/components/AdminNav";
+import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { BotonCopiarTexto } from "@/components/BotonCopiarTexto";
 import { GeneradorVideoTasas } from "@/components/GeneradorVideoTasas";
-import { Logo } from "@/components/Logo";
-import { COOKIE_SESION, esSesionValida } from "@/lib/admin-session";
 import { formatRelative } from "@/lib/format";
 import { nubeConfigurada } from "@/lib/video-nube";
 import { motivoNoDisponible, resumenTasas, type ResumenTasas } from "@/lib/video-tasas";
@@ -39,11 +35,6 @@ async function leerResumen(): Promise<ResumenTasas | null> {
 }
 
 export default async function AdminVideoPage() {
-  const cookieStore = await cookies();
-  if (!esSesionValida(cookieStore.get(COOKIE_SESION)?.value)) {
-    redirect("/admin/login");
-  }
-
   const resumen = await leerResumen();
   // Con la nube configurada no hace falta nada local, así que no se
   // comprueba el CLI ni ffmpeg: preguntarlo daría un aviso falso en Vercel.
@@ -51,16 +42,11 @@ export default async function AdminVideoPage() {
   const motivo = enNube ? null : motivoNoDisponible();
 
   return (
-    <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-6 px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(1.5rem,env(safe-area-inset-top))] sm:px-6">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <Logo className="h-8 w-8 shrink-0 text-accent" />
-          <h1 className="text-xl font-bold leading-none tracking-tight">
-            La <span className="text-accent">Tasa</span>
-          </h1>
-        </div>
-        <AdminNav activa="video" />
-      </header>
+    <>
+      <AdminPageHeader
+        titulo="Generador de videos"
+        descripcion="El Reel de tasas del día, con el copy del último post."
+      />
 
       <section className="flex flex-col gap-4 rounded-2xl border border-border-soft bg-surface px-4 py-4">
         <div className="flex flex-col gap-1">
@@ -96,6 +82,6 @@ export default async function AdminVideoPage() {
           </>
         ) : null}
       </section>
-    </main>
+    </>
   );
 }

@@ -1,10 +1,6 @@
 import type { Metadata } from "next";
-import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
-import { AdminNav } from "@/components/AdminNav";
-import { Logo } from "@/components/Logo";
+import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { ParadaPanel } from "@/components/ParadaPanel";
-import { COOKIE_SESION, esSesionValida } from "@/lib/admin-session";
 import { leerParadaPendiente } from "@/lib/parada";
 
 export const metadata: Metadata = {
@@ -23,27 +19,17 @@ export const metadata: Metadata = {
  * apunta a esa ruta y ella misma resuelve el estado actual.
  */
 export default async function AdminParadaPage() {
-  const cookieStore = await cookies();
-  if (!esSesionValida(cookieStore.get(COOKIE_SESION)?.value)) {
-    redirect("/admin/login");
-  }
-
   const pendiente = await leerParadaPendiente().catch(() => null);
   const borrador = pendiente && !pendiente.publicado ? pendiente : null;
 
   return (
-    <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-6 px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(1.5rem,env(safe-area-inset-top))] sm:px-6">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <Logo className="h-8 w-8 shrink-0 text-accent" />
-          <h1 className="text-xl font-bold leading-none tracking-tight">
-            Dólar en <span className="text-accent">La Parada</span>
-          </h1>
-        </div>
-        <AdminNav activa="parada" />
-      </header>
+    <>
+      <AdminPageHeader
+        titulo="Dólar en La Parada"
+        descripcion="Revisa y publica el borrador que detecta el cron de lanacionweb.com."
+      />
 
       <ParadaPanel borrador={borrador} />
-    </main>
+    </>
   );
 }
