@@ -22,7 +22,7 @@ const RATE_META: Record<RateKey, Pick<Rate, "label" | "shortLabel" | "symbol">> 
   USD_BINANCE_SELL: { label: "Dólar Binance (venta)", shortLabel: "$ Bin. venta", symbol: "$" },
   EUR_BCV: { label: "Euro BCV", shortLabel: "€ BCV", symbol: "€" },
   COP_OFICIAL: { label: "Peso oficial", shortLabel: "COP oficial", symbol: "COP" },
-  COP_FRONTERA: { label: "Peso frontera", shortLabel: "COP frontera", symbol: "COP" },
+  COP_FRONTERA: { label: "Peso Binance", shortLabel: "COP Binance", symbol: "COP" },
   VES: { label: "Bolívar", shortLabel: "Bs", symbol: "Bs" },
 };
 

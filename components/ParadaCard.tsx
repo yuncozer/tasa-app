@@ -44,7 +44,7 @@ export function ParadaCard({ parada }: { parada: ParadaBorrador | null }) {
         </div>
       </div>
 
-      <p className="text-xs text-muted">{parada.lugar} · billete de 100 · Fuente: lanacionweb.com</p>
+      <p className="text-[10px] text-muted">{parada.lugar} · Billete de 100$ · Fuente: lanacionweb.com</p>
     </article>
   );
 }
