@@ -407,7 +407,8 @@ export function buildNewsCaption(article: ArticleData): string {
 const FUENTE_PARADA = "@lanacionweb";
 const REPORTERO_PARADA = "@ponchogocho";
 
-const HASHTAGS_PARADA = "#LaParada #VillaDelRosario #Cúcuta #DolarHoy #Frontera #LaTasaOnline";
+const HASHTAGS_PARADA =
+  "#LaParada #VillaDelRosario #Cúcuta #DolarHoy #Frontera #Peso #Colombia #SanAntonio #Tachira #LaTasaOnline";
 
 /**
  * Caption del post de "Dólar en La Parada", la nota diaria de lanacionweb
@@ -418,7 +419,7 @@ const HASHTAGS_PARADA = "#LaParada #VillaDelRosario #Cúcuta #DolarHoy #Frontera
  */
 export function buildParadaCaption(article: ArticleData): string {
   return [
-    `💵 ${article.title}`,
+    `🇨🇴 ${article.title}`,
     "",
     article.description,
     "",
