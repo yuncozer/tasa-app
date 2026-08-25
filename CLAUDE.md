@@ -1314,14 +1314,12 @@ la otra protege los endpoints de publicación/cron. La sesión es una cookie
 `CRON_SECRET` nunca llega al navegador: `/admin/noticia` lo usa solo del lado
 servidor, a través de `publishNewsPost`.
 
-Cuelgan cinco páginas de esa misma sesión —`/admin/hoy`, `/admin/noticia`,
-`/admin/parada`, `/admin/semanal` y `/admin/canal`—, más `/admin` como menú de
-entrada. Siguen siendo páginas separadas y no pestañas de una: la de noticias
-es un formulario con estado propio —switch Post/Reel, subidas, previa
-desactualizada, cola— y el reporte semanal **no tiene entradas**: se mira y se
-publica. La nav compartida vive en `components/AdminNav.tsx`; antes cada
-página repetía a mano su enlace cruzado y con varias hermanas más el menú ya
-pesaba más duplicarla que extraerla.
+Cuelgan seis páginas de esa misma sesión —`/admin/hoy`, `/admin/parada`,
+`/admin/noticia`, `/admin/semanal`, `/admin/canal` y `/admin/video`—, más
+`/admin` como dashboard de entrada. Siguen siendo páginas separadas y no
+pestañas de una: la de noticias es un formulario con estado propio —switch
+Post/Reel, subidas, previa desactualizada, cola— y el reporte semanal **no
+tiene entradas**: se mira y se publica.
 
 `/admin/hoy` es el escape valve del cron de tasas: dispara el mismo carrusel
 de bolívares/pesos que `app/api/cron/publish-instagram/route.ts`, pero sin
@@ -1330,6 +1328,62 @@ de bolívares/pesos que `app/api/cron/publish-instagram/route.ts`, pero sin
 a "Actualización del día" en vez de "de la mañana/tarde". Existe porque un
 BCV que falla a las 9:00 y responde a las 9:20 antes no tenía forma de
 corregirse sin esperar al disparo de la tarde.
+
+#### El chrome de `/admin` vive en un layout, no repetido en cada página
+
+Al principio cada página traía su propio `<header>` (logo, título, nav) y su
+propia comprobación de sesión — siete copias del mismo
+`if (!esSesionValida(...)) redirect(...)`, y una fila de píldoras que se
+envolvía en el teléfono sin decir con claridad dónde estaba uno parado. Con
+seis secciones ya se sentía un menú suelto, no un panel.
+
+Ahora todas cuelgan de `app/admin/(dashboard)/layout.tsx` — un grupo de rutas
+(las paréntesis no entran en la URL: `(dashboard)/hoy/page.tsx` sigue
+resolviendo a `/admin/hoy`) que queda **fuera** de `/admin/login`, la única
+página que no comparte sesión ni chrome con el resto. Ese layout hace la
+comprobación de sesión una sola vez y envuelve todo en `AdminShell`
+(`components/admin/AdminShell.tsx`): sidebar fija en escritorio, barra +
+tira de navegación horizontal (scroll, sin JavaScript para navegar) en
+móvil. Es `"use client"` únicamente por `usePathname()` — resaltar la
+sección activa es lo único que necesita el navegador; los enlaces siguen
+siendo `<Link>` normales.
+
+Toda la nav —qué páginas hay, en qué orden, con qué ícono y bajo qué grupo
+("Publicar", "Reportes y difusión", "Herramientas")— sale de una sola fuente,
+`components/admin/nav-admin.ts`. La consumen tanto `AdminShell` (la nav de
+verdad) como el dashboard de `/admin` (las tarjetas de acceso), así que un
+enlace nuevo se agrega una vez y aparece en los dos sitios. Es también lo que
+deja este chrome portable si el panel se separa algún día a un proyecto de
+gestor de redes aparte: dos archivos, ninguna página conoce su posición en
+la nav.
+
+El dashboard de `/admin` no es una lista estática: cada tarjeta trae, cuando
+hay algo real que atender, una insignia de estado —proveedores degradados en
+"Publicar tasas", un borrador de La Parada sin publicar, publicaciones en
+cola en "Noticias"— para que abrir el panel ya diga qué necesita revisión
+antes de entrar a cada sección. Cada fuente de estado se envuelve en su
+propio `try/catch`: un Supabase caído no puede tumbar el dashboard entero,
+solo dejar sin insignia a la tarjeta que dependía de él.
+
+`app/admin/(dashboard)/loading.tsx` es el esqueleto que Next.js muestra
+mientras el `page.tsx` de destino resuelve su lectura a Supabase o a las
+tasas en vivo. Al vivir en ese segmento cubre la navegación a **cualquier**
+sub-ruta —`loading.tsx` envuelve tanto la página del propio segmento como
+todas sus hijas—, así que un solo esqueleto basta y la sidebar no parpadea:
+vive dentro del layout, por fuera del boundary de carga.
+
+Los botones que ya avisaban con texto ("Publicando…", "Guardando…",
+"Redactando…") llevan además un ícono girando al lado
+(`components/admin/Spinner.tsx`, puramente decorativo, sin `role`) — se nota
+de reojo sin leer el texto, útil cuando el botón queda arriba del scroll
+mientras se revisa el resto del formulario. Y las vistas previas que genera
+Satori al vuelo (La Parada, el reporte semanal, el post/carrusel de noticia)
+usan `components/admin/ImagenConCarga.tsx`, que reserva el espacio final con
+la proporción real (1:1 o 9:16) y muestra un esqueleto hasta que el
+navegador termina de cargar la imagen — sin eso el `<img>` se veía en
+blanco uno o dos segundos, y sin la proporción fija el esqueleto colapsaba a
+0 de alto porque el navegador todavía no conoce el tamaño intrínseco de una
+imagen que no ha terminado de descargar.
 
 ### El envío al canal de WhatsApp es manual, y por eso `/admin/canal`
 
