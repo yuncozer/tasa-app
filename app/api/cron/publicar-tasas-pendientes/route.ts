@@ -1,0 +1,56 @@
+import { apiError, apiJson } from "@/lib/api";
+import { publicarTasasDelDia } from "@/lib/publish-hoy";
+import { getRates } from "@/lib/rates";
+import { liberarPendiente, marcarPublicada, reclamarPendiente, tasasBaseCompletas } from "@/lib/tasas-pendientes";
+
+/**
+ * Reintenta cada 2 minutos el post de tasas que `app/api/cron/publish-instagram`
+ * dejó en espera por faltarle una tasa base (dólar BCV, euro BCV, Binance
+ * compra/venta). Va en cron-job.org, no en `vercel.json` — mismo motivo que
+ * el resto de los crons del proyecto: el plan Hobby de Vercel no da esa
+ * cadencia.
+ *
+ * No hay nada que avanzar por fases aquí: cada disparo toma como mucho una
+ * fila, comprueba las tasas en vivo, y si ya están completas publica de un
+ * tirón con la misma puerta única (`publicarTasasDelDia`) que usa el cron
+ * normal y el botón manual de `/admin/hoy`. Si siguen incompletas, suelta la
+ * fila sin tocar su estado para que el disparo de dentro de 2 minutos la
+ * vuelva a intentar.
+ */
+export const runtime = "nodejs";
+export const maxDuration = 60;
+
+export async function GET(request: Request) {
+  const auth = request.headers.get("authorization");
+  if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
+    return apiError("No autorizado", undefined, 401);
+  }
+
+  const siteUrl = process.env.SITE_URL;
+  if (!siteUrl) {
+    return apiError("Falta configurar SITE_URL", undefined, 500);
+  }
+
+  const pendiente = await reclamarPendiente().catch(() => null);
+  if (!pendiente) {
+    return apiJson({ ok: true, estado: "nada_pendiente" }, { cachear: false });
+  }
+
+  try {
+    const snapshot = await getRates();
+    if (!tasasBaseCompletas(snapshot)) {
+      await liberarPendiente(pendiente.id);
+      return apiJson({ ok: true, estado: "sigue_incompleta" }, { cachear: false });
+    }
+
+    const { mediaId, enlace } = await publicarTasasDelDia(siteUrl, pendiente.momento);
+    await marcarPublicada(pendiente.id);
+    return apiJson({ ok: true, estado: "publicada", mediaId, enlace }, { cachear: false });
+  } catch (error) {
+    // Error transitorio (Meta, Supabase, la propia red): se suelta la fila
+    // para reintentar en 2 minutos, en vez de darla por perdida. El estado
+    // sigue en `pendiente`, así que el próximo disparo la recoge solo.
+    await liberarPendiente(pendiente.id).catch(() => {});
+    return apiError("No se pudo publicar el post de tasas pendiente", error);
+  }
+}

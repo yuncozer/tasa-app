@@ -362,6 +362,49 @@ mismo orden en que se deslizan: bolívares primero, pesos después.
   a mano desde `/admin/video`; esta Historia no lo sustituye ni depende de
   él.
 
+### El cron de tasas no publica con un hueco en las tasas base
+
+`app/api/cron/publish-instagram` puede dispararse a las 9:00 o las 18:00 con
+alguna fuente todavía sin responder — el BCV se raspa de su portada y puede
+caerse, Binance puede tardar. Publicar de todos modos dejaría el carrusel y
+las dos Historias diciendo "No disponible" en una tasa que, dos minutos
+después, ya tenía precio: peor que esperar un poco.
+
+- **Solo se gatean las cuatro tasas base**: dólar BCV, euro BCV, Binance
+  compra y Binance venta (`TASAS_BASE` en `lib/tasas-pendientes.ts`). Las
+  demás claves (`COP_FRONTERA`, `COP_OFICIAL`, `VES`) son cruces derivados de
+  estas y de la TRM del Banco de la República — no algo que una fuente pueda
+  dejar "a medias", así que gatear sobre ellas no tendría sentido.
+- **Solo aplica con `momento` explícito**, es decir, solo al cron. El botón
+  "Publicar ahora" de `/admin/hoy` sigue publicando con lo que haya: ahí hay
+  una persona mirando la pantalla y decidiendo, el mismo criterio que ya
+  separaba `momento` del botón manual antes de esto.
+- **`tasas_pendientes`** (migración `0009`) es la cola: una fila por
+  `(fecha, momento)`, no un histórico — mismo criterio que `snapshot_hoy` y
+  `parada_pendiente`. Si las tasas están incompletas, el cron no llama a
+  `publicarTasasDelDia()`: deja la fila con `registrarPendiente()` y devuelve
+  200 con `estado: "pendiente"`, no un error — no publicar a tiempo no es un
+  fallo de la petición.
+- **Un segundo cron, `app/api/cron/publicar-tasas-pendientes`, reintenta cada
+  2 minutos** (cron-job.org, no `vercel.json`, mismo motivo que el resto).
+  Cada disparo reclama como mucho una fila de forma atómica
+  (`reclamarPendiente()`, mismo patrón de `estado=eq.pendiente` en el `WHERE`
+  del `UPDATE` que ya usa `reclamarVencida()` en `lib/programadas.ts`, para
+  que dos disparos solapados no se lleven la misma fila), comprueba las tasas
+  en vivo, y si ya están completas publica con la misma puerta única
+  (`publicarTasasDelDia`) que usa el cron normal. Si siguen incompletas,
+  suelta la fila (`liberarPendiente`) sin tocar su estado para que el
+  disparo de dentro de 2 minutos la retome — no hay fases que avanzar, cada
+  intento cabe entero en una invocación.
+- **`registrarPendiente()` abandona cualquier otra fila que siguiera
+  `pendiente`** al crear la nueva: un `manana` que nunca se resolvió no debe
+  seguir reintentándose una vez ya se está esperando el `tarde`, ni una fila
+  de un día anterior que por lo que sea quedó viva.
+- Un error real al publicar (Meta, Supabase) suelta la fila en vez de darla
+  por perdida: sigue en `pendiente` y el próximo disparo de los 2 minutos la
+  recoge solo, mismo criterio de "el reintento es automático" que ya rige el
+  resto de los crons del proyecto.
+
 ### El pie de tres enlaces es solo para WhatsApp; en Instagram se cierra con hashtags
 
 Existe un pie de tres enlaces —el post, la calculadora y el canal—

@@ -1,6 +1,8 @@
 import type { NextRequest } from "next/server";
 import { apiError, apiJson } from "@/lib/api";
 import { publicarTasasDelDia } from "@/lib/publish-hoy";
+import { getRates } from "@/lib/rates";
+import { fechaDeHoy, registrarPendiente, tasasBaseCompletas } from "@/lib/tasas-pendientes";
 
 /**
  * Se dispara dos veces al día, hora de Caracas: 9:00 am y 6:00 pm. Cada
@@ -25,6 +27,15 @@ import { publicarTasasDelDia } from "@/lib/publish-hoy";
  * compartida con el botón "Publicar ahora" de `/admin/hoy` — ahí no hay
  * `momento` porque el admin puede disparar a cualquier hora, y esta ruta es la
  * única que sí lo pasa explícito.
+ *
+ * **No publica con un hueco en las tasas base** (dólar BCV, euro BCV, Binance
+ * compra/venta): si alguna todavía no respondió a la hora exacta del disparo,
+ * esta ruta no llama a `publicarTasasDelDia()` — deja una fila en
+ * `tasas_pendientes` (`lib/tasas-pendientes.ts`) y es
+ * `app/api/cron/publicar-tasas-pendientes` quien reintenta cada 2 minutos
+ * hasta que las cuatro estén completas. Ese gate solo aplica aquí, con
+ * `momento` explícito: el botón manual de `/admin/hoy` publica con lo que
+ * haya, porque ahí decide una persona mirando la pantalla.
  *
  * A diferencia del resto de las rutas de la API, esta sí exige autenticación:
  * publica en una cuenta real y no debe poder dispararla cualquiera que
@@ -63,6 +74,15 @@ export async function GET(request: NextRequest) {
 
   try {
     const momento = momentoDesdeQuery(request);
+
+    if (momento) {
+      const snapshot = await getRates();
+      if (!tasasBaseCompletas(snapshot)) {
+        await registrarPendiente(fechaDeHoy(), momento);
+        return apiJson({ ok: true, estado: "pendiente" }, { cachear: false });
+      }
+    }
+
     const { mediaId, enlace } = await publicarTasasDelDia(siteUrl, momento);
     return apiJson({ ok: true, mediaId, enlace }, { cachear: false });
   } catch (error) {
