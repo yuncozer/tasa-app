@@ -1,6 +1,17 @@
 import { ImageResponse } from "next/og";
-import { formatClock, formatDate, formatRate, vigenciaBcv } from "@/lib/format";
-import { AIRE_LATERAL, AVISO_TASAS, COLOR, Encabezado, FilaMoneda, Pie, leerFontBuffer, leerSvgComoDataUri } from "@/lib/og-shared";
+import type { NextRequest } from "next/server";
+import { formatClock, formatDate, formatFechaCorta, formatRate, vigenciaBcv } from "@/lib/format";
+import {
+  AIRE_LATERAL,
+  AVISO_TASAS,
+  COLOR,
+  Encabezado,
+  FilaMoneda,
+  Pie,
+  TituloHistoria,
+  leerFontBuffer,
+  leerSvgComoDataUri,
+} from "@/lib/og-shared";
 import { snapshotDelDia } from "@/lib/snapshot-hoy";
 import type { Rate, RateKey, RatesSnapshot } from "@/lib/types";
 
@@ -16,10 +27,41 @@ import type { Rate, RateKey, RatesSnapshot } from "@/lib/types";
  * snapshot sale de `snapshotDelDia()` (el que el cron congeló al publicar) y
  * no de `getRates()` en vivo: si el dólar Binance se mueve entre medias, la
  * imagen tiene que seguir diciendo lo mismo que el caption ya publicado.
+ *
+ * `?proporcion=9:16` sirve el mismo contenido recortado para la Historia
+ * automática que se publica junto al carrusel (ver `lib/publish-hoy.ts`).
+ * Mismo patrón que `instagram-semanal`: el lienzo vertical reserva aire
+ * arriba y abajo (`reservaArriba`/`reservaAbajo`) porque Instagram superpone
+ * su propia interfaz ahí en una Story, y sin firma HMAC por el mismo motivo
+ * que ya tiene esta ruta — no recibe texto libre, solo un valor de un
+ * conjunto cerrado.
  */
 export const runtime = "nodejs";
 
-const SIZE = { width: 1080, height: 1080 };
+type Proporcion = "1:1" | "9:16";
+
+const SIZE: Record<Proporcion, { width: number; height: number }> = {
+  "1:1": { width: 1080, height: 1080 },
+  "9:16": { width: 1080, height: 1920 },
+};
+
+interface Medidas {
+  padding: number;
+  reservaArriba: number;
+  reservaAbajo: number;
+  gapFilas: number;
+  /** Aire desde la reserva superior hasta el título de la Historia. Solo lo usa 9:16. */
+  tituloMarginTop: number;
+  /** Aire entre el título y el header (logo + hora). Solo lo usa 9:16. */
+  cuerpoMarginTop: number;
+  /** Entre el header y la primera tarjeta de tasa. Solo lo usa 9:16. */
+  cuerpoGap: number;
+}
+
+const MEDIDAS: Record<Proporcion, Medidas> = {
+  "1:1": { padding: 56, reservaArriba: 0, reservaAbajo: 0, gapFilas: 20, tituloMarginTop: 0, cuerpoMarginTop: 0, cuerpoGap: 0 },
+  "9:16": { padding: 56, reservaArriba: 110, reservaAbajo: 130, gapFilas: 28, tituloMarginTop: 140, cuerpoMarginTop: 42, cuerpoGap: 40 },
+};
 
 const FILAS: RateKey[] = ["USD_BCV", "USD_BINANCE_BUY", "USD_BINANCE_SELL", "EUR_BCV", "COP_FRONTERA"];
 
@@ -52,7 +94,88 @@ function FilaTasa({ rate, banderaSrc }: { rate: Rate; banderaSrc: string }) {
   );
 }
 
-function PostImage({ snapshot, banderas, icons }: { snapshot: RatesSnapshot; banderas: Record<string, string>; icons: { instagram: string; browser: string } }) {
+function proporcionDesdeQuery(request: NextRequest): Proporcion {
+  return request.nextUrl.searchParams.get("proporcion") === "9:16" ? "9:16" : "1:1";
+}
+
+function PostImage({
+  snapshot,
+  proporcion,
+  banderas,
+  banderaVe,
+  icons,
+}: {
+  snapshot: RatesSnapshot;
+  proporcion: Proporcion;
+  banderas: Record<string, string>;
+  banderaVe: string;
+  icons: { instagram: string; browser: string };
+}) {
+  const medidas = MEDIDAS[proporcion];
+  const esHistoria = proporcion === "9:16";
+
+  const header = (
+    <div
+      style={{
+        display: "flex",
+        justifyContent: "space-between",
+        // Bottoms alineados en la Historia: el bloque del logo (dos líneas) y
+        // la hora (una) quedan a la misma distancia de la primera tasa, en
+        // vez de que la hora —más corta— le saque aire de más.
+        alignItems: esHistoria ? "flex-end" : "flex-start",
+        paddingLeft: AIRE_LATERAL,
+        paddingRight: AIRE_LATERAL,
+      }}
+    >
+      <Encabezado subtitulo="Cuánto vale tu dinero hoy" escala={esHistoria ? 0.9 : 1} />
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
+        {/* En la Historia el título ya dice la fecha: aquí solo queda la hora. */}
+        {!esHistoria && (
+          <span style={{ fontSize: 32, color: COLOR.foreground, fontWeight: 700 }}>
+            {formatDate(snapshot.fetchedAt)}
+          </span>
+        )}
+        <span style={{ fontSize: 32, color: COLOR.foreground, fontWeight: 700 }}>
+          {formatClock(snapshot.fetchedAt)}
+        </span>
+      </div>
+    </div>
+  );
+
+  const filas = (
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: medidas.gapFilas,
+        paddingLeft: AIRE_LATERAL,
+        paddingRight: AIRE_LATERAL,
+      }}
+    >
+      {FILAS.map((key) => (
+        <FilaTasa key={key} rate={snapshot.rates[key]} banderaSrc={banderas[key]} />
+      ))}
+    </div>
+  );
+
+  // Satori no soporta fragmentos (`<>…</>`): un fragmento ahí rompe el árbol
+  // de layout de Yoga y descuadra el ancho de los hermanos siguientes —así se
+  // desbordaban las tarjetas de tasa en el 1:1 antes de este cambio. Por eso
+  // el 1:1 inserta `header` y `filas` como dos hijos sueltos (con `&&`) en
+  // vez de agruparlos, y son igual de "hijos directos" del contenedor de
+  // abajo que en la versión sin Historia original.
+  const cuerpoHistoria = esHistoria && (
+    <div style={{ display: "flex", flexDirection: "column" }}>
+      <div style={{ display: "flex", justifyContent: "center", marginTop: medidas.tituloMarginTop }}>
+        <TituloHistoria fecha={formatFechaCorta(snapshot.fetchedAt)} moneda="Bs" banderaSrc={banderaVe} />
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: medidas.cuerpoGap, marginTop: medidas.cuerpoMarginTop }}>
+        {header}
+        {filas}
+      </div>
+    </div>
+  );
+
   return (
     <div
       style={{
@@ -60,68 +183,60 @@ function PostImage({ snapshot, banderas, icons }: { snapshot: RatesSnapshot; ban
         height: "100%",
         display: "flex",
         flexDirection: "column",
+        // "space-between" reparte el aire sobrante entre los bloques de
+        // arriba abajo. En el 1:1 son tres hijos (header, filas, pie): el
+        // mismo reparto de siempre. En la Historia son solo dos (el grupo
+        // título+cuerpo, y el pie), para que el pie quede pegado al fondo sin
+        // que ese reparto también separe el título del cuerpo — esa distancia
+        // ya la fijan `tituloMarginTop`/`cuerpoMarginTop` a propósito.
         justifyContent: "space-between",
         backgroundColor: COLOR.background,
-        padding: 56,
+        paddingLeft: medidas.padding,
+        paddingRight: medidas.padding,
+        paddingTop: medidas.padding + medidas.reservaArriba,
+        paddingBottom: medidas.padding + medidas.reservaAbajo,
         fontFamily: "Geist",
       }}
     >
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "flex-start",
-          paddingLeft: AIRE_LATERAL,
-          paddingRight: AIRE_LATERAL,
-        }}
-      >
-        <Encabezado subtitulo="Cuánto vale tu dinero hoy" />
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
-          <span style={{ fontSize: 32, color: COLOR.foreground, fontWeight: 700 }}>
-            {formatDate(snapshot.fetchedAt)}
-          </span>
-          <span style={{ fontSize: 32, color: COLOR.foreground, fontWeight: 700 }}>
-            {formatClock(snapshot.fetchedAt)}
-          </span>
-        </div>
-      </div>
+      {esHistoria ? cuerpoHistoria : header}
+      {!esHistoria && filas}
 
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          gap: 20,
-          paddingLeft: AIRE_LATERAL,
-          paddingRight: AIRE_LATERAL,
-        }}
-      >
-        {FILAS.map((key) => (
-          <FilaTasa key={key} rate={snapshot.rates[key]} banderaSrc={banderas[key]} />
-        ))}
+      <div style={{ display: "flex" }}>
+        <Pie icons={icons} aviso={AVISO_TASAS} />
       </div>
-
-      <Pie icons={icons} aviso={AVISO_TASAS} />
     </div>
   );
 }
 
-export async function GET() {
-  const [snapshot, geistRegular, geistBold, instagramIcon, browserIcon, ...banderasSvg] = await Promise.all([
+export async function GET(request: NextRequest) {
+  const proporcion = proporcionDesdeQuery(request);
+
+  const [snapshot, geistRegular, geistBold, instagramIcon, browserIcon, banderaVe, ...banderasSvg] = await Promise.all([
     snapshotDelDia(),
     leerFontBuffer("Geist-Regular.ttf"),
     leerFontBuffer("Geist-Bold.ttf"),
     leerSvgComoDataUri("instagram-icon.svg"),
     leerSvgComoDataUri("browser-icon.svg"),
+    leerSvgComoDataUri("Flag-of-Venezuela.svg"),
     ...FILAS.map((key) => leerSvgComoDataUri(BANDERA_POR_TASA[key]!)),
   ]);
 
   const banderas = Object.fromEntries(FILAS.map((key, i) => [key, banderasSvg[i]]));
 
-  return new ImageResponse(<PostImage snapshot={snapshot} banderas={banderas} icons={{ instagram: instagramIcon, browser: browserIcon }} />, {
-    ...SIZE,
-    fonts: [
-      { name: "Geist", data: geistRegular, weight: 400, style: "normal" },
-      { name: "Geist", data: geistBold, weight: 700, style: "normal" },
-    ],
-  });
+  return new ImageResponse(
+    <PostImage
+      snapshot={snapshot}
+      proporcion={proporcion}
+      banderas={banderas}
+      banderaVe={banderaVe}
+      icons={{ instagram: instagramIcon, browser: browserIcon }}
+    />,
+    {
+      ...SIZE[proporcion],
+      fonts: [
+        { name: "Geist", data: geistRegular, weight: 400, style: "normal" },
+        { name: "Geist", data: geistBold, weight: 700, style: "normal" },
+      ],
+    },
+  );
 }

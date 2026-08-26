@@ -35,9 +35,13 @@ export const runtime = "nodejs";
 /**
  * Publicar un carrusel son cuatro viajes a Meta —dos contenedores hijos, el
  * padre y la publicación—, y crear cada hijo obliga a Meta a descargarse una
- * imagen que se renderiza al vuelo. Con el tope por defecto de la plataforma
- * eso va justo, y encima `publicarContenedor()` puede esperar hasta 8 s
- * reintentando si Meta todavía está procesando.
+ * imagen que se renderiza al vuelo. Las dos Historias que salen después
+ * (`publishStory()` en `lib/publish-hoy.ts`) suman dos viajes más cada una
+ * —crear contenedor y publicar—, sin el sondeo largo que sí necesita un
+ * video: una Historia de imagen resuelve con el reintento corto de
+ * `publicarContenedor()`. Con el tope por defecto de la plataforma eso va
+ * justo, y encima `publicarContenedor()` puede esperar hasta 8 s reintentando
+ * si Meta todavía está procesando.
  */
 export const maxDuration = 60;
 

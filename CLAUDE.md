@@ -317,6 +317,51 @@ pesos después.
   abajo sobre `/p/<slug>`: el mismo mecanismo lo comparte con los posts de
   noticia.
 
+### Cada diapositiva del carrusel diario publica también su propia Historia
+
+Además del carrusel de feed, cada disparo de `publicarTasasDelDia()`
+(`lib/publish-hoy.ts`) publica **dos Historias**, una por diapositiva, en el
+mismo orden en que se deslizan: bolívares primero, pesos después.
+
+- **Puede publicarse sola, a diferencia de la Story del reporte semanal.** La
+  limitación de "no se publica desde la app… no admite sticker de enlace ni
+  texto" (ver más abajo, sección del reporte semanal) es específica de esa
+  Story, que sí necesita un sticker de enlace. La Historia diaria no lleva
+  ningún llamado a la acción —es la misma información que ya va en el
+  carrusel, en vertical—, así que `media_type=STORIES` de la Graph API la
+  publica sin restricciones. `publishStory()` (`lib/instagram.ts`) es el
+  atajo: crear contenedor + publicar, sin `caption` (Meta lo ignora ahí).
+- **Cabe en la misma invocación del cron, a diferencia del Reel de video.**
+  Publicar el carrusel ya son 4 viajes a Meta; cada Historia de imagen suma 2
+  más (crear + publicar), sin el sondeo largo que sí necesita un video —
+  resuelve con el reintento corto de `publicarContenedor()`, igual que
+  `publishDailyPost`. No hace falta tabla, cola ni cron aparte.
+- **Es un extra, nunca puede tumbar el post principal.** Cada llamada a
+  `publishStory()` va en su propio `try/catch`, después de que el carrusel ya
+  tiene `mediaId` — el mismo criterio que anotar el enlace de `/hoy`: el post
+  ya está en la cuenta, y un fallo en la Historia no puede convertir una
+  publicación exitosa en un error.
+- **La imagen es la misma URL del carrusel, con `?proporcion=9:16`.**
+  `app/api/og/instagram-post` y `app/api/og/instagram-post-pesos` generan las
+  dos proporciones desde la misma plantilla —mismo patrón que
+  `instagram-semanal`—, así que la Historia dice exactamente lo mismo que la
+  diapositiva que acompaña. El lienzo vertical reserva 110 px arriba y 130
+  abajo (`reservaArriba`/`reservaAbajo`) para no quedar tapado por la
+  interfaz de Instagram, y sin firma HMAC por el mismo motivo que ya tenían
+  estas rutas: no reciben texto libre, solo un valor de un conjunto cerrado.
+- **El título nuevo** ("Tasas de hoy", la fecha corta y la moneda entre
+  paréntesis con la bandera del lado que corresponde) es el protagonista de
+  la Historia, por delante del propio logo — `TituloHistoria()` en
+  `lib/og-shared.tsx`. `formatFechaCorta()` (`lib/format.ts`) le da el
+  formato "26 de Agosto": sin año, mes con mayúscula inicial, porque el año
+  ya se sobreentiende del día en que se publica. El header (`Encabezado`) se
+  encoge con su prop `escala` en la Historia (0.5) para que sirva de
+  identidad visual sin robarle la mirada al título, y pierde la fecha del
+  rincón —ya la dice el título— y se queda solo con la hora.
+- El video de tasas (sección más abajo) sigue siendo el único que se dispara
+  a mano desde `/admin/video`; esta Historia no lo sustituye ni depende de
+  él.
+
 ### El pie de tres enlaces es solo para WhatsApp; en Instagram se cierra con hashtags
 
 Existe un pie de tres enlaces —el post, la calculadora y el canal—
@@ -1274,13 +1319,29 @@ pegar a mano en el canal. El envío lo sigue haciendo el admin.
   el semanal) porque allí los enlaces del caption no son clicables; en WhatsApp
   sí, y además aquí ya se conoce el permalink real —sale de la Graph API, del
   post que se está mirando—, así que el enlace va directo en vez de pasar por
-  un atajo. `formatMensajeCanal` es solo `conPieEnlaces(caption,
-  permalinkPost)`: corta el cierre que traiga el caption publicado y pone el
-  pie en su lugar. No hay IA de por medio, igual que los captions de origen.
+  un atajo. `formatMensajeCanal` corta el cierre que traiga el caption
+  publicado y pone el pie en su lugar. No hay IA de por medio, igual que los
+  captions de origen.
+- **Excepto el post diario de tasas, que sí tiene un atajo mejor: `/hoy`.**
+  Es el mismo enlace que ya lleva el propio caption publicado, resuelve
+  siempre al último post de tasas y trae su propia vista previa Open Graph —
+  más corto y memorable que el permalink, y consistente con cómo la app
+  enlaza al post del día en todos los demás sitios. `esCaptionDiario()`
+  (`lib/caption.ts`) detecta el caption diario por su propio marcador
+  ("📊 TASAS DE HOY", el mismo en mañana, tarde o el disparo manual sin
+  momento) — nunca una noticia ni el semanal, que no empiezan así. Sin
+  `SITE_URL` configurado se cae al permalink de siempre.
 - **El texto se muestra editable, no de solo lectura**
   (`components/BotonCopiarTexto.tsx`). Es el mismo criterio que
   `captionOverride` en noticias: lo que arma la plantilla es un punto de
   partida, no algo intocable.
+- **Un botón "Compartir" abre el selector nativo del sistema** cuando el
+  navegador soporta `navigator.share` (Web Share API) — WhatsApp queda a un
+  toque, sin el salto de copiar y cambiar de app a mano. Se oculta por
+  completo si no está disponible (la mayoría de navegadores de escritorio),
+  mismo criterio que el botón "Pegar" de la calculadora: un botón que nunca
+  funciona es peor que no tenerlo. "Copiar mensaje" se queda como respaldo
+  universal.
 
 ## Cómo trabajar en este proyecto
 

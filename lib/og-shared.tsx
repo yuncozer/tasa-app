@@ -114,17 +114,74 @@ export function LogoTaza({ tamano = 80 }: { tamano?: number } = {}) {
   );
 }
 
-/** Header con logo, wordmark "La Tasa" y subtítulo, común a ambas plantillas. */
-export function Encabezado({ subtitulo }: { subtitulo: string }) {
+/**
+ * Header con logo, wordmark "La Tasa" y subtítulo, común a ambas plantillas.
+ *
+ * `escala` lo encoge para la Historia automática (`?proporcion=9:16` de
+ * `instagram-post`/`instagram-post-pesos`): ahí el título nuevo
+ * (`TituloHistoria`) es el protagonista, y el header solo tiene que servir de
+ * identidad visual sin robarle la mirada. Por defecto vale 1 y el header sale
+ * exactamente igual que antes de que existiera la Historia.
+ */
+export function Encabezado({ subtitulo, escala = 1 }: { subtitulo: string; escala?: number }) {
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-      <LogoTaza />
+    <div style={{ display: "flex", alignItems: "center", gap: 16 * escala, opacity: escala < 1 ? 0.9 : 1 }}>
+      <LogoTaza tamano={80 * escala} />
       <div style={{ display: "flex", flexDirection: "column" }}>
-        <div style={{ display: "flex", fontSize: 48, fontWeight: 700 }}>
+        <div style={{ display: "flex", fontSize: 48 * escala, fontWeight: 700 }}>
           <span style={{ color: COLOR.foreground }}>La&nbsp;</span>
           <span style={{ color: COLOR.accent }}>Tasa</span>
         </div>
-        <span style={{ fontSize: 28, color: COLOR.muted }}>{subtitulo}</span>
+        <span style={{ fontSize: 28 * escala, color: COLOR.muted }}>{subtitulo}</span>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Título de tres líneas de la Historia automática: "Tasas de hoy", la fecha
+ * corta y, entre paréntesis, la moneda del lado de la frontera que le
+ * corresponde a esa Historia — bolívares con la bandera de Venezuela, pesos
+ * con la de Colombia. Centrado y grande a propósito: es lo primero que se lee
+ * al abrir la Historia, por delante del propio logo (ver `Encabezado`).
+ *
+ * Solo lo usan las plantillas del post diario en `?proporcion=9:16`; el
+ * lienzo cuadrado del carrusel no lo lleva.
+ */
+export function TituloHistoria({
+  fecha,
+  moneda,
+  banderaSrc,
+}: {
+  fecha: string;
+  moneda: string;
+  banderaSrc: string;
+}) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 20 }}>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+        <span style={{ fontSize: 110, fontWeight: 700, color: COLOR.foreground, lineHeight: 1.2 }}>
+          Tasas de hoy
+        </span>
+        <span style={{ fontSize: 110, fontWeight: 700, color: COLOR.foreground, lineHeight: 1.2 }}>{fecha}</span>
+      </div>
+      <div style={{ display: "flex", alignItems: "center" }}>
+        <span style={{ fontSize: 52, fontWeight: 500, color: COLOR.muted }}>({moneda}</span>
+        <div
+          style={{
+            display: "flex",
+            width: 46,
+            height: 46,
+            marginLeft: 10,
+            borderRadius: 9999,
+            overflow: "hidden",
+            border: `2px solid ${COLOR.border}`,
+          }}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element -- Satori rasteriza, no es una <img> de navegador. */}
+          <img src={banderaSrc} width={46} height={46} style={{ objectFit: "cover" }} alt="" />
+        </div>
+        <span style={{ fontSize: 52, fontWeight: 500, color: COLOR.muted }}>)</span>
       </div>
     </div>
   );

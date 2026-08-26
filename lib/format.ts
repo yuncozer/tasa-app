@@ -297,6 +297,24 @@ export function formatFechaLarga(iso: string | null): string {
 }
 
 /**
+ * Fecha corta en hora de Caracas, p. ej. "26 de Agosto": sin año, mes con
+ * mayúscula inicial. La usa el título de la Historia automática
+ * (`lib/og-shared.tsx`), donde el año no cabe en una frase corta y ya se
+ * sobreentiende del propio día en que se publica.
+ */
+export function formatFechaCorta(iso: string | null): string {
+  if (!iso) return "—";
+
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "—";
+
+  const caracas = new Date(date.getTime() - CARACAS_OFFSET_MS);
+  const mes = MESES_LARGOS[caracas.getUTCMonth()];
+
+  return `${caracas.getUTCDate()} de ${mes.charAt(0).toUpperCase()}${mes.slice(1)}`;
+}
+
+/**
  * Un porcentaje ya calculado, con su símbolo: "1,4 %".
  *
  * No usa `style: "percent"` de `Intl` porque ese espera una fracción (0,014) y

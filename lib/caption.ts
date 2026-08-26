@@ -191,6 +191,19 @@ const HASHTAGS_DIARIO =
   "#Venezuela #Colombia #DolarBCV #DolarParalelo #TasaDeCambio #Cucuta " +
   "#Binance #EuroVenezuela #TRM #PesoColombiano #LaTasaOnline";
 
+/** El caption del post diario siempre arranca así, sin importar el momento. */
+const INICIO_CAPTION_DIARIO = "📊 TASAS DE HOY";
+
+/**
+ * `true` si este caption es el del post diario de tasas (mañana, tarde o el
+ * disparo manual sin momento) — nunca una noticia ni el reporte semanal, que
+ * no empiezan así. La usa `formatMensajeCanal()` (`lib/canal-whatsapp.ts`)
+ * para decidir si el enlace del canal apunta a `/hoy` en vez de al permalink.
+ */
+export function esCaptionDiario(caption: string): boolean {
+  return caption.startsWith(INICIO_CAPTION_DIARIO);
+}
+
 /** Cuerpo del caption del post diario, sin pie: título, subtítulo y las dos listas de cifras. */
 function cuerpoCaptionDiario(snapshot: RatesSnapshot, momento?: "manana" | "tarde"): string {
   const subtitulo = momento ? SUBTITULO_POR_MOMENTO[momento] : "Actualización del día";

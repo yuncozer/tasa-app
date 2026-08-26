@@ -228,6 +228,29 @@ export async function publishDailyPost(
 }
 
 /**
+ * Contenedor de una Historia de imagen (`media_type=STORIES`). Sin
+ * `caption`: Meta lo ignora ahí, a diferencia del feed.
+ */
+export function crearContenedorStory(imageUrl: string): Promise<string> {
+  return crearContenedor({ media_type: "STORIES", image_url: imageUrl }, "el contenedor de la Historia");
+}
+
+/**
+ * Publica una Historia de imagen: crea el contenedor y lo publica.
+ *
+ * Solo sirve para Historias sin sticker de enlace — la única razón por la que
+ * el reporte semanal no publica la suya así y hay que descargarla y subirla a
+ * mano (ver `CLAUDE.md`). La Historia diaria no lleva ningún enlace, así que
+ * sí puede salir sola con el reintento corto de `publicarContenedor`, igual
+ * que `publishDailyPost`.
+ */
+export async function publishStory(imageUrl: string): Promise<{ mediaId: string }> {
+  const containerId = await crearContenedorStory(imageUrl);
+  const mediaId = await publicarContenedor(containerId);
+  return { mediaId };
+}
+
+/**
  * Publica un video como Reel: mismo contenedor que la imagen, pero con
  * `media_type=REELS` y `video_url` en vez de `image_url`, y con una espera
  * de procesamiento (`esperarVideoListo`) antes del intento de publicar —

@@ -1,7 +1,7 @@
 import { buildCaption } from "@/lib/caption";
 import { guardarEnlace } from "@/lib/enlaces";
 import { registrarSnapshot } from "@/lib/historico";
-import { permalinkDeMedia, publishCarouselPost } from "@/lib/instagram";
+import { permalinkDeMedia, publishCarouselPost, publishStory } from "@/lib/instagram";
 import { getRates } from "@/lib/rates";
 import { guardarSnapshotHoy } from "@/lib/snapshot-hoy";
 
@@ -11,13 +11,20 @@ export interface ResultadoPublicacionHoy {
 }
 
 /**
- * Publica el carrusel diario de tasas (bolívares + pesos) y deja `/hoy`
- * apuntando a él. Puerta única compartida por el cron
- * (`app/api/cron/publish-instagram/route.ts`, dos veces al día con
- * `momento` explícito) y el botón "Publicar ahora" de `/admin/hoy` (sin
- * `momento`, a la hora que el admin decida) — mismo criterio que
- * `ejecutarPublicacion()` para noticias y programadas: si el disparo manual
- * hiciera su propia llamada a Meta, podría divergir de lo que hace el cron.
+ * Publica el carrusel diario de tasas (bolívares + pesos), una Historia por
+ * cada diapositiva, y deja `/hoy` apuntando al carrusel. Puerta única
+ * compartida por el cron (`app/api/cron/publish-instagram/route.ts`, dos
+ * veces al día con `momento` explícito) y el botón "Publicar ahora" de
+ * `/admin/hoy` (sin `momento`, a la hora que el admin decida) — mismo
+ * criterio que `ejecutarPublicacion()` para noticias y programadas: si el
+ * disparo manual hiciera su propia llamada a Meta, podría divergir de lo que
+ * hace el cron.
+ *
+ * Las Historias no llevan sticker de enlace, así que a diferencia de la del
+ * reporte semanal (que sí lo necesita y por eso se descarga y sube a mano)
+ * pueden publicarse solas por la Graph API. Cada imagen del carrusel ya
+ * incluye su propio título ("Tasas de hoy…") en `?proporcion=9:16`, así que
+ * no hace falta redactar nada nuevo para ellas.
  *
  * Sin `momento` no se archiva en `historico_tasas` (`registrarSnapshot` solo
  * corre si se pasa) y el caption sale con "Actualización del día" en vez de
@@ -56,6 +63,21 @@ export async function publicarTasasDelDia(
     [`${siteUrl}/api/og/instagram-post`, `${siteUrl}/api/og/instagram-post-pesos`],
     caption,
   );
+
+  // Una Historia por diapositiva del carrusel, con el mismo orden. Son un
+  // extra sobre el post ya publicado — que es lo irreversible — así que cada
+  // una va en su propio `try/catch`: si una falla no debe tocar `mediaId` ni
+  // `enlace`, y que falle una no debe impedir la otra.
+  try {
+    await publishStory(`${siteUrl}/api/og/instagram-post?proporcion=9:16`);
+  } catch {
+    // Sin Historia en bolívares, el carrusel de feed ya publicado sigue en pie.
+  }
+  try {
+    await publishStory(`${siteUrl}/api/og/instagram-post-pesos?proporcion=9:16`);
+  } catch {
+    // Sin Historia en pesos, el carrusel de feed ya publicado sigue en pie.
+  }
 
   // El post ya está en la cuenta y eso es lo irreversible: un fallo al anotar
   // el enlace no puede convertir una publicación exitosa en un error que
