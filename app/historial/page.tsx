@@ -191,8 +191,8 @@ async function HistorialPesos() {
           <div className="grid grid-cols-2 gap-x-4 gap-y-2">
             <ValorPesos label="Dólar TRM" valor={fila.trm} />
             <ValorPesos label="Bolívar (promedio)" valor={fila.vesPromedio} />
-            <ValorPesos label="Frontera (compra)" valor={fila.fronteraBuy} />
-            <ValorPesos label="Frontera (venta)" valor={fila.fronteraSell} />
+            <ValorPesos label="Binance (compra)" valor={fila.fronteraBuy} />
+            <ValorPesos label="Binance (venta)" valor={fila.fronteraSell} />
           </div>
         </li>
       ))}

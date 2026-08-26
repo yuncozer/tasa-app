@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { ImagenConCarga } from "@/components/admin/ImagenConCarga";
+import { Spinner } from "@/components/admin/Spinner";
 
 /**
  * Panel de `/admin/parada`: revisa el borrador que detectó el cron, confirma
@@ -169,15 +171,15 @@ export function ParadaPanel({ borrador }: { borrador: Borrador | null }) {
           type="button"
           onClick={guardarVistaPrevia}
           disabled={guardando}
-          className="rounded-full border border-border-soft px-3 py-1 text-xs font-medium text-muted transition active:scale-95 disabled:opacity-60"
+          className="flex items-center justify-center gap-1.5 rounded-full border border-border-soft px-3 py-1 text-xs font-medium text-muted transition active:scale-95 disabled:opacity-60"
         >
+          {guardando && <Spinner className="size-3.5" />}
           {guardando ? "Guardando…" : "Actualizar vista previa"}
         </button>
       </section>
 
       {marca && (
-        // eslint-disable-next-line @next/next/no-img-element -- Se genera al vuelo; next/image obligaría a declarar el host.
-        <img
+        <ImagenConCarga
           src={`/api/og/instagram-post-parada?t=${marca}`}
           alt={`Vista previa del post: ${borrador.titulo}`}
           className="h-auto w-full rounded-2xl border border-border-soft"
@@ -204,8 +206,9 @@ export function ParadaPanel({ borrador }: { borrador: Borrador | null }) {
         type="button"
         onClick={publicar}
         disabled={publicando || publicado || !camposCompletos}
-        className="rounded-2xl bg-accent px-4 py-3 text-sm font-semibold text-background transition active:scale-95 disabled:opacity-60"
+        className="flex items-center justify-center gap-2 rounded-2xl bg-accent px-4 py-3 text-sm font-semibold text-background transition active:scale-95 disabled:opacity-60"
       >
+        {publicando && <Spinner className="size-4" />}
         {publicando ? "Publicando…" : publicado ? "Publicado" : "Publicar ahora"}
       </button>
 

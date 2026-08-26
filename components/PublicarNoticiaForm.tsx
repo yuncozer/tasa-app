@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import type { ElementoCarruselEntrada, ProporcionCarrusel, PublicacionPayload } from "@/lib/publish-news";
+import { ImagenConCarga } from "@/components/admin/ImagenConCarga";
+import { Spinner } from "@/components/admin/Spinner";
 import { BarraProgreso } from "@/components/BarraProgreso";
 import { BotonRedactarIa } from "@/components/BotonRedactarIa";
 import type { Cintillo } from "@/components/ControlCintillo";
@@ -1144,8 +1146,9 @@ export function PublicarNoticiaForm({
         type="button"
         onClick={verVistaPrevia}
         disabled={!puedeVerVistaPrevia || cargandoPreview || publicando}
-        className="rounded-xl border border-accent bg-accent/15 px-4 py-3 text-base font-semibold text-accent transition active:scale-95 disabled:opacity-50"
+        className="flex items-center justify-center gap-2 rounded-xl border border-accent bg-accent/15 px-4 py-3 text-base font-semibold text-accent transition active:scale-95 disabled:opacity-50"
       >
+        {cargandoPreview && <Spinner className="size-4" />}
         {cargandoPreview ? "Cargando vista previa…" : desactualizado ? "Actualizar vista previa" : "Vista previa"}
       </button>
 
@@ -1190,11 +1193,10 @@ export function PublicarNoticiaForm({
                           className="h-40 w-40 rounded-xl border border-border-soft object-cover"
                         />
                       ) : (
-                        // eslint-disable-next-line @next/next/no-img-element -- imagen generada dinámicamente, no un asset estático.
-                        <img
+                        <ImagenConCarga
                           src={diapositiva.url}
                           alt=""
-                          className="h-40 w-40 rounded-xl border border-border-soft object-cover"
+                          className="h-40 w-40 rounded-xl border border-border-soft"
                         />
                       )}
                       <BotonDescargar url={diapositiva.descargaUrl} />
@@ -1202,13 +1204,15 @@ export function PublicarNoticiaForm({
                   ))}
                 </ul>
               ) : (
-                <p className="text-xs text-muted">Generando vista previa del carrusel…</p>
+                <p className="flex items-center gap-1.5 text-xs text-muted">
+                  <Spinner className="size-3.5" />
+                  Generando vista previa del carrusel…
+                </p>
               )}
             </div>
           ) : (
             <div className="flex flex-col gap-2">
-              {/* eslint-disable-next-line @next/next/no-img-element -- imagen generada dinámicamente, no un asset estático. */}
-              <img src={preview.imageUrl} alt="" className="w-full rounded-2xl border border-border-soft" />
+              <ImagenConCarga src={preview.imageUrl} alt="" className="w-full rounded-2xl border border-border-soft" />
               <BotonDescargar url={preview.descargaUrl} ancho />
             </div>
           )}
@@ -1464,8 +1468,9 @@ export function PublicarNoticiaForm({
                 type="button"
                 onClick={() => setEstado({ paso: "confirmar", preview })}
                 disabled={publicando || subiendo || desactualizado || faltanElementos}
-                className="rounded-xl border border-warning bg-warning/15 px-4 py-3 text-base font-semibold text-warning transition active:scale-95 disabled:opacity-50"
+                className="flex items-center justify-center gap-2 rounded-xl border border-warning bg-warning/15 px-4 py-3 text-base font-semibold text-warning transition active:scale-95 disabled:opacity-50"
               >
+                {publicando && <Spinner className="size-4" />}
                 {publicando ? "Publicando…" : esCarrusel ? "Publicar carrusel" : "Publicar"}
               </button>
             ))}

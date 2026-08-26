@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { ImagenConCarga } from "@/components/admin/ImagenConCarga";
+import { Spinner } from "@/components/admin/Spinner";
 import { BotonRedactarIa } from "@/components/BotonRedactarIa";
 import { conAnalisisSemanal } from "@/lib/caption";
 
@@ -111,8 +113,7 @@ export function ReporteSemanalPanel({
 
       <section className="flex flex-col gap-3">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">Feed (1:1)</h2>
-        {/* eslint-disable-next-line @next/next/no-img-element -- Se genera al vuelo; `next/image` no aporta nada y obligaría a declarar el host. */}
-        <img
+        <ImagenConCarga
           src={cuadrada}
           alt="Vista previa del reporte semanal para el feed"
           className="h-auto w-full rounded-2xl border border-border-soft"
@@ -121,8 +122,9 @@ export function ReporteSemanalPanel({
           type="button"
           onClick={publicar}
           disabled={publicando}
-          className="rounded-2xl bg-accent px-4 py-3 text-sm font-semibold text-background transition active:scale-95 disabled:opacity-60"
+          className="flex items-center justify-center gap-2 rounded-2xl bg-accent px-4 py-3 text-sm font-semibold text-background transition active:scale-95 disabled:opacity-60"
         >
+          {publicando && <Spinner className="size-4" />}
           {publicando ? "Publicando…" : "Publicar en el feed"}
         </button>
 
@@ -134,11 +136,11 @@ export function ReporteSemanalPanel({
 
       <section className="flex flex-col gap-3">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">Story (9:16)</h2>
-        {/* eslint-disable-next-line @next/next/no-img-element -- Igual que la anterior. */}
-        <img
+        <ImagenConCarga
           src={vertical}
           alt="Vista previa del reporte semanal para Story"
           className="mx-auto h-auto w-1/2 rounded-2xl border border-border-soft"
+          aspecto="9:16"
         />
         <p className="text-xs leading-relaxed text-muted">
           La Story se sube a mano: publicada por la API no admite sticker de enlace, que es lo que la hace útil.

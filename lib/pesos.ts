@@ -55,13 +55,13 @@ export function buildFilasPesos(snapshot: RatesSnapshot): FilaPesos[] {
     },
     {
       id: "FRONTERA_BUY",
-      label: "Dólar frontera (compra)",
+      label: "Dólar Binance (compra)",
       copPerUnit: enPesos(snapshot, "USD_BINANCE_BUY"),
       fuente: fuenteFrontera,
     },
     {
       id: "FRONTERA_SELL",
-      label: "Dólar frontera (venta)",
+      label: "Dólar Binance (venta)",
       copPerUnit: enPesos(snapshot, "USD_BINANCE_SELL"),
       fuente: fuenteFrontera,
     },

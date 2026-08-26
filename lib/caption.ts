@@ -131,8 +131,8 @@ const EMOJI_POR_FILA_PESOS: Record<FilaPesosId, string> = {
  * "Dólar" al frente y con la acción capitalizada.
  */
 const LABEL_CAPTION_PESOS: Partial<Record<FilaPesosId, string>> = {
-  FRONTERA_BUY: "Frontera (Compra)",
-  FRONTERA_SELL: "Frontera (Venta)",
+  FRONTERA_BUY: "Binance (Compra)",
+  FRONTERA_SELL: "Binance (Venta)",
   VES_PROMEDIO: "Bolívar (Promedio)",
 };
 

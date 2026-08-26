@@ -49,6 +49,18 @@ El de frontera es una **aproximación**: no existe API pública de las casas de
 cambio de Cúcuta. Está construido para ser verificable contra fuentes reales, pero
 no es una cotización en firme y la interfaz no debe presentarlo como tal.
 
+`COP_FRONTERA` se llama internamente así, pero el nombre que ve el lector es
+**"Peso Binance"** (`label` en `lib/rates.ts`) y no "Peso frontera": el dato
+sale de Binance P2P, no de un número propio recogido en las casas de cambio de
+Cúcuta —eso es justo lo que el párrafo de arriba dice que no existe—, así que
+llamarlo "frontera" sugería una fuente que no es la real. El mismo criterio
+vale para las dos filas de dólar que cruzan por esta tasa en el post de pesos
+(`lib/pesos.ts`: "Dólar Binance (compra/venta)", no "Dólar frontera…") y para
+su versión corta en el caption (`LABEL_CAPTION_PESOS` en `lib/caption.ts`). No
+confundir con **"Dólar en La Parada"**, la serie aparte que sí sale de un
+punto físico real (ver más abajo): ahí "frontera" seguía siendo válido antes
+del cambio de nombre porque el dato mismo era de calle, no de Binance.
+
 ### El BCV se lee raspando su portada
 
 Es la única fuente gratuita verificada que publica el **euro oficial**; las APIs de
@@ -800,6 +812,78 @@ Lo demás que hay que respetar:
   WhatsApp no se adivina y uno inventado mandaría a un chat ajeno. Sin
   `ENLACE_WHATSAPP` la ruta simplemente no existe.
 
+### "Dólar en La Parada" detecta solo, pero publica un humano
+
+Además de las tasas propias, La Tasa republica a diario la columna de
+lanacionweb.com sobre el cambio informal de dólares en La Parada (Villa del
+Rosario, frontera con Cúcuta), citando `@lanacionweb` y a quien la firme como
+fuente. Es la única serie del proyecto que combina un cron que vigila un sitio
+de terceros con una cola de un solo elemento que un humano tiene que aprobar
+antes de que salga nada.
+
+- **El cron detecta, nunca publica.** `app/api/cron/vigilar-parada/route.ts`
+  revisa la categoría "Frontera" de lanacionweb.com (`lib/providers/parada.ts`,
+  regex sobre el HTML del listado — el sitio no tiene API) cada pocos minutos,
+  porque la columna no sale a una hora fija y algunos días no sale. Si el
+  título del artículo más reciente cambió respecto al que ya tenía guardado,
+  scrapea el cuerpo con el mismo `fetchArticle()` que usa `/admin/noticia`
+  (`lanacionweb.com` ya estaba en `CONTENEDOR_POR_HOST`) y guarda un borrador
+  nuevo en `parada_pendiente` (tabla de una sola fila, mismo patrón que
+  `snapshot_hoy`) — pero **no publica**. Extraer el cuerpo con una expresión
+  regular sobre prosa libre ya falló una vez en producción (texto de un
+  artículo distinto colándose en el scrapeado), y esta es la peor serie para
+  que eso pase en silencio: es justo el número que el lector se lleva de un
+  vistazo. Por eso, y por el mismo criterio de "revisión humana" que ya rige
+  `/admin/noticia`, un humano confirma antes de que salga nada.
+- **`compra` y `venta` arrancan vacíos a propósito.** El cron guarda título,
+  imagen y caption sugerido, pero dejar el lugar en su valor por defecto
+  (`LUGAR_PARADA_DEFECTO`, "La Parada, Villa del Rosario") y `compra`/`venta`
+  en `null` — nunca intenta leerlos del cuerpo del artículo. El admin los
+  confirma a mano en `/admin/parada`, leyendo el artículo original, antes de
+  que el botón "Publicar ahora" se habilite.
+- **El correo de aviso es de conveniencia, no un requisito.**
+  `lib/notificar-parada.ts` llama a la API HTTP de Resend (sin su SDK, mismo
+  criterio que `lib/ia.ts` con OpenRouter) justo después de guardar un
+  borrador nuevo, en su propio `try/catch` tragado: si el correo falla, el
+  borrador ya quedó guardado y `/admin/parada` lo sigue ofreciendo igual. Sin
+  `RESEND_API_KEY` o `NOTIFICAR_PARADA_EMAIL` configuradas, se omite en
+  silencio.
+- **La imagen es una plantilla dedicada, no una variante de la de noticia.**
+  `/api/og/instagram-post-parada` no recibe título/imagen/cifras por query
+  string —a diferencia de `instagram-post-news`— sino que lee el borrador
+  directo de `parada_pendiente`, igual que `/api/og/instagram-post` lee
+  `snapshotDelDia()`. Por eso **no lleva firma HMAC**: nada de lo que dibuja es
+  texto que alguien pueda controlar armando la URL. Muestra el lugar, el
+  título, la foto del artículo y las cifras de compra/venta como dos tarjetas
+  dentro del marco (no enterradas en un párrafo), con un aviso legal propio
+  —"tasa informal... puede variar durante el día"— distinto del genérico de
+  noticia.
+- **`/admin/parada` guarda antes de mostrar.** El botón "Actualizar vista
+  previa" hace un `PATCH` a `/api/admin/parada` (lugar/compra/venta/caption)
+  y solo entonces refresca el `<img>` con un parámetro que cambia — mismo
+  truco que el `?actualizar=` de la portada, porque la plantilla no toma nada
+  por query string y sin eso el navegador serviría su propia copia. Es la
+  razón por la que un cambio de copy o de plantilla **no se nota en un
+  borrador ya guardado**: hay que volver a guardar (o esperar al próximo
+  artículo que detecte el cron) para que se refleje.
+- **`/laparada` es `/hoy`, calcado.** Mismo motivo, misma solución: página con
+  `<meta refresh>` y Open Graph propio (no una redirección 307) para que el
+  rastreador de WhatsApp se quede con la tarjeta en vez de toparse con el muro
+  de login de Instagram. `destinoDeLaParada()` en `lib/enlaces.ts` usa los
+  mismos dos respaldos que `/p/<slug>` (tabla → perfil, sin variable de
+  entorno intermedia) y se anota justo después de publicar, en
+  `/api/admin/publish-parada`. Está en `ATAJOS` de `public/sw.js` y en las
+  cabeceras `no-store` de `next.config.ts`, igual que `/hoy`.
+- **La portada muestra una tarjeta aparte, nunca una moneda más.** Todas las
+  demás tasas de la calculadora se leen en vivo de un proveedor; esta la
+  confirma el admin a mano, una vez al día, y algunos días no hay dato en
+  absoluto. Mezclarla en `RATE_ORDER` daría una imagen falsa de qué tan fresca
+  es. `ParadaCard` (en `app/page.tsx`, vía `paradaDelDia()` en `lib/parada.ts`)
+  solo muestra un borrador **ya publicado** —nunca uno a medio revisar en
+  `/admin/parada`— y va cacheada 5 minutos con `withCache`, el mismo TTL que
+  `getRates()`: sin eso sería la misma consulta a Supabase por visitante que
+  el proyecto ya prohíbe para `historico_tasas`.
+
 ### La IA solo redacta prosa, y siempre con revisión humana
 
 Dos textos de `/admin` se pueden pedir a un modelo de OpenRouter (plan gratuito):
@@ -1318,13 +1402,76 @@ la otra protege los endpoints de publicación/cron. La sesión es una cookie
 `CRON_SECRET` nunca llega al navegador: `/admin/noticia` lo usa solo del lado
 servidor, a través de `publishNewsPost`.
 
-Cuelgan tres páginas de esa misma sesión —`/admin/noticia`, `/admin/semanal`
-y `/admin/canal`—, más `/admin` como menú de entrada. Siguen siendo páginas
-separadas y no pestañas de una: la primera es un formulario con estado propio
-—switch Post/Reel, subidas, previa desactualizada, cola— y el reporte semanal
-**no tiene entradas**: se mira y se publica. La nav compartida vive en
-`components/AdminNav.tsx`; antes cada página repetía a mano su enlace cruzado
-y con tres hermanas más el menú ya pesaba más duplicarla que extraerla.
+Cuelgan seis páginas de esa misma sesión —`/admin/hoy`, `/admin/parada`,
+`/admin/noticia`, `/admin/semanal`, `/admin/canal` y `/admin/video`—, más
+`/admin` como dashboard de entrada. Siguen siendo páginas separadas y no
+pestañas de una: la de noticias es un formulario con estado propio —switch
+Post/Reel, subidas, previa desactualizada, cola— y el reporte semanal **no
+tiene entradas**: se mira y se publica.
+
+`/admin/hoy` es el escape valve del cron de tasas: dispara el mismo carrusel
+de bolívares/pesos que `app/api/cron/publish-instagram/route.ts`, pero sin
+`momento` —así no pisa el registro de `historico_tasas` de las 9:00 am o las
+6:00 pm con una lectura que no es ninguna de las dos— y con el caption cayendo
+a "Actualización del día" en vez de "de la mañana/tarde". Existe porque un
+BCV que falla a las 9:00 y responde a las 9:20 antes no tenía forma de
+corregirse sin esperar al disparo de la tarde.
+
+#### El chrome de `/admin` vive en un layout, no repetido en cada página
+
+Al principio cada página traía su propio `<header>` (logo, título, nav) y su
+propia comprobación de sesión — siete copias del mismo
+`if (!esSesionValida(...)) redirect(...)`, y una fila de píldoras que se
+envolvía en el teléfono sin decir con claridad dónde estaba uno parado. Con
+seis secciones ya se sentía un menú suelto, no un panel.
+
+Ahora todas cuelgan de `app/admin/(dashboard)/layout.tsx` — un grupo de rutas
+(las paréntesis no entran en la URL: `(dashboard)/hoy/page.tsx` sigue
+resolviendo a `/admin/hoy`) que queda **fuera** de `/admin/login`, la única
+página que no comparte sesión ni chrome con el resto. Ese layout hace la
+comprobación de sesión una sola vez y envuelve todo en `AdminShell`
+(`components/admin/AdminShell.tsx`): sidebar fija en escritorio, barra +
+tira de navegación horizontal (scroll, sin JavaScript para navegar) en
+móvil. Es `"use client"` únicamente por `usePathname()` — resaltar la
+sección activa es lo único que necesita el navegador; los enlaces siguen
+siendo `<Link>` normales.
+
+Toda la nav —qué páginas hay, en qué orden, con qué ícono y bajo qué grupo
+("Publicar", "Reportes y difusión", "Herramientas")— sale de una sola fuente,
+`components/admin/nav-admin.ts`. La consumen tanto `AdminShell` (la nav de
+verdad) como el dashboard de `/admin` (las tarjetas de acceso), así que un
+enlace nuevo se agrega una vez y aparece en los dos sitios. Es también lo que
+deja este chrome portable si el panel se separa algún día a un proyecto de
+gestor de redes aparte: dos archivos, ninguna página conoce su posición en
+la nav.
+
+El dashboard de `/admin` no es una lista estática: cada tarjeta trae, cuando
+hay algo real que atender, una insignia de estado —proveedores degradados en
+"Publicar tasas", un borrador de La Parada sin publicar, publicaciones en
+cola en "Noticias"— para que abrir el panel ya diga qué necesita revisión
+antes de entrar a cada sección. Cada fuente de estado se envuelve en su
+propio `try/catch`: un Supabase caído no puede tumbar el dashboard entero,
+solo dejar sin insignia a la tarjeta que dependía de él.
+
+`app/admin/(dashboard)/loading.tsx` es el esqueleto que Next.js muestra
+mientras el `page.tsx` de destino resuelve su lectura a Supabase o a las
+tasas en vivo. Al vivir en ese segmento cubre la navegación a **cualquier**
+sub-ruta —`loading.tsx` envuelve tanto la página del propio segmento como
+todas sus hijas—, así que un solo esqueleto basta y la sidebar no parpadea:
+vive dentro del layout, por fuera del boundary de carga.
+
+Los botones que ya avisaban con texto ("Publicando…", "Guardando…",
+"Redactando…") llevan además un ícono girando al lado
+(`components/admin/Spinner.tsx`, puramente decorativo, sin `role`) — se nota
+de reojo sin leer el texto, útil cuando el botón queda arriba del scroll
+mientras se revisa el resto del formulario. Y las vistas previas que genera
+Satori al vuelo (La Parada, el reporte semanal, el post/carrusel de noticia)
+usan `components/admin/ImagenConCarga.tsx`, que reserva el espacio final con
+la proporción real (1:1 o 9:16) y muestra un esqueleto hasta que el
+navegador termina de cargar la imagen — sin eso el `<img>` se veía en
+blanco uno o dos segundos, y sin la proporción fija el esqueleto colapsaba a
+0 de alto porque el navegador todavía no conoce el tamaño intrínseco de una
+imagen que no ha terminado de descargar.
 
 ### El envío al canal de WhatsApp es manual, y por eso `/admin/canal`
 

@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { Spinner } from "@/components/admin/Spinner";
 import type { PublicacionPayload } from "@/lib/publish-news";
 import { formatClock, formatDate, horaCaracasDesdeIso, isoDesdeHoraCaracas } from "@/lib/format";
 
@@ -207,11 +208,17 @@ export function ColaProgramadas({
                   {/* `formatRelative` no vale aquí — está hecho para la fecha
                       valor de una tasa y diría "vigente hoy". */}
                   {enCurso?.id === programada.id ? (
-                    <span className="text-xs text-accent">{enCurso.texto}</span>
+                    <span className="flex items-center gap-1.5 text-xs text-accent">
+                      <Spinner className="size-3" />
+                      {enCurso.texto}
+                    </span>
                   ) : programada.estado === "fallida" ? (
                     <span className="text-xs text-warning">No salió: {programada.error ?? "error desconocido"}</span>
                   ) : programada.estado === "publicando" ? (
-                    <span className="text-xs text-warning">Publicándose ahora mismo</span>
+                    <span className="flex items-center gap-1.5 text-xs text-warning">
+                      <Spinner className="size-3" />
+                      Publicándose ahora mismo
+                    </span>
                   ) : null}
                 </div>
 
