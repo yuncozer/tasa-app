@@ -653,10 +653,20 @@ movió entre las dos. Se dispara a mano desde `/admin/brecha`.
   sube → rojo, baja → verde, y la magnitud viaja en valor absoluto porque el
   signo ya lo dice la flecha. La variación va en **puntos porcentuales**: la
   brecha ya es un porcentaje.
-- **Dos lienzos, 1:1 y 9:16, y la Story se descarga.** Misma repartición que el
-  reporte semanal —reservas de 110 y 130 px arriba y abajo del vertical para
-  que la interfaz de Instagram no tape nada— y mismo motivo para no publicarla
-  por la API: una Story de la Graph API no admite sticker de enlace.
+- **Dos lienzos, 1:1 y 9:16, y la Historia sí se publica desde la app.** Misma
+  repartición que el reporte semanal —reservas de 110 y 130 px arriba y abajo
+  del vertical para que la interfaz de Instagram no tape nada—, pero al
+  contrario que aquella esta Historia sale por la Graph API
+  (`publishStory`, `destino: "historia"` en `/api/admin/publish-brecha`). La
+  limitación de "no se publica desde la app" es específica del semanal, cuya
+  Story necesita un sticker de enlace; esta no lleva ningún llamado a la
+  acción, igual que las Historias del post diario. La descarga del 9:16 se
+  queda para cuando sí se le quiera poner un sticker a mano.
+  Feed e Historia son **dos botones y dos estados separados**: se publican por
+  separado y a veces sale solo uno, así que un estado compartido dejaría el
+  "Publicado" de uno colgando bajo el botón del otro. Mientras uno sale, los
+  dos se bloquean: los dos releen las tasas en el servidor y dispararlos a la
+  vez son dos descargas de imagen para Meta sin ninguna necesidad.
 - **La franja del titular va de borde a borde y con un rojo propio.** El
   relleno lateral del lienzo lo ponen los bloques y no el contenedor raíz,
   justo para que esa franja pueda llegar a los dos bordes: así se lee como un

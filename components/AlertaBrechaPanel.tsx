@@ -16,6 +16,13 @@ import { Spinner } from "@/components/admin/Spinner";
  * no haya cron: sale cuando el admin ve que el movimiento merece contarse.
  */
 
+type Destino = "feed" | "historia";
+
+/**
+ * El estado es uno por destino y no uno solo: el feed y la Historia se publican
+ * por separado —a veces solo uno de los dos— y un estado compartido dejaría el
+ * "Publicado" del post colgando debajo del botón de la Historia.
+ */
 type Estado =
   | { paso: "inicial" }
   | { paso: "publicando" }
@@ -53,18 +60,31 @@ export function AlertaBrechaPanel({
    * servidor y en el navegador, y eso rompe la hidratación.
    */
   const [marca, setMarca] = useState("");
-  const [estado, setEstado] = useState<Estado>({ paso: "inicial" });
+  const [feed, setFeed] = useState<Estado>({ paso: "inicial" });
+  const [historia, setHistoria] = useState<Estado>({ paso: "inicial" });
 
-  const publicando = estado.paso === "publicando";
+  // Mientras uno de los dos está saliendo se bloquean ambos: los dos leen las
+  // tasas del momento en el servidor, y dispararlos a la vez es pedirle a Meta
+  // dos descargas de imágenes que se renderizan al vuelo sin ninguna necesidad.
+  const publicando = feed.paso === "publicando" || historia.paso === "publicando";
   const base = "/api/og/instagram-brecha";
   const refresco = marca ? `&t=${marca}` : "";
   const cuadrada = `${base}?proporcion=1:1${refresco}`;
   const vertical = `${base}?proporcion=9:16${refresco}`;
 
-  async function publicar() {
+  async function publicar(destino: Destino) {
+    const setEstado = destino === "historia" ? setHistoria : setFeed;
+
     setEstado({ paso: "publicando" });
     try {
-      const response = await fetch("/api/admin/publish-brecha", { method: "POST" });
+      const response = await fetch("/api/admin/publish-brecha", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        // Solo el destino. Las cifras y el caption los recompone el servidor con
+        // las tasas vigentes, que es lo que impide publicar un número viejo de
+        // una pestaña que lleva horas abierta.
+        body: JSON.stringify({ destino }),
+      });
       if (!response.ok) {
         setEstado({ paso: "error", mensaje: await leerError(response) });
         return;
@@ -118,16 +138,16 @@ export function AlertaBrechaPanel({
         />
         <button
           type="button"
-          onClick={publicar}
+          onClick={() => publicar("feed")}
           disabled={publicando || !publicable}
           className="flex items-center justify-center gap-2 rounded-2xl bg-accent px-4 py-3 text-sm font-semibold text-background transition active:scale-95 disabled:opacity-60"
         >
-          {publicando && <Spinner className="size-4" />}
-          {publicando ? "Publicando…" : "Publicar en el feed"}
+          {feed.paso === "publicando" && <Spinner className="size-4" />}
+          {feed.paso === "publicando" ? "Publicando…" : "Publicar en el feed"}
         </button>
 
-        {estado.paso === "publicado" && <p className="text-xs text-accent">Publicado. Media ID: {estado.mediaId}</p>}
-        {estado.paso === "error" && <p className="text-xs text-warning">{estado.mensaje}</p>}
+        {feed.paso === "publicado" && <p className="text-xs text-accent">Publicado. Media ID: {feed.mediaId}</p>}
+        {feed.paso === "error" && <p className="text-xs text-warning">{feed.mensaje}</p>}
       </section>
 
       <section className="flex flex-col gap-3">
@@ -138,15 +158,34 @@ export function AlertaBrechaPanel({
           className="mx-auto h-auto w-1/2 rounded-2xl border border-border-soft"
           aspecto="9:16"
         />
-        <p className="text-xs leading-relaxed text-muted">
-          La Story se sube a mano: publicada por la API no admite sticker de enlace, que es lo que la hace útil.
-        </p>
+        <button
+          type="button"
+          onClick={() => publicar("historia")}
+          disabled={publicando || !publicable}
+          className="flex items-center justify-center gap-2 rounded-2xl bg-accent px-4 py-3 text-sm font-semibold text-background transition active:scale-95 disabled:opacity-60"
+        >
+          {historia.paso === "publicando" && <Spinner className="size-4" />}
+          {historia.paso === "publicando" ? "Publicando…" : "Publicar como Historia"}
+        </button>
+
+        {historia.paso === "publicado" && (
+          <p className="text-xs text-accent">Historia publicada. Media ID: {historia.mediaId}</p>
+        )}
+        {historia.paso === "error" && <p className="text-xs text-warning">{historia.mensaje}</p>}
+
+        {/* La descarga se queda: publicada por la API, la Historia no admite
+            sticker de enlace, así que subirla a mano sigue siendo la vía para
+            cuando sí se le quiera poner uno. */}
         <a
           href={`${base}?proporcion=9:16&descargar=1`}
           className="rounded-2xl border border-border-soft px-4 py-3 text-center text-sm font-semibold transition active:scale-95"
         >
           Descargar 9:16
         </a>
+        <p className="text-xs leading-relaxed text-muted">
+          Publicada desde aquí, la Historia sale sin sticker de enlace: la Graph API no lo admite. Si lo quieres,
+          descárgala y súbela a mano.
+        </p>
       </section>
 
       <section className="flex flex-col gap-2">

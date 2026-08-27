@@ -3,7 +3,8 @@ import { COOKIE_SESION, esSesionValida } from "@/lib/admin-session";
 import { construirAlertaBrecha } from "@/lib/alerta-brecha";
 import { apiError, apiJson } from "@/lib/api";
 import { buildCaptionBrecha } from "@/lib/caption";
-import { ejecutarPublicacion } from "@/lib/publish-news";
+import { publishStory } from "@/lib/instagram";
+import { ejecutarPublicacion, urlAlertaBrecha } from "@/lib/publish-news";
 import { getRates } from "@/lib/rates";
 
 /**
@@ -19,6 +20,16 @@ import { getRates } from "@/lib/rates";
  * con un hueco, y no la degradación a `Sin dato` de la portada —aquella muestra
  * un estado, esto sale a la cuenta real y no se corrige después—.
  *
+ * `destino` elige entre el feed y la Historia. La Historia sí se publica desde
+ * aquí, al contrario que la del reporte semanal: aquella necesita un sticker de
+ * enlace —lo único que la hace útil— y la Graph API no lo admite, mientras que
+ * esta no lleva ningún llamado a la acción, igual que las Historias del post
+ * diario (`publicarTasasDelDia`). El botón de descargar el 9:16 se queda de
+ * todas formas, para cuando sí se quiera subir a mano con sticker.
+ *
+ * La Historia no lleva caption: Meta lo ignora en `media_type=STORIES`. Por eso
+ * el caption solo se compone en el camino del feed.
+ *
  * No anota `/hoy`: "el post del día" es el de tasas, y esto no lo pisa.
  */
 export const runtime = "nodejs";
@@ -31,6 +42,11 @@ export async function POST(request: NextRequest) {
     return apiError("No autorizado", undefined, 401);
   }
 
+  const body = await request.json().catch(() => null);
+  // Cualquier cosa que no sea "historia" es el feed: el destino por defecto es
+  // el post, que es lo que hace el botón principal.
+  const destino = body?.destino === "historia" ? "historia" : "feed";
+
   try {
     const snapshot = await getRates();
     const alerta = await construirAlertaBrecha(snapshot);
@@ -39,9 +55,16 @@ export async function POST(request: NextRequest) {
       return apiError("Falta una de las dos tasas: sin brecha no hay alerta que publicar", undefined, 409);
     }
 
-    const { mediaId } = await ejecutarPublicacion({ tipo: "brecha", caption: buildCaptionBrecha(alerta) });
-    return apiJson({ ok: true, mediaId }, { cachear: false });
+    const { mediaId } =
+      destino === "historia"
+        ? await publishStory(urlAlertaBrecha("9:16"))
+        : await ejecutarPublicacion({ tipo: "brecha", caption: buildCaptionBrecha(alerta) });
+
+    return apiJson({ ok: true, mediaId, destino }, { cachear: false });
   } catch (error) {
-    return apiError("No se pudo publicar la alerta de brecha", error);
+    return apiError(
+      destino === "historia" ? "No se pudo publicar la Historia" : "No se pudo publicar la alerta de brecha",
+      error,
+    );
   }
 }
