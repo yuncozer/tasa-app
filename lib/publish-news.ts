@@ -480,7 +480,19 @@ export type PublicacionPayload =
    * lo rechaza explícitamente. Está aquí para que el botón inmediato pase por
    * `ejecutarPublicacion()`, que es la puerta única.
    */
-  | { tipo: "semanal"; caption: string };
+  | { tipo: "semanal"; caption: string }
+  /**
+   * La alerta de brecha, que se dispara desde `/admin/brecha` cuando la
+   * distancia entre el BCV y Binance se movió lo bastante como para contarlo.
+   * Como el semanal, solo lleva el caption: la imagen se resuelve al publicar
+   * leyendo las tasas y el histórico del servidor.
+   *
+   * Tampoco se puede programar, y aquí por partida doble: sus cifras se
+   * resuelven al publicar —así que saldrían distintas de las previsualizadas— y
+   * además una alerta programada es una contradicción, porque lo que la
+   * justifica es que la brecha se movió *ahora*.
+   */
+  | { tipo: "brecha"; caption: string };
 
 /**
  * Cuánto del título se guarda para la cola. No es el ancho de la pantalla —de
@@ -515,7 +527,7 @@ export function resumenPublicacion(payload: PublicacionPayload): string {
       ? payload.datos.title
       : payload.tipo === "carrusel"
         ? (payload.datos.title ?? primeraLinea(payload.caption))
-        : payload.tipo === "reel" || payload.tipo === "semanal"
+        : payload.tipo === "reel" || payload.tipo === "semanal" || payload.tipo === "brecha"
           ? primeraLinea(payload.caption)
           : (payload.caption ?? payload.url);
 
@@ -564,6 +576,8 @@ export async function prepararPublicacion(payload: PublicacionPayload): Promise<
     }
     case "semanal":
       return { tipo: "imagen", imageUrl: urlReporteSemanal("1:1"), caption: payload.caption };
+    case "brecha":
+      return { tipo: "imagen", imageUrl: urlAlertaBrecha("1:1"), caption: payload.caption };
   }
 }
 
@@ -579,6 +593,20 @@ export function urlReporteSemanal(proporcion: "1:1" | "9:16"): string {
   if (!siteUrl) throw new Error("Falta configurar SITE_URL");
 
   return `${siteUrl.replace(/\/$/, "")}/api/og/instagram-semanal?proporcion=${encodeURIComponent(proporcion)}`;
+}
+
+/**
+ * La imagen de la alerta de brecha, para que Meta la descargue.
+ *
+ * Al feed va el cuadrado, igual que el semanal: el 9:16 es para Story, y una
+ * Story publicada por la Graph API no admite sticker de enlace —lo que la hace
+ * útil—, así que esa se descarga y se sube a mano desde `/admin/brecha`.
+ */
+export function urlAlertaBrecha(proporcion: "1:1" | "9:16"): string {
+  const siteUrl = process.env.SITE_URL;
+  if (!siteUrl) throw new Error("Falta configurar SITE_URL");
+
+  return `${siteUrl.replace(/\/$/, "")}/api/og/instagram-brecha?proporcion=${encodeURIComponent(proporcion)}`;
 }
 
 /**
@@ -675,6 +703,12 @@ export function leerPublicacionPayload(valor: unknown): PublicacionPayload | nul
     return { tipo: "reel", videoPublicId, caption, slugEnlace: slugEnlace(p), ...leerMarcaVideo(p) };
   }
 
+  if (p?.tipo === "brecha") {
+    const caption = texto((p as { caption?: unknown }).caption);
+    if (!caption) return null;
+    return { tipo: "brecha", caption };
+  }
+
   if (p?.tipo === "semanal") {
     const caption = texto((p as { caption?: unknown }).caption);
     if (!caption) return null;
@@ -705,6 +739,12 @@ export async function materializarParaProgramar(
   // de dejar que la cola lo acepte y sorprenda después.
   if (payload.tipo === "semanal") {
     throw new Error("El reporte semanal no se puede programar: sus cifras se resuelven al publicar");
+  }
+
+  // La alerta de brecha, por lo mismo y además porque se publica justo cuando
+  // el movimiento ocurre: programarla la dejaría anunciando una brecha vieja.
+  if (payload.tipo === "brecha") {
+    throw new Error("La alerta de brecha no se puede programar: sus cifras se resuelven al publicar");
   }
 
   await calentarVideo(payload);

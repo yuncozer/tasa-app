@@ -619,6 +619,51 @@ una con su valor y **cuánto se movió en siete días**. Se dispara a mano desde
   script y nunca en la ruta**, porque un parámetro que falsea datos en una URL
   pública es justo lo que la ausencia de firma no debe permitir.
 
+### La alerta de brecha se publica cuando el admin ve que se movió, no por cron
+
+Además del post diario y del reporte semanal, hay una pieza suelta —"URGENTE |
+SE ABRIÓ LA BRECHA"— con la brecha de hoy, la de hace una semana y cuánto se
+movió entre las dos. Se dispara a mano desde `/admin/brecha`.
+
+- **No tiene cron, y esa es su razón de ser.** Lo que la justifica no es la
+  hora sino que la distancia entre el BCV y Binance se movió lo bastante como
+  para contarlo; publicarla dos veces al día la convertiría en el post diario,
+  que ya existe. Por lo mismo **no se puede programar**: `materializarParaProgramar`
+  la rechaza igual que al semanal —sus cifras se resuelven al publicar— y
+  además una alerta programada es una contradicción, porque anunciaría un
+  movimiento de ayer.
+- **La cifra sale de `calcularBrecha()`**, la misma de la portada y de la
+  tarjeta del reporte semanal (`lib/brecha.ts`). Esta pieza existe justo para
+  llamar la atención sobre ese número, así que sería el peor sitio donde
+  publicar una cuenta propia. La comparación contra hace una semana usa
+  `leerComparativa()` con la misma ventana de ±3 días que el semanal.
+- **El titular lo decide la dirección, no la interfaz** (`titularDe()` en
+  `lib/alerta-brecha.ts`): "SE ABRIÓ LA BRECHA" si subió, "SE CERRÓ" si bajó,
+  "SE MANTIENE" si no se movió y "ASÍ ESTÁ LA BRECHA" cuando no hay con qué
+  comparar. Dejarlo editable permitiría publicar un "se abrió" encima de unas
+  cifras que dicen lo contrario, que están justo debajo en la misma imagen. La
+  palabra **URGENTE** solo aparece cuando se abrió: ponerla también sobre un
+  "se cerró" la convertiría en decoración.
+- **Sin brecha no se publica.** Aquí no vale la degradación a `Sin dato` de la
+  portada: aquella muestra un estado y esto produce un post que sale a la
+  cuenta real y no se corrige después —mismo criterio que el video de tasas—.
+  Lo que sí degrada es la comparación: sin dato de hace una semana la imagen
+  sale con la brecha de hoy y dice que no hay comparación, nunca un `0,0 pp`.
+- **El color va por impacto y la flecha por signo**, igual que el semanal:
+  sube → rojo, baja → verde, y la magnitud viaja en valor absoluto porque el
+  signo ya lo dice la flecha. La variación va en **puntos porcentuales**: la
+  brecha ya es un porcentaje.
+- **Dos lienzos, 1:1 y 9:16, y la Story se descarga.** Misma repartición que el
+  reporte semanal —reservas de 110 y 130 px arriba y abajo del vertical para
+  que la interfaz de Instagram no tape nada— y mismo motivo para no publicarla
+  por la API: una Story de la Graph API no admite sticker de enlace.
+- **La imagen va sin firma HMAC**, como `instagram-semanal`: no recibe ni un
+  carácter de texto libre —lee las tasas y el histórico del servidor— y su
+  única entrada es un valor de un conjunto cerrado.
+- Se itera con `npx tsx scripts/preview-brecha.ts`, que imprime el caption y
+  las dos URLs; `--sin-historico` enseña la degradación sin esperar. Ese flag
+  vive **en el script y nunca en la ruta**, por lo mismo que en el semanal.
+
 ### `/historial` enseña lo archivado, y por eso el histórico guarda mañana y tarde
 
 El histórico nació para el reporte semanal, pero la pregunta que de verdad
@@ -1402,9 +1447,9 @@ la otra protege los endpoints de publicación/cron. La sesión es una cookie
 `CRON_SECRET` nunca llega al navegador: `/admin/noticia` lo usa solo del lado
 servidor, a través de `publishNewsPost`.
 
-Cuelgan seis páginas de esa misma sesión —`/admin/hoy`, `/admin/parada`,
-`/admin/noticia`, `/admin/semanal`, `/admin/canal` y `/admin/video`—, más
-`/admin` como dashboard de entrada. Siguen siendo páginas separadas y no
+Cuelgan siete páginas de esa misma sesión —`/admin/hoy`, `/admin/parada`,
+`/admin/noticia`, `/admin/semanal`, `/admin/brecha`, `/admin/canal` y
+`/admin/video`—, más `/admin` como dashboard de entrada. Siguen siendo páginas separadas y no
 pestañas de una: la de noticias es un formulario con estado propio —switch
 Post/Reel, subidas, previa desactualizada, cola— y el reporte semanal **no
 tiene entradas**: se mira y se publica.
@@ -1577,6 +1622,7 @@ tres scripts se reparten el trabajo:
 | `scripts/preview-noticia.ts <url>` | Un artículo real: imagen enmarcada + caption | Sí |
 | `scripts/preview-marca.ts <archivo>` | Material propio: marcos, video en sus tres lienzos, sello y cintillo | Solo para las de imagen |
 | `scripts/preview-semanal.ts` | El reporte semanal: caption y las dos URLs (1:1 y 9:16) | Sí |
+| `scripts/preview-brecha.ts` | La alerta de brecha: caption y las dos URLs (1:1 y 9:16) | Sí |
 | `scripts/preview-ia.ts <tipo>` | Los dos textos que redacta la IA, junto a su plantilla | No |
 | `scripts/video-tasas.ts` | El Reel de tasas del día, desde el snapshot publicado | No |
 
@@ -1599,6 +1645,10 @@ npx tsx scripts/preview-marca.ts clip.mp4     # video en 1:1, 4:5 y Reel, con su
 npx tsx scripts/preview-semanal.ts
 npx tsx scripts/preview-semanal.ts --sin-historico   # la degradación del arranque
 
+# Alerta de brecha: imprime el caption y las dos URLs (tampoco lleva firma)
+npx tsx scripts/preview-brecha.ts
+npx tsx scripts/preview-brecha.ts --sin-historico   # sin dato de hace una semana
+
 # Textos de la IA: imprime también la plantilla, que es contra lo que se comparan
 npx tsx scripts/preview-ia.ts noticia "https://url-del-articulo"
 npx tsx scripts/preview-ia.ts semanal
@@ -1614,6 +1664,7 @@ npx tsx scripts/preview-ia.ts semanal
 | Sello de marca sobre el video | Cloudinary, capa fija ya subida | el mismo (`SELLO_PUBLIC_ID`, `yDelSello`) |
 | Cintillo del video | Satori, PNG transparente que Cloudinary superpone | `lib/og-cintillo.tsx` |
 | Reporte semanal (1:1 y 9:16) | Satori, sin firma; las filas salen de `lib/semanal.ts` | `app/api/og/instagram-semanal/route.tsx` |
+| Alerta de brecha (1:1 y 9:16) | Satori, sin firma; las cifras salen de `lib/alerta-brecha.ts` | `app/api/og/instagram-brecha/route.tsx` |
 
 **Cómo pedir cada variante del video**, que es lo que más se confunde:
 
