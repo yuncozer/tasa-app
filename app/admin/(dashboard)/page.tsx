@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
+import { AvisoToken } from "@/components/admin/AvisoToken";
 import { ENLACE_ANALITICAS, NAV_ADMIN, type EnlaceAdmin } from "@/components/admin/nav-admin";
 import { DIAS_PARA_AVISAR, estadoToken } from "@/lib/instagram-token";
 import { leerParadaPendiente } from "@/lib/parada";
@@ -136,13 +137,7 @@ export default async function AdminPage() {
       <AdminPageHeader
         titulo="Panel de La Tasa"
         descripcion="Publicar contenido, revisar borradores pendientes y armar reportes."
-        aviso={
-          aviso ? (
-            <p className="rounded-2xl border border-warning/40 bg-warning/10 px-4 py-3 text-xs text-warning">
-              {aviso}
-            </p>
-          ) : undefined
-        }
+        aviso={aviso ? <AvisoToken mensaje={aviso} /> : undefined}
       />
 
       <div className="flex flex-col gap-6">

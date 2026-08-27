@@ -1139,6 +1139,14 @@ caducidad obliga a guardar el resultado del refresco, y de ahí la tabla
 - **El panel solo habla cuando hay algo que hacer**: con el token sano, `/admin`
   no dice nada; por debajo de 10 días —o sin registrar, o ya caducado— aparece
   la franja ámbar. Mismo criterio que las insignias de las tarjetas.
+- **La franja lleva su propio botón de renovar**
+  (`components/admin/AvisoToken.tsx` → `/api/admin/token-instagram`), que
+  fuerza el refresco saltándose el umbral de veinte días. Es lo que permite
+  **inicializar la tabla** sin esperar al cron ni disparar un curl con el
+  `CRON_SECRET` desde el teléfono, y rescatar el caso de que el cron lleve
+  días fallando. Renovar de más no cuesta nada: el token nuevo vale 60 días
+  desde que se pulsa. Va protegido por la cookie de sesión, no por
+  `CRON_SECRET`, que nunca llega al navegador.
 - La tabla lleva RLS **y** los privilegios retirados a `anon`/`authenticated`:
   con RLS sin políticas ya no se vería ninguna fila, pero esta guarda una
   credencial y conviene que PostgREST responda "permiso denegado" en vez de una
