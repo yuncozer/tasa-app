@@ -637,6 +637,23 @@ movió entre las dos. Se dispara a mano desde `/admin/brecha`.
   llamar la atención sobre ese número, así que sería el peor sitio donde
   publicar una cuenta propia. La comparación contra hace una semana usa
   `leerComparativa()` con la misma ventana de ±3 días que el semanal.
+- **Dos variantes, y las elige el admin: con comparación o solo el nivel de
+  hoy.** No es una degradada y la otra completa: hay días en que el movimiento
+  no es la noticia y el nivel sí, y entonces mencionar la semana pasada solo
+  reparte la atención. `construirAlertaBrecha(snapshot, { comparar: false })`
+  ni consulta el histórico —sería una lectura a Supabase para un dato que no se
+  va a mostrar— y la imagen se pide con `?comparar=0`. Que la ruta acepte esa
+  clave no contradice su falta de firma: no falsea ningún dato y es un valor de
+  un conjunto cerrado, igual que `proporcion`; lo que la firma evita en
+  `instagram-post-news` es texto libre, y aquí sigue sin haberlo.
+  `AlertaBrecha.comparada` distingue "no se pidió comparación" de "se pidió y
+  el histórico no la tenía": la imagen se ve igual, pero el caption no puede
+  decir lo mismo — mencionar un dato que falta cuando nadie lo pidió es
+  inventarle un problema al lector.
+  Las dos variantes se arman en el servidor y bajan juntas al panel, así que el
+  toggle no le pide nada a la red salvo la imagen. Cambiar de variante limpia
+  los estados de publicación: un "Publicado" de la otra colgando debajo diría
+  que salió esta.
 - **El titular lo decide la dirección, no la interfaz** (`titularDe()` en
   `lib/alerta-brecha.ts`): "AUMENTA LA BRECHA" si subió, "BAJA LA BRECHA" si bajó,
   "SE MANTIENE" si no se movió y "ASÍ ESTÁ LA BRECHA" cuando no hay con qué

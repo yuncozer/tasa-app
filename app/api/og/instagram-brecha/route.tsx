@@ -441,8 +441,22 @@ function proporcionDesdeQuery(request: NextRequest): Proporcion {
   return request.nextUrl.searchParams.get("proporcion") === "9:16" ? "9:16" : "1:1";
 }
 
+/**
+ * `?comparar=0` publica solo la brecha de hoy, sin el "hace una semana" ni la
+ * variación: la elige el admin en `/admin/brecha`.
+ *
+ * Que la ruta acepte esta clave no contradice la ausencia de firma: no falsea
+ * ningún dato —lo que muestra sigue saliendo de las tasas del servidor— y es un
+ * valor de un conjunto cerrado, igual que `proporcion`. Lo que la firma evita
+ * en `instagram-post-news` es texto libre, y aquí sigue sin haberlo.
+ */
+function compararDesdeQuery(request: NextRequest): boolean {
+  return request.nextUrl.searchParams.get("comparar") !== "0";
+}
+
 export async function GET(request: NextRequest) {
   const proporcion = proporcionDesdeQuery(request);
+  const comparar = compararDesdeQuery(request);
 
   const [snapshot, geistRegular, geistBold, instagramIcon, browserIcon, fondo] = await Promise.all([
     getRates(),
@@ -453,7 +467,7 @@ export async function GET(request: NextRequest) {
     leerImagenComoDataUri("fondo-brecha.jpg"),
   ]);
 
-  const alerta = await construirAlertaBrecha(snapshot);
+  const alerta = await construirAlertaBrecha(snapshot, { comparar });
 
   const imagen = new ImageResponse(
     <BrechaImage

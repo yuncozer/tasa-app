@@ -492,7 +492,7 @@ export type PublicacionPayload =
    * además una alerta programada es una contradicción, porque lo que la
    * justifica es que la brecha se movió *ahora*.
    */
-  | { tipo: "brecha"; caption: string };
+  | { tipo: "brecha"; caption: string; comparar?: boolean };
 
 /**
  * Cuánto del título se guarda para la cola. No es el ancho de la pantalla —de
@@ -577,7 +577,11 @@ export async function prepararPublicacion(payload: PublicacionPayload): Promise<
     case "semanal":
       return { tipo: "imagen", imageUrl: urlReporteSemanal("1:1"), caption: payload.caption };
     case "brecha":
-      return { tipo: "imagen", imageUrl: urlAlertaBrecha("1:1"), caption: payload.caption };
+      return {
+        tipo: "imagen",
+        imageUrl: urlAlertaBrecha("1:1", payload.comparar ?? true),
+        caption: payload.caption,
+      };
   }
 }
 
@@ -602,11 +606,17 @@ export function urlReporteSemanal(proporcion: "1:1" | "9:16"): string {
  * Story publicada por la Graph API no admite sticker de enlace —lo que la hace
  * útil—, así que esa se descarga y se sube a mano desde `/admin/brecha`.
  */
-export function urlAlertaBrecha(proporcion: "1:1" | "9:16"): string {
+export function urlAlertaBrecha(proporcion: "1:1" | "9:16", comparar = true): string {
   const siteUrl = process.env.SITE_URL;
   if (!siteUrl) throw new Error("Falta configurar SITE_URL");
 
-  return `${siteUrl.replace(/\/$/, "")}/api/og/instagram-brecha?proporcion=${encodeURIComponent(proporcion)}`;
+  const url = new URL(`${siteUrl.replace(/\/$/, "")}/api/og/instagram-brecha`);
+  url.searchParams.set("proporcion", proporcion);
+  // Solo se manda cuando se aparta del valor por defecto: así la URL de la
+  // variante normal es la misma de siempre.
+  if (!comparar) url.searchParams.set("comparar", "0");
+
+  return url.toString();
 }
 
 /**
@@ -706,7 +716,7 @@ export function leerPublicacionPayload(valor: unknown): PublicacionPayload | nul
   if (p?.tipo === "brecha") {
     const caption = texto((p as { caption?: unknown }).caption);
     if (!caption) return null;
-    return { tipo: "brecha", caption };
+    return { tipo: "brecha", caption, comparar: (p as { comparar?: unknown }).comparar !== false };
   }
 
   if (p?.tipo === "semanal") {

@@ -46,10 +46,14 @@ export async function POST(request: NextRequest) {
   // Cualquier cosa que no sea "historia" es el feed: el destino por defecto es
   // el post, que es lo que hace el botón principal.
   const destino = body?.destino === "historia" ? "historia" : "feed";
+  // Igual que el destino: por defecto la pieza compara, que es la variante
+  // principal. `comparar: false` es la elección explícita de publicar solo el
+  // nivel de hoy.
+  const comparar = body?.comparar !== false;
 
   try {
     const snapshot = await getRates();
-    const alerta = await construirAlertaBrecha(snapshot);
+    const alerta = await construirAlertaBrecha(snapshot, { comparar });
 
     if (!alerta.publicable) {
       return apiError("Falta una de las dos tasas: sin brecha no hay alerta que publicar", undefined, 409);
@@ -57,8 +61,8 @@ export async function POST(request: NextRequest) {
 
     const { mediaId } =
       destino === "historia"
-        ? await publishStory(urlAlertaBrecha("9:16"))
-        : await ejecutarPublicacion({ tipo: "brecha", caption: buildCaptionBrecha(alerta) });
+        ? await publishStory(urlAlertaBrecha("9:16", comparar))
+        : await ejecutarPublicacion({ tipo: "brecha", caption: buildCaptionBrecha(alerta), comparar });
 
     return apiJson({ ok: true, mediaId, destino }, { cachear: false });
   } catch (error) {

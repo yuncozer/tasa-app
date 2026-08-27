@@ -21,7 +21,12 @@ export default async function AdminBrechaPage() {
   // `construirAlertaBrecha` ya degrada sola si Supabase falla: devuelve la
   // brecha de hoy sin comparación en vez de tumbar la página.
   const snapshot = await getRates();
+  // Las dos variantes se arman en el servidor y bajan juntas: el toggle solo
+  // cambia cuál se enseña, sin pedirle nada a la red. La segunda no vuelve a
+  // consultar el histórico —`comparar: false` ni lo mira— así que no cuesta
+  // una lectura más a Supabase, y el snapshot es el mismo objeto.
   const alerta = await construirAlertaBrecha(snapshot);
+  const alertaSimple = await construirAlertaBrecha(snapshot, { comparar: false });
 
   const flecha = alerta.direccion === "sube" ? "↑" : alerta.direccion === "baja" ? "↓" : "";
   const variacionTexto =
@@ -46,6 +51,8 @@ export default async function AdminBrechaPage() {
         sinComparacion={alerta.direccion === "desconocida"}
         publicable={alerta.publicable}
         caption={buildCaptionBrecha(alerta)}
+        captionSimple={buildCaptionBrecha(alertaSimple)}
+        titularSimple={alertaSimple.titular}
       />
     </>
   );

@@ -36,14 +36,18 @@ async function leerError(response: Response): Promise<string> {
 
 export function AlertaBrechaPanel({
   titular,
+  titularSimple,
   brechaTexto,
   brechaAntesTexto,
   variacionTexto,
   sinComparacion,
   publicable,
   caption,
+  captionSimple,
 }: {
   titular: string;
+  /** El titular de la variante sin comparación, que no dice si subió o bajó. */
+  titularSimple: string;
   brechaTexto: string;
   brechaAntesTexto: string;
   /** La variación ya con su flecha, o `null` si no hay con qué comparar. */
@@ -52,6 +56,8 @@ export function AlertaBrechaPanel({
   /** Sin brecha no hay pieza: el botón se deshabilita en vez de publicar un hueco. */
   publicable: boolean;
   caption: string;
+  /** El caption de la variante sin comparación: no menciona la semana pasada. */
+  captionSimple: string;
 }) {
   /**
    * Cambia la URL de las dos imágenes para forzar que el navegador vuelva a
@@ -59,6 +65,14 @@ export function AlertaBrechaPanel({
    * no con `Date.now()`: sembrarlo con la hora daría valores distintos en el
    * servidor y en el navegador, y eso rompe la hidratación.
    */
+  /**
+   * Qué variante se publica. No es una degradación de la otra: hay días en que
+   * el movimiento no es la noticia y el nivel sí, y entonces mencionar la
+   * semana pasada solo reparte la atención. Vive en el cliente porque las dos
+   * bajan ya armadas del servidor y cambiar de una a otra no le pide nada a la
+   * red — salvo la imagen, que la sirve la misma ruta con `?comparar=0`.
+   */
+  const [comparar, setComparar] = useState(true);
   const [marca, setMarca] = useState("");
   const [feed, setFeed] = useState<Estado>({ paso: "inicial" });
   const [historia, setHistoria] = useState<Estado>({ paso: "inicial" });
@@ -68,9 +82,10 @@ export function AlertaBrechaPanel({
   // dos descargas de imágenes que se renderizan al vuelo sin ninguna necesidad.
   const publicando = feed.paso === "publicando" || historia.paso === "publicando";
   const base = "/api/og/instagram-brecha";
+  const variante = comparar ? "" : "&comparar=0";
   const refresco = marca ? `&t=${marca}` : "";
-  const cuadrada = `${base}?proporcion=1:1${refresco}`;
-  const vertical = `${base}?proporcion=9:16${refresco}`;
+  const cuadrada = `${base}?proporcion=1:1${variante}${refresco}`;
+  const vertical = `${base}?proporcion=9:16${variante}${refresco}`;
 
   async function publicar(destino: Destino) {
     const setEstado = destino === "historia" ? setHistoria : setFeed;
@@ -83,7 +98,7 @@ export function AlertaBrechaPanel({
         // Solo el destino. Las cifras y el caption los recompone el servidor con
         // las tasas vigentes, que es lo que impide publicar un número viejo de
         // una pestaña que lleva horas abierta.
-        body: JSON.stringify({ destino }),
+        body: JSON.stringify({ destino, comparar }),
       });
       if (!response.ok) {
         setEstado({ paso: "error", mensaje: await leerError(response) });
@@ -109,14 +124,42 @@ export function AlertaBrechaPanel({
             Actualizar vista previa
           </button>
         </div>
-        <p className="text-sm font-medium">{titular}</p>
+        {/* Dos botones y no un `<select>`: son dos y se eligen de un toque
+            desde el teléfono, que es donde se usa este panel. Cambiar de
+            variante limpia los estados de publicación: un "Publicado" de la
+            otra variante colgando debajo diría que salió esta. */}
+        <div className="flex gap-2 rounded-full border border-border-soft p-1">
+          {[
+            { valor: true, etiqueta: "Con comparación" },
+            { valor: false, etiqueta: "Solo hoy" },
+          ].map((opcion) => (
+            <button
+              key={String(opcion.valor)}
+              type="button"
+              onClick={() => {
+                if (opcion.valor === comparar) return;
+                setComparar(opcion.valor);
+                setFeed({ paso: "inicial" });
+                setHistoria({ paso: "inicial" });
+              }}
+              disabled={publicando}
+              className={`flex-1 rounded-full px-3 py-2 text-xs font-semibold transition active:scale-95 disabled:opacity-60 ${
+                opcion.valor === comparar ? "bg-accent text-background" : "text-muted"
+              }`}
+            >
+              {opcion.etiqueta}
+            </button>
+          ))}
+        </div>
+
+        <p className="text-sm font-medium">{comparar ? titular : titularSimple}</p>
         <p className="tabular text-sm text-muted">
           Hoy {brechaTexto}
-          {!sinComparacion && ` · hace una semana ${brechaAntesTexto}`}
-          {variacionTexto && ` · ${variacionTexto}`}
+          {comparar && !sinComparacion && ` · hace una semana ${brechaAntesTexto}`}
+          {comparar && variacionTexto && ` · ${variacionTexto}`}
         </p>
 
-        {sinComparacion && (
+        {comparar && sinComparacion && (
           <p className="text-xs leading-relaxed text-warning">
             No hay dato de hace una semana en el histórico, así que la alerta sale solo con la brecha de hoy.
           </p>
@@ -193,7 +236,7 @@ export function AlertaBrechaPanel({
         {/* `whitespace-pre-wrap` sobre un `<p>` y no un `<pre>`: aquel heredaría
             la mono del navegador, y el proyecto usa una sola familia. */}
         <p className="whitespace-pre-wrap rounded-2xl border border-border-soft bg-surface px-4 py-3 text-xs leading-relaxed text-muted">
-          {caption}
+          {comparar ? caption : captionSimple}
         </p>
       </section>
     </div>

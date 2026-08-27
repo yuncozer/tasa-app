@@ -278,8 +278,13 @@ export function buildCaptionBrecha(alerta: AlertaBrecha): string {
           ? "📊 La brecha entre el dólar BCV y Binance se mantuvo esta semana"
           : "📊 Así está hoy la brecha entre el dólar BCV y Binance";
 
-  const comparacion =
-    alerta.direccion === "desconocida"
+  // Sin comparación pedida, la línea no existe: el caption habla solo del
+  // nivel de hoy. Solo se menciona el hueco cuando la comparación se pidió y
+  // el histórico no la tenía, que es una explicación que el admin sí necesita
+  // ver en la vista previa antes de publicar.
+  const comparacion = !alerta.comparada
+    ? null
+    : alerta.direccion === "desconocida"
       ? "🕒 Hace una semana: sin dato en el histórico (sin comparación)"
       : alerta.direccion === "igual"
         ? `🕒 Hace una semana: ${alerta.brechaAntesTexto} (sin cambios)`
@@ -289,7 +294,7 @@ export function buildCaptionBrecha(alerta: AlertaBrecha): string {
     apertura,
     "",
     `📊 Brecha hoy: ${alerta.brechaTexto}`,
-    comparacion,
+    ...(comparacion ? [comparacion] : []),
     `🇺🇸 Dólar BCV: ${alerta.valorOficialTexto}`,
     `🟡 USDT Binance (venta): ${alerta.valorParaleloTexto}`,
     "",

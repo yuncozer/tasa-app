@@ -51,6 +51,15 @@ export interface AlertaBrecha {
   /** Instante en que se capturaron las tasas. Lo que fecha la pieza. */
   capturadoEn: string;
   /**
+   * Si esta alerta se pidió **con** comparación. No es lo mismo que tenerla:
+   * `false` significa que el admin eligió publicar solo la brecha de hoy, y
+   * `true` con `direccion: "desconocida"` que la pidió pero el histórico no
+   * tenía el dato. La imagen se ve igual en los dos casos —la comparación no
+   * está—, pero el caption no puede decir lo mismo: hablar de un dato que
+   * falta cuando nadie lo pidió sería inventarle un problema al lector.
+   */
+  comparada: boolean;
+  /**
    * Si hay algo que publicar. Sin brecha no hay post: a diferencia de la
    * portada o del semanal, que muestran un estado, esto es una pieza cuyo
    * único contenido *es* esa cifra, y un "Sin dato" enorme no es una alerta.
@@ -82,6 +91,7 @@ function titularDe(direccion: DireccionVariacion): string {
 export function armarAlertaBrecha(
   snapshot: RatesSnapshot,
   comparativa: Map<ClaveHistorico, PuntoHistorico>,
+  comparada = true,
 ): AlertaBrecha {
   const brecha = brechaDelSnapshot(snapshot);
 
@@ -106,6 +116,7 @@ export function armarAlertaBrecha(
     valorParaleloTexto: `${formatRate(snapshot.rates.USD_BINANCE_SELL.bsPerUnit)} Bs`,
     valorOficialTexto: `${formatRate(snapshot.rates.USD_BCV.bsPerUnit)} Bs`,
     capturadoEn: snapshot.fetchedAt,
+    comparada,
     publicable: brecha !== null,
   };
 }
@@ -115,8 +126,20 @@ export function armarAlertaBrecha(
  *
  * Si la base falla, la alerta sale igual pero sin comparación: la brecha de hoy
  * no depende del histórico. Misma degradación que `construirReporteSemanal()`.
+ *
+ * `comparar: false` es la elección del admin en `/admin/brecha`: publicar solo
+ * la brecha de hoy, sin decir si subió o bajó. No es una variante degradada
+ * sino una pieza distinta —hay días en que el movimiento no es la noticia y el
+ * nivel sí—, y entonces ni se consulta el histórico: sería una lectura a
+ * Supabase para un dato que no se va a mostrar.
  */
-export async function construirAlertaBrecha(snapshot: RatesSnapshot): Promise<AlertaBrecha> {
+export async function construirAlertaBrecha(
+  snapshot: RatesSnapshot,
+  opciones?: { comparar?: boolean },
+): Promise<AlertaBrecha> {
+  const comparar = opciones?.comparar ?? true;
+  if (!comparar) return armarAlertaBrecha(snapshot, new Map<ClaveHistorico, PuntoHistorico>(), false);
+
   const hoy = diaCaracasISO(new Date(snapshot.fetchedAt).getTime());
 
   let comparativa = new Map<ClaveHistorico, PuntoHistorico>();
