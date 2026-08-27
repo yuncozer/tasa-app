@@ -65,12 +65,6 @@ export const NAV_ADMIN: GrupoAdmin[] = [
     titulo: "Reportes y difusión",
     enlaces: [
       {
-        href: "/admin/analiticas",
-        label: "Analíticas",
-        descripcion: "Uso de la calculadora y rendimiento de lo publicado en Instagram.",
-        icon: Activity,
-      },
-      {
         href: "/admin/semanal",
         label: "Semanal",
         descripcion: "Cómo se movieron las tasas en los últimos 7 días.",
@@ -111,5 +105,23 @@ export const ENLACE_INICIO: EnlaceAdmin = {
   icon: LayoutDashboard,
 };
 
-/** Todos los enlaces en un único arreglo plano, en el orden en que se muestran. */
+export const ENLACE_ANALITICAS: EnlaceAdmin = {
+  href: "/admin/analiticas",
+  label: "Analíticas",
+  descripcion: "Uso de la calculadora y rendimiento de lo publicado en Instagram.",
+  icon: Activity,
+};
+
+/**
+ * Los dos enlaces que van sueltos arriba, antes de los grupos.
+ *
+ * No están en ningún grupo porque no comparten su criterio: "Publicar",
+ * "Reportes y difusión" y "Herramientas" son cosas que se **disparan** sobre
+ * una sección concreta, y estas dos son la mirada de conjunto —dónde está el
+ * panel y cómo va lo que ya salió—. Puestas dentro de un grupo quedaban a
+ * media lista, que es donde no se busca un panorama.
+ */
+export const ENLACES_SUPERIORES: EnlaceAdmin[] = [ENLACE_INICIO, ENLACE_ANALITICAS];
+
+/** Los enlaces de los grupos, en un único arreglo plano y en orden. */
 export const ENLACES_ADMIN: EnlaceAdmin[] = NAV_ADMIN.flatMap((grupo) => grupo.enlaces);

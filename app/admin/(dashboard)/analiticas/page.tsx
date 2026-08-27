@@ -31,9 +31,17 @@ export const metadata: Metadata = {
  * abre para mirar, así que media pantalla con datos vale más que una pantalla
  * de error — mismo criterio que las insignias del dashboard.
  *
- * El período viaja por query string (`?dias=`) y no en estado de cliente: la
- * página ya se renderiza en el servidor y un enlace normal resuelve el caso
- * sin JavaScript, igual que el `?vista=` de `/historial`.
+ * **Son dos pestañas y no una página larga.** Las dos mitades no se comparan
+ * entre sí —nadie lee "sesiones de la calculadora" al lado de "alcance del
+ * post" para sacar una conclusión— y juntas obligaban a bajar media pantalla
+ * en el teléfono para llegar a Instagram. Separadas, además, cada una se
+ * **carga sola**: mirar la calculadora ya no gasta cuatro llamadas a la Graph
+ * API que nadie va a leer.
+ *
+ * La pestaña y el período viajan por query string (`?vista=` y `?dias=`) y no
+ * en estado de cliente: la página ya se renderiza en el servidor y un enlace
+ * normal resuelve el caso sin JavaScript, igual que el `?vista=` de
+ * `/historial`.
  */
 
 const PERIODOS = [7, 30, 90] as const;
@@ -47,12 +55,59 @@ const POR_DEFECTO = 30;
  */
 const MAX_DIAS_INSTAGRAM = 30;
 
+const VISTAS = ["calculadora", "instagram"] as const;
+type Vista = (typeof VISTAS)[number];
+
+/** La calculadora primero: es el sitio propio, y lo de Instagram ya se ve en Instagram. */
+const VISTA_POR_DEFECTO: Vista = "calculadora";
+
 function leerDias(valor: string | undefined): number {
   const dias = Number(valor);
   return PERIODOS.includes(dias as (typeof PERIODOS)[number]) ? dias : POR_DEFECTO;
 }
 
-function SelectorPeriodo({ dias }: { dias: number }) {
+function leerVista(valor: string | undefined): Vista {
+  return VISTAS.includes(valor as Vista) ? (valor as Vista) : VISTA_POR_DEFECTO;
+}
+
+/**
+ * Las dos pestañas. Cada enlace **conserva el período** que ya estaba
+ * elegido: cambiar de mitad no es cambiar de pregunta, y volver a los 30 días
+ * por defecto cada vez obligaría a reelegirlo a cada salto.
+ */
+function Pestanas({ vista, dias }: { vista: Vista; dias: number }) {
+  const etiquetas: Record<Vista, string> = {
+    calculadora: "Calculadora",
+    instagram: "Instagram",
+  };
+
+  return (
+    <nav
+      aria-label="Qué analíticas se ven"
+      className="flex gap-2 border-b border-border-soft pb-3"
+    >
+      {VISTAS.map((opcion) => {
+        const activa = opcion === vista;
+        return (
+          <Link
+            key={opcion}
+            href={`/admin/analiticas?vista=${opcion}&dias=${dias}`}
+            aria-current={activa ? "page" : undefined}
+            className={`rounded-xl border px-3 py-1.5 text-sm font-semibold transition active:scale-95 ${
+              activa
+                ? "border-accent bg-accent/15 text-accent"
+                : "border-border-soft bg-surface text-muted"
+            }`}
+          >
+            {etiquetas[opcion]}
+          </Link>
+        );
+      })}
+    </nav>
+  );
+}
+
+function SelectorPeriodo({ vista, dias }: { vista: Vista; dias: number }) {
   return (
     <nav aria-label="Período" className="flex gap-2">
       {PERIODOS.map((opcion) => {
@@ -60,7 +115,7 @@ function SelectorPeriodo({ dias }: { dias: number }) {
         return (
           <Link
             key={opcion}
-            href={`/admin/analiticas?dias=${opcion}`}
+            href={`/admin/analiticas?vista=${vista}&dias=${opcion}`}
             aria-current={activo ? "page" : undefined}
             className={`rounded-xl border px-3 py-1.5 text-sm font-semibold transition active:scale-95 ${
               activo
@@ -109,7 +164,7 @@ function BloqueWeb({ datos, dias }: { datos: AnaliticasWeb; dias: number }) {
     totales.sesiones > 0 ? (totales.conversiones / totales.sesiones) * 100 : null;
 
   return (
-    <Seccion titulo={`Calculadora · últimos ${dias} días`}>
+    <Seccion titulo={`Últimos ${dias} días`}>
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <TarjetaMetrica etiqueta="Sesiones" valor={totales.sesiones} apoyo="Pestañas distintas" />
         <TarjetaMetrica etiqueta="Visitas" valor={totales.visitas} apoyo="Pantallas abiertas" />
@@ -173,7 +228,7 @@ function BloqueInstagram({ datos, dias }: { datos: AnaliticasInstagram; dias: nu
   const periodo = Math.min(dias, MAX_DIAS_INSTAGRAM);
 
   return (
-    <Seccion titulo={`Instagram · últimos ${periodo} días`}>
+    <Seccion titulo={`Últimos ${periodo} días`}>
       {dias > MAX_DIAS_INSTAGRAM && (
         <p className="text-xs text-muted">
           Instagram no devuelve métricas de cuenta más allá de {MAX_DIAS_INSTAGRAM} días, así que
@@ -244,14 +299,22 @@ function BloqueInstagram({ datos, dias }: { datos: AnaliticasInstagram; dias: nu
 export default async function AdminAnaliticasPage({
   searchParams,
 }: {
-  searchParams: Promise<{ dias?: string }>;
+  searchParams: Promise<{ vista?: string; dias?: string }>;
 }) {
-  const dias = leerDias((await searchParams).dias);
+  const params = await searchParams;
+  const vista = leerVista(params.vista);
+  const dias = leerDias(params.dias);
 
-  const [web, instagram] = await Promise.all([
-    leerAnaliticasWeb(dias).catch((error: Error) => error),
-    leerAnaliticasInstagram(Math.min(dias, MAX_DIAS_INSTAGRAM)),
-  ]);
+  // Solo se pide lo que se va a mostrar. Es la razón práctica de las
+  // pestañas: la mitad de Instagram son cinco llamadas a la Graph API, y
+  // hacerlas para una pantalla que nadie va a mirar es gastar cuota y
+  // segundos de carga en nada.
+  const web =
+    vista === "calculadora"
+      ? await leerAnaliticasWeb(dias).catch((error: Error) => error)
+      : null;
+  const instagram =
+    vista === "instagram" ? await leerAnaliticasInstagram(Math.min(dias, MAX_DIAS_INSTAGRAM)) : null;
 
   return (
     <>
@@ -260,17 +323,18 @@ export default async function AdminAnaliticasPage({
         descripcion="Qué hace la gente en la calculadora y cómo le va a lo que se publica."
       />
 
-      <SelectorPeriodo dias={dias} />
+      <Pestanas vista={vista} dias={dias} />
 
-      <div className="flex flex-col gap-8">
-        {web instanceof Error ? (
+      <SelectorPeriodo vista={vista} dias={dias} />
+
+      {web !== null &&
+        (web instanceof Error ? (
           <Aviso>No se pudieron leer las analíticas del sitio: {web.message}</Aviso>
         ) : (
           <BloqueWeb datos={web} dias={dias} />
-        )}
+        ))}
 
-        <BloqueInstagram datos={instagram} dias={dias} />
-      </div>
+      {instagram !== null && <BloqueInstagram datos={instagram} dias={dias} />}
     </>
   );
 }

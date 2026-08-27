@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
-import { NAV_ADMIN, type EnlaceAdmin } from "@/components/admin/nav-admin";
+import { ENLACE_ANALITICAS, NAV_ADMIN, type EnlaceAdmin } from "@/components/admin/nav-admin";
 import { leerParadaPendiente } from "@/lib/parada";
 import { listarProgramadas } from "@/lib/programadas";
 import { getRates } from "@/lib/rates";
@@ -109,6 +109,11 @@ export default async function AdminPage() {
       />
 
       <div className="flex flex-col gap-6">
+        {/* Analíticas va suelta y primero, fuera de los grupos, igual que en
+            la sidebar: es la mirada de conjunto sobre lo que ya salió, no una
+            acción que se dispare sobre una sección. */}
+        <TarjetaSeccion enlace={ENLACE_ANALITICAS} />
+
         {NAV_ADMIN.map((grupo) => (
           <section key={grupo.id} aria-labelledby={`grupo-${grupo.id}`} className="flex flex-col gap-3">
             <h2

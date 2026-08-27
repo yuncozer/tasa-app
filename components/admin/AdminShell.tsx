@@ -5,7 +5,12 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, type ReactNode } from "react";
 import { Logo } from "@/components/Logo";
-import { ENLACE_INICIO, ENLACES_ADMIN, NAV_ADMIN, type EnlaceAdmin } from "@/components/admin/nav-admin";
+import {
+  ENLACES_ADMIN,
+  ENLACES_SUPERIORES,
+  NAV_ADMIN,
+  type EnlaceAdmin,
+} from "@/components/admin/nav-admin";
 
 /**
  * Chrome persistente de `/admin`: sidebar en desktop, barra + tira de
@@ -27,10 +32,12 @@ function esActivo(pathname: string, href: string): boolean {
 }
 
 function tituloActivo(pathname: string): string {
-  if (pathname === "/admin") return ENLACE_INICIO.label;
-  const enlace = NAV_ADMIN.flatMap((g) => g.enlaces).find((e) => esActivo(pathname, e.href));
+  const enlace = TODOS.find((e) => esActivo(pathname, e.href));
   return enlace?.label ?? "Admin";
 }
+
+/** En el orden en que se muestran: los sueltos de arriba y luego los grupos. */
+const TODOS: EnlaceAdmin[] = [...ENLACES_SUPERIORES, ...ENLACES_ADMIN];
 
 const CLASE_ITEM_SIDEBAR =
   "flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-medium transition active:scale-[0.98]";
@@ -100,7 +107,11 @@ export function AdminShell({ children }: { children: ReactNode }) {
           </Link>
 
           <nav aria-label="Secciones de admin" className="flex flex-col gap-5">
-            <ItemSidebar enlace={ENLACE_INICIO} activo={pathname === "/admin"} />
+            <div className="flex flex-col gap-1">
+              {ENLACES_SUPERIORES.map((enlace) => (
+                <ItemSidebar key={enlace.href} enlace={enlace} activo={esActivo(pathname, enlace.href)} />
+              ))}
+            </div>
             {NAV_ADMIN.map((grupo) => (
               <div key={grupo.id} className="flex flex-col gap-1">
                 <h2 className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wide text-muted">
@@ -135,7 +146,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
           aria-label="Secciones de admin"
           className="flex gap-2 overflow-x-auto border-b border-border-soft bg-surface px-4 py-2.5 lg:hidden"
         >
-          {[ENLACE_INICIO, ...ENLACES_ADMIN].map((enlace) => {
+          {TODOS.map((enlace) => {
             const Icon = enlace.icon;
             const activo = esActivo(pathname, enlace.href);
             return (

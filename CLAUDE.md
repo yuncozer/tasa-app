@@ -814,8 +814,19 @@ hace la gente en la calculadora y cómo le va a lo que se publica en Instagram.
 - **Los gráficos son SVG a mano** (`components/admin/BarrasDias.tsx`), sin
   librería, por lo mismo que `components/Sparkline.tsx`. Barras y no línea
   porque lo que se compara son días sueltos, no una tendencia continua.
-- El período viaja por query string (`?dias=`), como el `?vista=` de
-  `/historial`, y la página **no lleva cabecera de CDN**: cuelga de la sesión
+- **Son dos pestañas —Calculadora e Instagram— y no una página larga.** Las
+  dos mitades no se comparan entre sí: nadie lee "sesiones de la calculadora"
+  al lado de "alcance del post" para sacar una conclusión, y juntas obligaban
+  a bajar media pantalla en el teléfono para llegar a Instagram. Separadas,
+  además, **cada mitad se carga sola**: mirar la calculadora ya no gasta las
+  cinco llamadas a la Graph API de la otra pestaña. Cambiar de pestaña
+  conserva el período elegido —cambiar de mitad no es cambiar de pregunta—.
+- **En la nav va suelta, justo debajo de Inicio**, fuera de los tres grupos
+  (`ENLACES_SUPERIORES` en `nav-admin.ts`). Los grupos son cosas que se
+  *disparan* sobre una sección concreta; estas dos son la mirada de conjunto,
+  y a media lista es donde no se busca un panorama.
+- El período y la pestaña viajan por query string (`?dias=` y `?vista=`), como
+  el `?vista=` de `/historial`, y la página **no lleva cabecera de CDN**: cuelga de la sesión
   de `/admin`, la abre una sola persona y cachearla serviría cifras viejas
   justo a quien las está mirando para decidir.
 
