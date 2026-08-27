@@ -619,6 +619,106 @@ una con su valor y **cuánto se movió en siete días**. Se dispara a mano desde
   script y nunca en la ruta**, porque un parámetro que falsea datos en una URL
   pública es justo lo que la ausencia de firma no debe permitir.
 
+### La alerta de brecha se publica cuando el admin ve que se movió, no por cron
+
+Además del post diario y del reporte semanal, hay una pieza suelta —"URGENTE |
+AUMENTA LA BRECHA"— con la brecha de hoy, la de hace una semana y cuánto se
+movió entre las dos. Se dispara a mano desde `/admin/brecha`.
+
+- **No tiene cron, y esa es su razón de ser.** Lo que la justifica no es la
+  hora sino que la distancia entre el BCV y Binance se movió lo bastante como
+  para contarlo; publicarla dos veces al día la convertiría en el post diario,
+  que ya existe. Por lo mismo **no se puede programar**: `materializarParaProgramar`
+  la rechaza igual que al semanal —sus cifras se resuelven al publicar— y
+  además una alerta programada es una contradicción, porque anunciaría un
+  movimiento de ayer.
+- **La cifra sale de `calcularBrecha()`**, la misma de la portada y de la
+  tarjeta del reporte semanal (`lib/brecha.ts`). Esta pieza existe justo para
+  llamar la atención sobre ese número, así que sería el peor sitio donde
+  publicar una cuenta propia. La comparación contra hace una semana usa
+  `leerComparativa()` con la misma ventana de ±3 días que el semanal.
+- **Dos variantes, y las elige el admin: con comparación o solo el nivel de
+  hoy.** No es una degradada y la otra completa: hay días en que el movimiento
+  no es la noticia y el nivel sí, y entonces mencionar la semana pasada solo
+  reparte la atención. `construirAlertaBrecha(snapshot, { comparar: false })`
+  ni consulta el histórico —sería una lectura a Supabase para un dato que no se
+  va a mostrar— y la imagen se pide con `?comparar=0`. Que la ruta acepte esa
+  clave no contradice su falta de firma: no falsea ningún dato y es un valor de
+  un conjunto cerrado, igual que `proporcion`; lo que la firma evita en
+  `instagram-post-news` es texto libre, y aquí sigue sin haberlo.
+  `AlertaBrecha.comparada` distingue "no se pidió comparación" de "se pidió y
+  el histórico no la tenía": la imagen se ve igual, pero el caption no puede
+  decir lo mismo — mencionar un dato que falta cuando nadie lo pidió es
+  inventarle un problema al lector.
+  Las dos variantes se arman en el servidor y bajan juntas al panel, así que el
+  toggle no le pide nada a la red salvo la imagen. Cambiar de variante limpia
+  los estados de publicación: un "Publicado" de la otra colgando debajo diría
+  que salió esta.
+- **El titular lo decide la dirección, no la interfaz** (`titularDe()` en
+  `lib/alerta-brecha.ts`): "AUMENTA LA BRECHA" si subió, "BAJA LA BRECHA" si bajó,
+  "SE MANTIENE" si no se movió y "ASÍ ESTÁ LA BRECHA" cuando no hay con qué
+  comparar. Dejarlo editable permitiría publicar un "aumenta" encima de unas
+  cifras que dicen lo contrario, que están justo debajo en la misma imagen. La
+  palabra **URGENTE** solo aparece cuando aumenta: ponerla también sobre un
+  "baja" la convertiría en decoración.
+- **Sin brecha no se publica.** Aquí no vale la degradación a `Sin dato` de la
+  portada: aquella muestra un estado y esto produce un post que sale a la
+  cuenta real y no se corrige después —mismo criterio que el video de tasas—.
+  Lo que sí degrada es la comparación: sin dato de hace una semana la imagen
+  sale solo con la brecha de hoy —nunca un `0,0 pp`— y **no explica la
+  ausencia**. Al lector no le interesa el estado de nuestro histórico, y una
+  línea sobre lo que falta le quita sitio a la única cifra que sí hay; el
+  titular ya cambia a "ASÍ ESTÁ LA BRECHA" en vez de anunciar un movimiento
+  que no se puede afirmar. Es distinto del semanal, donde `Sin comparación`
+  ocupa el hueco de una columna que las otras tarjetas sí llenan. Por lo mismo
+  el aviso legal es una función (`avisoBrecha`) y no una constante: la frase
+  "comparada con el dato de hace una semana" solo se dice cuando la imagen de
+  verdad compara.
+- **El color va por impacto y la flecha por signo**, igual que el semanal:
+  sube → rojo, baja → verde, y la magnitud viaja en valor absoluto porque el
+  signo ya lo dice la flecha. La variación va en **puntos porcentuales**: la
+  brecha ya es un porcentaje.
+- **Dos lienzos, 1:1 y 9:16, y la Historia sí se publica desde la app.** Misma
+  repartición que el reporte semanal —reservas de 110 y 130 px arriba y abajo
+  del vertical para que la interfaz de Instagram no tape nada—, pero al
+  contrario que aquella esta Historia sale por la Graph API
+  (`publishStory`, `destino: "historia"` en `/api/admin/publish-brecha`). La
+  limitación de "no se publica desde la app" es específica del semanal, cuya
+  Story necesita un sticker de enlace; esta no lleva ningún llamado a la
+  acción, igual que las Historias del post diario. La descarga del 9:16 se
+  queda para cuando sí se le quiera poner un sticker a mano.
+  Feed e Historia son **dos botones y dos estados separados**: se publican por
+  separado y a veces sale solo uno, así que un estado compartido dejaría el
+  "Publicado" de uno colgando bajo el botón del otro. Mientras uno sale, los
+  dos se bloquean: los dos releen las tasas en el servidor y dispararlos a la
+  vez son dos descargas de imagen para Meta sin ninguna necesidad.
+- **La franja del titular va de borde a borde y con un rojo propio.** El
+  relleno lateral del lienzo lo ponen los bloques y no el contenedor raíz,
+  justo para que esa franja pueda llegar a los dos bordes: así se lee como un
+  rótulo de noticiero y no como otra píldora más de las que ya tiene la imagen.
+  El rojo (`ROJO`, local a la ruta) es más vivo que `COLOR.danger`, que está
+  calibrado para la columna de variaciones del semanal —texto pequeño sobre
+  fondo oscuro— y aquí, sosteniendo una franja entera con una foto detrás,
+  se leía apagado. No se toca el token global: el semanal sigue con el suyo,
+  donde el problema no existe. Lo usan también la flecha, la variación y el
+  borde de la tarjeta de hoy, para que haya un solo rojo y no dos parecidos.
+- **La foto de fondo va embebida y apagada bajo un velo.** Vive en
+  `app/api/og/_assets/fondo-brecha.jpg` y se lee como data URI, igual que las
+  fuentes y los SVG del pie: pedirla por red desde dentro de la misma función
+  que Meta está esperando es un viaje que puede fallar sin necesidad. Va como
+  capa `<img>` y no como `backgroundImage` porque Satori no compone varias
+  capas de fondo y aquí hacen falta dos —la foto y el velo—. Encima, las
+  cifras se apoyan en un panel semitransparente: sobre la foto a la vista, el
+  gris de las etiquetas y del aviso legal deja de leerse. El original mide
+  412×512, así que se escala bastante; si algún día hay una versión más grande,
+  se sustituye el archivo y ya.
+- **La imagen va sin firma HMAC**, como `instagram-semanal`: no recibe ni un
+  carácter de texto libre —lee las tasas y el histórico del servidor— y su
+  única entrada es un valor de un conjunto cerrado.
+- Se itera con `npx tsx scripts/preview-brecha.ts`, que imprime el caption y
+  las dos URLs; `--sin-historico` enseña la degradación sin esperar. Ese flag
+  vive **en el script y nunca en la ruta**, por lo mismo que en el semanal.
+
 ### `/historial` enseña lo archivado, y por eso el histórico guarda mañana y tarde
 
 El histórico nació para el reporte semanal, pero la pregunta que de verdad
@@ -1402,9 +1502,9 @@ la otra protege los endpoints de publicación/cron. La sesión es una cookie
 `CRON_SECRET` nunca llega al navegador: `/admin/noticia` lo usa solo del lado
 servidor, a través de `publishNewsPost`.
 
-Cuelgan seis páginas de esa misma sesión —`/admin/hoy`, `/admin/parada`,
-`/admin/noticia`, `/admin/semanal`, `/admin/canal` y `/admin/video`—, más
-`/admin` como dashboard de entrada. Siguen siendo páginas separadas y no
+Cuelgan siete páginas de esa misma sesión —`/admin/hoy`, `/admin/parada`,
+`/admin/noticia`, `/admin/semanal`, `/admin/brecha`, `/admin/canal` y
+`/admin/video`—, más `/admin` como dashboard de entrada. Siguen siendo páginas separadas y no
 pestañas de una: la de noticias es un formulario con estado propio —switch
 Post/Reel, subidas, previa desactualizada, cola— y el reporte semanal **no
 tiene entradas**: se mira y se publica.
@@ -1577,6 +1677,7 @@ tres scripts se reparten el trabajo:
 | `scripts/preview-noticia.ts <url>` | Un artículo real: imagen enmarcada + caption | Sí |
 | `scripts/preview-marca.ts <archivo>` | Material propio: marcos, video en sus tres lienzos, sello y cintillo | Solo para las de imagen |
 | `scripts/preview-semanal.ts` | El reporte semanal: caption y las dos URLs (1:1 y 9:16) | Sí |
+| `scripts/preview-brecha.ts` | La alerta de brecha: caption y las dos URLs (1:1 y 9:16) | Sí |
 | `scripts/preview-ia.ts <tipo>` | Los dos textos que redacta la IA, junto a su plantilla | No |
 | `scripts/video-tasas.ts` | El Reel de tasas del día, desde el snapshot publicado | No |
 
@@ -1599,6 +1700,10 @@ npx tsx scripts/preview-marca.ts clip.mp4     # video en 1:1, 4:5 y Reel, con su
 npx tsx scripts/preview-semanal.ts
 npx tsx scripts/preview-semanal.ts --sin-historico   # la degradación del arranque
 
+# Alerta de brecha: imprime el caption y las dos URLs (tampoco lleva firma)
+npx tsx scripts/preview-brecha.ts
+npx tsx scripts/preview-brecha.ts --sin-historico   # sin dato de hace una semana
+
 # Textos de la IA: imprime también la plantilla, que es contra lo que se comparan
 npx tsx scripts/preview-ia.ts noticia "https://url-del-articulo"
 npx tsx scripts/preview-ia.ts semanal
@@ -1614,6 +1719,7 @@ npx tsx scripts/preview-ia.ts semanal
 | Sello de marca sobre el video | Cloudinary, capa fija ya subida | el mismo (`SELLO_PUBLIC_ID`, `yDelSello`) |
 | Cintillo del video | Satori, PNG transparente que Cloudinary superpone | `lib/og-cintillo.tsx` |
 | Reporte semanal (1:1 y 9:16) | Satori, sin firma; las filas salen de `lib/semanal.ts` | `app/api/og/instagram-semanal/route.tsx` |
+| Alerta de brecha (1:1 y 9:16) | Satori, sin firma; las cifras salen de `lib/alerta-brecha.ts` | `app/api/og/instagram-brecha/route.tsx` |
 
 **Cómo pedir cada variante del video**, que es lo que más se confunde:
 

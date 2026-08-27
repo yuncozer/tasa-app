@@ -26,6 +26,12 @@ export interface ResultadoPublicacionHoy {
  * incluye su propio título ("Tasas de hoy…") en `?proporcion=9:16`, así que
  * no hace falta redactar nada nuevo para ellas.
  *
+ * Solo se publican en el disparo de la mañana (`momento === "manana"`) o en
+ * el botón manual de `/admin/hoy` (sin `momento`). El de la tarde
+ * (`momento === "tarde"`) se queda solo con el carrusel: dos Historias
+ * idénticas en formato el mismo día saturan quien mira el timeline, y la de
+ * la mañana ya cumplió el propósito de avisar que hay tasas nuevas.
+ *
  * Sin `momento` no se archiva en `historico_tasas` (`registrarSnapshot` solo
  * corre si se pasa) y el caption sale con "Actualización del día" en vez de
  * "de la mañana/tarde" — no hay bajo qué mitad del día archivar un disparo
@@ -67,16 +73,19 @@ export async function publicarTasasDelDia(
   // Una Historia por diapositiva del carrusel, con el mismo orden. Son un
   // extra sobre el post ya publicado — que es lo irreversible — así que cada
   // una va en su propio `try/catch`: si una falla no debe tocar `mediaId` ni
-  // `enlace`, y que falle una no debe impedir la otra.
-  try {
-    await publishStory(`${siteUrl}/api/og/instagram-post?proporcion=9:16`);
-  } catch {
-    // Sin Historia en bolívares, el carrusel de feed ya publicado sigue en pie.
-  }
-  try {
-    await publishStory(`${siteUrl}/api/og/instagram-post-pesos?proporcion=9:16`);
-  } catch {
-    // Sin Historia en pesos, el carrusel de feed ya publicado sigue en pie.
+  // `enlace`, y que falle una no debe impedir la otra. Se saltan en el
+  // disparo de la tarde: ver el comentario de la función.
+  if (momento !== "tarde") {
+    try {
+      await publishStory(`${siteUrl}/api/og/instagram-post?proporcion=9:16`);
+    } catch {
+      // Sin Historia en bolívares, el carrusel de feed ya publicado sigue en pie.
+    }
+    try {
+      await publishStory(`${siteUrl}/api/og/instagram-post-pesos?proporcion=9:16`);
+    } catch {
+      // Sin Historia en pesos, el carrusel de feed ya publicado sigue en pie.
+    }
   }
 
   // El post ya está en la cuenta y eso es lo irreversible: un fallo al anotar

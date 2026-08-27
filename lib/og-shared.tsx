@@ -76,9 +76,44 @@ export const AVISO_SEMANAL =
   "La Tasa no fija ni certifica ninguna tasa y esto no es asesoría financiera. " +
   "Confirma siempre con la fuente oficial.";
 
+/**
+ * Aviso de la alerta de brecha. Es una función y no una constante porque la
+ * pieza tiene dos formas: con comparación contra hace una semana y sin ella.
+ * Más corto que `AVISO_TASAS` por lo mismo que
+ * `AVISO_SEMANAL`: ahí lo que se muestra no es una tasa para operar sino una
+ * diferencia entre dos, y la imagen ya carga con las cifras y su comparación.
+ * Lo esencial —de dónde salen los números, contra qué se comparan y que hay
+ * que confirmarlos en la fuente— se mantiene.
+ */
+export function avisoBrecha(conComparacion: boolean): string {
+  return (
+    "Brecha calculada entre el dólar oficial del BCV y el USDT de venta en Binance P2P" +
+    // La frase solo se dice cuando la imagen de verdad compara. Sin dato de
+    // hace una semana la pieza muestra únicamente la brecha de hoy, y dejar
+    // aquí "comparada con el dato de hace una semana" sería el aviso legal
+    // afirmando algo que la imagen no hace.
+    (conComparacion ? ", comparada con el dato de hace una semana" : "") +
+    ". Datos con fines exclusivamente informativos: La Tasa no fija ni certifica ninguna " +
+    "tasa y esto no es asesoría financiera. Confirma siempre con la fuente oficial."
+  );
+}
+
 /** Lee un archivo de fuente `.ttf` compartido por ambas plantillas de imagen. */
 export async function leerFontBuffer(nombre: string): Promise<Buffer> {
   return readFile(path.join(process.cwd(), "app/api/og/_assets", nombre));
+}
+
+/**
+ * Lee una imagen de `app/api/og/_assets` y la convierte a data URI para Satori.
+ *
+ * Va embebida y no como URL: la plantilla se renderiza dentro de la misma
+ * función que Meta está esperando, y una petición de red más ahí —a nuestro
+ * propio dominio, mientras la función corre— es un viaje que puede fallar sin
+ * necesidad. Mismo criterio que las fuentes y los SVG del pie.
+ */
+export async function leerImagenComoDataUri(nombre: string, tipo = "image/jpeg"): Promise<string> {
+  const buffer = await readFile(path.join(process.cwd(), "app/api/og/_assets", nombre));
+  return `data:${tipo};base64,${buffer.toString("base64")}`;
 }
 
 /** Lee un SVG de `public/SVG` y lo convierte a data URI para Satori. */

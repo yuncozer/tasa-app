@@ -1,3 +1,4 @@
+import type { AlertaBrecha } from "@/lib/alerta-brecha";
 import { enlaceWhatsapp } from "@/lib/atajos";
 import { formatDate, formatRate, formatVariacion, vigenciaBcv } from "@/lib/format";
 import { buildFilasPesos, type FilaPesosId } from "@/lib/pesos";
@@ -244,6 +245,71 @@ export function buildCaption(snapshot: RatesSnapshot, momento?: "manana" | "tard
     HASHTAGS_DIARIO,
   ].join("\n");
 }
+
+const HASHTAGS_BRECHA =
+  "#Venezuela #DolarBCV #Binance #BrechaCambiaria #TasaDeCambio #USDT #Dolar " +
+  "#Cucuta #LaTasaOnline";
+
+/**
+ * Caption de la alerta de brecha.
+ *
+ * Consume la misma `AlertaBrecha` que pinta la imagen —una sola cuenta por
+ * cifra, igual que el semanal con sus filas— y abre con el movimiento, que es
+ * lo único que se lee sin pulsar "más": Instagram corta el texto a los ~125
+ * caracteres, y repetir ahí el titular que ya se lee enorme en la imagen sería
+ * desperdiciar la línea.
+ *
+ * Los `pp` se explican pegados a su propio número, por el mismo motivo que en
+ * `buildCaptionSemanal`: se aclaran una sola vez, donde de verdad se leen.
+ */
+export function buildCaptionBrecha(alerta: AlertaBrecha): string {
+  const flecha = alerta.direccion === "sube" ? "↑" : alerta.direccion === "baja" ? "↓" : "";
+  const magnitud = formatVariacion(alerta.variacion, "puntos");
+
+  // La unidad se aclara pegada al número que la usa, no en un párrafo aparte.
+  const movimiento = `${magnitud} —puntos porcentuales—`;
+
+  const apertura =
+    alerta.direccion === "sube"
+      ? `🚨 La brecha entre el dólar BCV y Binance subió ${movimiento} en una semana`
+      : alerta.direccion === "baja"
+        ? `📉 La brecha entre el dólar BCV y Binance bajó ${movimiento} en una semana`
+        : alerta.direccion === "igual"
+          ? "📊 La brecha entre el dólar BCV y Binance se mantuvo esta semana"
+          : "📊 Así está hoy la brecha entre el dólar BCV y Binance";
+
+  // Sin comparación pedida, la línea no existe: el caption habla solo del
+  // nivel de hoy. Solo se menciona el hueco cuando la comparación se pidió y
+  // el histórico no la tenía, que es una explicación que el admin sí necesita
+  // ver en la vista previa antes de publicar.
+  const comparacion = !alerta.comparada
+    ? null
+    : alerta.direccion === "desconocida"
+      ? "🕒 Hace una semana: sin dato en el histórico (sin comparación)"
+      : alerta.direccion === "igual"
+        ? `🕒 Hace una semana: ${alerta.brechaAntesTexto} (sin cambios)`
+        : `🕒 Hace una semana: ${alerta.brechaAntesTexto} (${flecha} ${magnitud})`;
+
+  return [
+    apertura,
+    "",
+    `📊 Brecha hoy: ${alerta.brechaTexto}`,
+    ...(comparacion ? [comparacion] : []),
+    `🇺🇸 Dólar BCV: ${alerta.valorOficialTexto}`,
+    `🟡 USDT Binance (venta): ${alerta.valorParaleloTexto}`,
+    "",
+    LINEA_CALCULADORA,
+    "",
+    FUENTES_BRECHA,
+    "",
+    HASHTAGS_BRECHA,
+  ].join("\n");
+}
+
+/** De dónde salen las dos cifras y contra cuál se mide. En la imagen va en el pie; aquí, buscable. */
+const FUENTES_BRECHA =
+  "Fuentes: BCV y Binance P2P. La brecha se mide contra la venta de Binance, que es el lado " +
+  "que responde a cuánto se paga de más.";
 
 const HASHTAGS_SEMANAL =
   "#Venezuela #Colombia #DolarBCV #TasaDeCambio #Binance #TRM #PesoColombiano " +
