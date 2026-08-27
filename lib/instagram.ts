@@ -21,6 +21,8 @@
  * (`media_type=CAROUSEL`) que es el que lleva el caption y el que se publica.
  */
 
+import { tokenActual } from "@/lib/instagram-token";
+
 const GRAPH_VERSION = "v21.0";
 /**
  * Se exporta para `lib/instagram-insights.ts`, que lee las métricas de la
@@ -52,9 +54,20 @@ export class InstagramApiError extends Error {
   }
 }
 
-export function credenciales(): { accountId: string; accessToken: string } {
+/**
+ * Es `async` porque el token puede venir de Supabase: `lib/instagram-token.ts`
+ * lo guarda al renovarlo, ya que Meta no expone la caducidad de un token y la
+ * única forma de vigilarla es guardar la del último refresco. La lectura va
+ * cacheada en memoria allí, así que las cuatro o más llamadas de una
+ * publicación no son cuatro consultas a la base.
+ *
+ * Si no hay fila guardada o Supabase no responde, `tokenActual()` cae a
+ * `IG_ACCESS_TOKEN` — o sea, exactamente el comportamiento anterior. El
+ * `accountId` sigue saliendo solo del entorno: no cambia nunca.
+ */
+export async function credenciales(): Promise<{ accountId: string; accessToken: string }> {
   const accountId = process.env.IG_BUSINESS_ACCOUNT_ID;
-  const accessToken = process.env.IG_ACCESS_TOKEN;
+  const accessToken = await tokenActual();
   if (!accountId || !accessToken) {
     throw new Error("Faltan IG_BUSINESS_ACCOUNT_ID o IG_ACCESS_TOKEN");
   }
@@ -62,7 +75,7 @@ export function credenciales(): { accountId: string; accessToken: string } {
 }
 
 async function crearContenedor(params: Record<string, string>, queHace: string): Promise<string> {
-  const { accountId, accessToken } = credenciales();
+  const { accountId, accessToken } = await credenciales();
   const url = new URL(`${GRAPH_BASE}/${accountId}/media`);
   for (const [clave, valor] of Object.entries(params)) url.searchParams.set(clave, valor);
   url.searchParams.set("access_token", accessToken);
@@ -90,7 +103,7 @@ async function crearContenedor(params: Record<string, string>, queHace: string):
 export type EstadoContenedor = "listo" | "procesando";
 
 export async function estadoContenedor(containerId: string, queEs: string): Promise<EstadoContenedor> {
-  const { accessToken } = credenciales();
+  const { accessToken } = await credenciales();
   const url = new URL(`${GRAPH_BASE}/${containerId}`);
   url.searchParams.set("fields", "status_code");
   url.searchParams.set("access_token", accessToken);
@@ -118,7 +131,7 @@ export async function estadoContenedor(containerId: string, queEs: string): Prom
  * anotar a dónde apunta `/hoy` sin que nadie copie nada a mano.
  */
 export async function permalinkDeMedia(mediaId: string): Promise<string> {
-  const { accessToken } = credenciales();
+  const { accessToken } = await credenciales();
   const url = new URL(`${GRAPH_BASE}/${mediaId}`);
   url.searchParams.set("fields", "permalink");
   url.searchParams.set("access_token", accessToken);
@@ -152,7 +165,7 @@ function esMediaNoLista(body: GraphErrorBody): boolean {
 }
 
 export async function publicarContenedor(containerId: string): Promise<string> {
-  const { accountId, accessToken } = credenciales();
+  const { accountId, accessToken } = await credenciales();
   const url = new URL(`${GRAPH_BASE}/${accountId}/media_publish`);
   url.searchParams.set("creation_id", containerId);
   url.searchParams.set("access_token", accessToken);
@@ -192,7 +205,7 @@ export interface MediaReciente {
  * para armar el mensaje del canal de WhatsApp a partir de un post real.
  */
 export async function listarMediaSemana(): Promise<MediaReciente[]> {
-  const { accountId, accessToken } = credenciales();
+  const { accountId, accessToken } = await credenciales();
   const desde = Math.floor((Date.now() - SIETE_DIAS_MS) / 1000);
 
   const url = new URL(`${GRAPH_BASE}/${accountId}/media`);

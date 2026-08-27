@@ -1106,6 +1106,44 @@ antes de que salga nada.
   `getRates()`: sin eso sería la misma consulta a Supabase por visitante que
   el proyecto ya prohíbe para `historico_tasas`.
 
+### El token de Instagram se renueva solo, y por eso está guardado
+
+El token de larga duración vale 60 días y vivía únicamente en
+`IG_ACCESS_TOKEN`. Cuando caducaba no se rompía nada visible: el cron de las
+9:00 simplemente dejaba de publicar, y uno se enteraba mirando el feed. Es el
+fallo más caro del proyecto porque es silencioso.
+
+Meta **no expone ningún endpoint que diga cuánto le queda a un token** de este
+flujo (verificado en la documentación de "Instagram API with Instagram
+Login"): la única vía es `GET /refresh_access_token?grant_type=ig_refresh_token`,
+que devuelve un token **nuevo** junto con su `expires_in`. O sea que vigilar la
+caducidad obliga a guardar el resultado del refresco, y de ahí la tabla
+`token_instagram` (migración `0012`, una sola fila, mismo patrón que
+`snapshot_hoy`).
+
+- **El entorno sigue siendo la semilla y el respaldo.** `tokenActual()` prefiere
+  la fila guardada y cae a `IG_ACCESS_TOKEN` sin fila o con Supabase caído —o
+  sea, exactamente el comportamiento anterior—. Esto añade vigilancia, no un
+  punto único de fallo, y por eso `credenciales()` pasó a ser `async`: es el
+  único cambio que la publicación notó.
+- **La lectura va cacheada cinco minutos** (`lib/cache.ts`, el mismo TTL que
+  `getRates()`): publicar un carrusel son cuatro o más llamadas a la Graph API
+  y no pueden ser cuatro consultas a Supabase por la misma fila. Al renovar se
+  olvida esa entrada (`olvidar()`), porque el sentido de renovar es dejar de
+  usar el token viejo.
+- **El cron es diario y conservador.** `app/api/cron/refrescar-token-ig` no
+  llama a Meta si todavía quedan más de 20 días; Meta además exige que el token
+  tenga al menos 24 horas. Un disparo al día deja veinte oportunidades antes de
+  que la fecha apriete. Un fallo sí devuelve 502, para que se vea en rojo en
+  cron-job.org: si el refresco falla varios días seguidos, el token muere.
+- **El panel solo habla cuando hay algo que hacer**: con el token sano, `/admin`
+  no dice nada; por debajo de 10 días —o sin registrar, o ya caducado— aparece
+  la franja ámbar. Mismo criterio que las insignias de las tarjetas.
+- La tabla lleva RLS **y** los privilegios retirados a `anon`/`authenticated`:
+  con RLS sin políticas ya no se vería ninguna fila, pero esta guarda una
+  credencial y conviene que PostgREST responda "permiso denegado" en vez de una
+  lista vacía.
+
 ### La IA solo redacta prosa, y siempre con revisión humana
 
 Dos textos de `/admin` se pueden pedir a un modelo de OpenRouter (plan gratuito):

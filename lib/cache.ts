@@ -52,6 +52,18 @@ export async function withCache<T>(
   return inFlight;
 }
 
+/**
+ * Olvida una sola entrada.
+ *
+ * La usa `lib/instagram-token.ts` tras renovar el token: la copia en memoria
+ * guarda el anterior y, sin esto, esta instancia seguiría publicando con él
+ * hasta que venza el TTL. Sigue siendo válido, pero el sentido de renovar es
+ * dejar de usarlo.
+ */
+export function olvidar(key: string): void {
+  store.delete(key);
+}
+
 /** Vacía la caché. Solo se usa desde `/api/rates?refresh=1`. */
 export function clearCache(): void {
   store.clear();

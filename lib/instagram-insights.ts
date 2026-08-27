@@ -64,7 +64,7 @@ export interface AnaliticasInstagram {
 }
 
 async function graph<T>(ruta: string, params: Record<string, string>): Promise<T> {
-  const { accessToken } = credenciales();
+  const { accessToken } = await credenciales();
   const url = new URL(`${GRAPH_BASE}${ruta}`);
   for (const [clave, valor] of Object.entries(params)) url.searchParams.set(clave, valor);
   url.searchParams.set("access_token", accessToken);
@@ -85,7 +85,7 @@ interface RespuestaInsights {
 
 /** Un total del período. `null` si esta cuenta no expone la métrica. */
 async function totalDe(metrica: MetricaTotal, dias: number): Promise<number | null> {
-  const { accountId } = credenciales();
+  const { accountId } = await credenciales();
   const body = await graph<RespuestaInsights>(`/${accountId}/insights`, {
     metric: metrica,
     metric_type: "total_value",
@@ -112,7 +112,7 @@ function rango(dias: number): { since: string; until: string } {
 }
 
 async function alcanceDiario(dias: number): Promise<{ fecha: string; valor: number }[]> {
-  const { accountId } = credenciales();
+  const { accountId } = await credenciales();
   const body = await graph<RespuestaInsights>(`/${accountId}/insights`, {
     metric: "reach",
     period: "day",
@@ -125,7 +125,7 @@ async function alcanceDiario(dias: number): Promise<{ fecha: string; valor: numb
 }
 
 async function perfil(): Promise<PerfilInstagram> {
-  const { accountId } = credenciales();
+  const { accountId } = await credenciales();
   const body = await graph<{ username?: string; followers_count?: number; media_count?: number }>(
     `/${accountId}`,
     { fields: "username,followers_count,media_count" },
@@ -156,7 +156,7 @@ interface FilaMedia {
  * `insights`, no puede dejar la tabla entera vacía.
  */
 async function publicaciones(cuantas: number): Promise<MediaConMetricas[]> {
-  const { accountId } = credenciales();
+  const { accountId } = await credenciales();
   const listado = await graph<{ data?: FilaMedia[] }>(`/${accountId}/media`, {
     fields: "id,caption,permalink,timestamp,media_type,like_count,comments_count",
     limit: String(cuantas),
@@ -221,7 +221,7 @@ export async function leerAnaliticasInstagram(
   };
 
   try {
-    credenciales();
+    await credenciales();
   } catch {
     avisos.push("Faltan IG_BUSINESS_ACCOUNT_ID o IG_ACCESS_TOKEN.");
     return vacio;

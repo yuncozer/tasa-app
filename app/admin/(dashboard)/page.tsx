@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { ENLACE_ANALITICAS, NAV_ADMIN, type EnlaceAdmin } from "@/components/admin/nav-admin";
+import { DIAS_PARA_AVISAR, estadoToken } from "@/lib/instagram-token";
 import { leerParadaPendiente } from "@/lib/parada";
 import { listarProgramadas } from "@/lib/programadas";
 import { getRates } from "@/lib/rates";
@@ -50,6 +51,34 @@ async function hayDegradacion(): Promise<boolean | null> {
   }
 }
 
+/**
+ * El token de Instagram caduca a los 60 días y, cuando lo hace, no se rompe
+ * nada visible: el cron simplemente deja de publicar. El cron diario lo
+ * renueva solo (`app/api/cron/refrescar-token-ig`), así que esto es la red
+ * por si ese cron llevara días fallando — y por eso **solo aparece cuando
+ * hay algo que hacer**: con el token sano, el panel no dice nada.
+ */
+async function avisoToken(): Promise<string | null> {
+  try {
+    const { diasRestantes } = await estadoToken();
+
+    if (diasRestantes === null) {
+      return "El token de Instagram todavía no está registrado: se publica con el del entorno y no hay forma de saber cuándo caduca. El cron diario lo registra en su próximo disparo.";
+    }
+    if (diasRestantes <= 0) {
+      return "El token de Instagram caducó. Nada se publicará hasta renovarlo.";
+    }
+    if (diasRestantes <= DIAS_PARA_AVISAR) {
+      return `El token de Instagram caduca en ${diasRestantes} ${diasRestantes === 1 ? "día" : "días"} y el cron de renovación no lo ha refrescado.`;
+    }
+    return null;
+  } catch {
+    // Sin Supabase no hay nada que avisar; la publicación sigue con el token
+    // del entorno, igual que antes de que esta vigilancia existiera.
+    return null;
+  }
+}
+
 function Insignia({ tono, children }: { tono: "accent" | "warning"; children: React.ReactNode }) {
   const clase =
     tono === "warning"
@@ -84,10 +113,11 @@ function TarjetaSeccion({ enlace, insignia }: { enlace: EnlaceAdmin; insignia?: 
 }
 
 export default async function AdminPage() {
-  const [pendientesNoticia, paradaPendiente, degradado] = await Promise.all([
+  const [pendientesNoticia, paradaPendiente, degradado, aviso] = await Promise.all([
     contarPendientesNoticia(),
     hayParadaPendiente(),
     hayDegradacion(),
+    avisoToken(),
   ]);
 
   const insignias: Partial<Record<string, React.ReactNode>> = {
@@ -106,6 +136,13 @@ export default async function AdminPage() {
       <AdminPageHeader
         titulo="Panel de La Tasa"
         descripcion="Publicar contenido, revisar borradores pendientes y armar reportes."
+        aviso={
+          aviso ? (
+            <p className="rounded-2xl border border-warning/40 bg-warning/10 px-4 py-3 text-xs text-warning">
+              {aviso}
+            </p>
+          ) : undefined
+        }
       />
 
       <div className="flex flex-col gap-6">
