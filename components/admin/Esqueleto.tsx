@@ -21,6 +21,11 @@ export function Bloque({ className }: { className?: string }) {
  * siempre tiene la misma forma: cuatro cifras arriba, una serie en medio y
  * listas debajo. Cuando el esqueleto coincide con lo que llega, el contenido
  * no salta al aparecer, que es la mitad del motivo de poner uno.
+ *
+ * Con una excepción asumida: la pestaña de Enlaces tiene cinco tarjetas en
+ * vez de cuatro, y aquí se dibujan cuatro. Una tarjeta de diferencia durante
+ * la espera no se nota; un esqueleto por pestaña sí habría que mantenerlo
+ * sincronizado con las tres.
  */
 export function EsqueletoAnaliticas() {
   return (

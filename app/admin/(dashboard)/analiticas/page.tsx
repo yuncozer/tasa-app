@@ -265,29 +265,23 @@ const NOMBRE_ATAJO: Record<string, string> = {
 };
 
 function BloqueEnlaces({ datos, dias }: { datos: AnaliticasWeb; dias: number }) {
+  // Un atajo sin un solo clic no aparece en el desglose, y su tarjeta tiene
+  // que decir "0" y no "—": aquí el cero es una medición, no un hueco —
+  // sabemos que nadie lo abrió, que es justo lo que se vino a mirar.
+  const clics = (atajo: string) => datos.atajos.find((fila) => fila.clave === atajo)?.total ?? 0;
+
   return (
     <Seccion titulo={`Últimos ${dias} días`}>
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
         <TarjetaMetrica
           etiqueta="Clics en atajos"
           valor={datos.totales.atajos}
           apoyo="Sin rastreadores"
         />
-        <TarjetaMetrica
-          etiqueta="Al canal de WhatsApp"
-          valor={datos.atajos.find((fila) => fila.clave === "/wa")?.total ?? 0}
-          apoyo="/wa"
-        />
-        <TarjetaMetrica
-          etiqueta="Al post del día"
-          valor={datos.atajos.find((fila) => fila.clave === "/hoy")?.total ?? 0}
-          apoyo="/hoy"
-        />
-        <TarjetaMetrica
-          etiqueta="Al perfil"
-          valor={datos.atajos.find((fila) => fila.clave === "/ig")?.total ?? 0}
-          apoyo="/ig"
-        />
+        <TarjetaMetrica etiqueta="Al canal de WhatsApp" valor={clics("/wa")} apoyo="/wa" />
+        <TarjetaMetrica etiqueta="Al post del día" valor={clics("/hoy")} apoyo="/hoy" />
+        <TarjetaMetrica etiqueta="Al post de La Parada" valor={clics("/laparada")} apoyo="/laparada" />
+        <TarjetaMetrica etiqueta="Al perfil" valor={clics("/ig")} apoyo="/ig" />
       </div>
 
       <div className="rounded-2xl border border-border-soft bg-surface px-4 py-4">
