@@ -22,7 +22,14 @@
  */
 
 const GRAPH_VERSION = "v21.0";
-const GRAPH_BASE = `https://graph.instagram.com/${GRAPH_VERSION}`;
+/**
+ * Se exporta para `lib/instagram-insights.ts`, que lee las métricas de la
+ * cuenta contra esta misma base y con las mismas credenciales. Publicar y
+ * medir son dos módulos aparte —uno escribe en la cuenta real y el otro solo
+ * lee— pero el transporte es el mismo y duplicarlo llevaría a que un cambio
+ * de versión de la Graph API se aplicara solo a la mitad.
+ */
+export const GRAPH_BASE = `https://graph.instagram.com/${GRAPH_VERSION}`;
 const MEDIA_NOT_READY_CODE = 9007;
 const REINTENTOS = 3;
 const ESPERA_MS = 4000;
@@ -45,7 +52,7 @@ export class InstagramApiError extends Error {
   }
 }
 
-function credenciales(): { accountId: string; accessToken: string } {
+export function credenciales(): { accountId: string; accessToken: string } {
   const accountId = process.env.IG_BUSINESS_ACCOUNT_ID;
   const accessToken = process.env.IG_ACCESS_TOKEN;
   if (!accountId || !accessToken) {

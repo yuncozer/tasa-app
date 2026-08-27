@@ -757,6 +757,68 @@ los dos disparos del día (ver la sección anterior).
   tres cachés: cada navegación se guarda bajo su propia ruta justamente porque
   esta página lo destapó.
 
+### Las analíticas son propias, y por eso hay una tabla de eventos
+
+`/admin/analiticas` junta las dos mitades del proyecto en una pantalla: qué
+hace la gente en la calculadora y cómo le va a lo que se publica en Instagram.
+
+- **Vercel Analytics se queda, pero no responde lo que aquí se pregunta.**
+  Cuenta visitas y rutas; no sabe qué es una conversión en esta app, con qué
+  moneda se hace, cuántas veces se copia la cifra que va a viajar por WhatsApp,
+  ni cuánta gente abre la app instalada o llega a usarla sin señal. Esas son
+  las preguntas que deciden qué se publica y qué se arregla, así que el evento
+  se registra en `eventos_web` (migración `0010`), en la misma base que ya usa
+  el resto del proyecto.
+- **Anónima por diseño.** No se guarda IP, ni user-agent, ni una sola cosa
+  tecleada por el usuario — el monto que escribe es asunto suyo, y el `detalle`
+  de una conversión es solo la moneda de origen, de conjunto cerrado. `sesion`
+  es un identificador aleatorio que vive en el `sessionStorage` de una pestaña
+  y muere con ella: existe para no contar diez veces a quien prueba diez
+  montos, no para seguir a nadie. Del referente se guarda **solo el host**.
+- **La fecha la pone el servidor**, con `diaCaracasISO()`, no el navegador: el
+  reloj de un teléfono se mueve y esa columna es la que agrupa el panel entero.
+  Mismo criterio de "el día se corta en Caracas" que `historico_tasas`.
+- **`/api/eventos` siempre contesta 204**, incluso ante un cuerpo inválido o un
+  Supabase caído. Quien llama es un `sendBeacon` que no mira la respuesta, y un
+  4xx solo convertiría la ruta en un oráculo de qué acepta. La defensa es que
+  el `tipo` esté en un conjunto cerrado y cada texto se recorte
+  (`normalizarEvento`): es la única ruta pública que escribe en Supabase.
+- **No hay cola de eventos en el dispositivo.** Sin red no se registra nada, y
+  es una renuncia deliberada: reenviar eventos viejos horas después falsearía
+  la hora a la que ocurrieron, que es la mitad de lo que se mide. La excepción
+  es `sin_conexion`, que se anota **al volver la conexión** — lo que interesa
+  no es el instante sino que esa sesión llegó a usar la app sin señal, que es
+  la pregunta que justifica el service worker.
+- **`/admin` no se cuenta.** El panel lo usa una sola persona varias veces al
+  día, y contarlo inflaría justo las cifras que se miran para saber si la app
+  le sirve a alguien más.
+- **El resumen se agrupa en la base**, con la función `analiticas_web(desde,
+  hasta)` de la misma migración: PostgREST no agrupa, y la alternativa era
+  traerse decenas de miles de filas a una función serverless para contarlas.
+  Es un solo viaje y devuelve el panel entero.
+- **Las dos mitades degradan por separado.** Un Supabase caído no puede dejar
+  sin métricas de Instagram ni un token caducado sin las de la web. Dentro de
+  la mitad de redes, además, **cada métrica degrada por su cuenta**
+  (`lib/instagram-insights.ts`): la Graph API retira y renombra métricas sin
+  aviso y oculta varias en cuentas pequeñas, así que se piden **una por una**
+  —pedirlas en lote hace que una sola métrica no disponible tumbe las demás— y
+  lo que falla se muestra como `—`, nunca como `0`.
+- **Instagram no devuelve métricas de cuenta más allá de 30 días.** El selector
+  ofrece igualmente 90, que estira solo la mitad web, y la pantalla lo dice en
+  vez de recortar la opción: "cómo viene el trimestre en el sitio" es una
+  pregunta legítima aunque Instagram no la acompañe.
+- **`lib/instagram-insights.ts` vive aparte de `lib/instagram.ts`**: aquel
+  publica —cada llamada escribe en la cuenta real y es irreversible— y este
+  solo pregunta. Comparten `GRAPH_BASE` y `credenciales()` para que un cambio
+  de versión de la Graph API no se aplique a la mitad, y nada más.
+- **Los gráficos son SVG a mano** (`components/admin/BarrasDias.tsx`), sin
+  librería, por lo mismo que `components/Sparkline.tsx`. Barras y no línea
+  porque lo que se compara son días sueltos, no una tendencia continua.
+- El período viaja por query string (`?dias=`), como el `?vista=` de
+  `/historial`, y la página **no lleva cabecera de CDN**: cuelga de la sesión
+  de `/admin`, la abre una sola persona y cachearla serviría cifras viejas
+  justo a quien las está mirando para decidir.
+
 ### Los crons ya no son de Vercel, y por eso hay cola de programadas
 
 Un post de `/admin/noticia` se puede dejar en cola para que salga a cierta hora.
@@ -1502,9 +1564,9 @@ la otra protege los endpoints de publicación/cron. La sesión es una cookie
 `CRON_SECRET` nunca llega al navegador: `/admin/noticia` lo usa solo del lado
 servidor, a través de `publishNewsPost`.
 
-Cuelgan siete páginas de esa misma sesión —`/admin/hoy`, `/admin/parada`,
-`/admin/noticia`, `/admin/semanal`, `/admin/brecha`, `/admin/canal` y
-`/admin/video`—, más `/admin` como dashboard de entrada. Siguen siendo páginas separadas y no
+Cuelgan ocho páginas de esa misma sesión —`/admin/hoy`, `/admin/parada`,
+`/admin/noticia`, `/admin/analiticas`, `/admin/semanal`, `/admin/brecha`,
+`/admin/canal` y `/admin/video`—, más `/admin` como dashboard de entrada. Siguen siendo páginas separadas y no
 pestañas de una: la de noticias es un formulario con estado propio —switch
 Post/Reel, subidas, previa desactualizada, cola— y el reporte semanal **no
 tiene entradas**: se mira y se publica.

@@ -1,6 +1,7 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
+import { registrarEvento } from "@/lib/analitica-cliente";
 
 /**
  * Invitación discreta a instalar la app en la pantalla de inicio.
@@ -106,7 +107,11 @@ export function InstallPrompt() {
   const instalar = async () => {
     if (!evento) return;
     await evento.prompt();
-    await evento.userChoice;
+    const { outcome } = await evento.userChoice;
+    // Solo cuenta el que aceptó: lo que se quiere saber es cuánta gente
+    // termina con la app en su pantalla de inicio, no cuánta abrió el
+    // diálogo y se echó atrás.
+    if (outcome === "accepted") registrarEvento("instalar");
     evento = null;
     avisar();
   };
