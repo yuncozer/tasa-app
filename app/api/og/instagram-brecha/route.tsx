@@ -2,7 +2,16 @@ import { ImageResponse } from "next/og";
 import type { NextRequest } from "next/server";
 import { construirAlertaBrecha, type AlertaBrecha } from "@/lib/alerta-brecha";
 import { diaCaracasISO, formatClock, formatFechaCorta, formatVariacion } from "@/lib/format";
-import { AIRE_LATERAL, AVISO_BRECHA, COLOR, LogoTaza, Pie, leerFontBuffer, leerSvgComoDataUri } from "@/lib/og-shared";
+import {
+  AIRE_LATERAL,
+  AVISO_BRECHA,
+  COLOR,
+  LogoTaza,
+  Pie,
+  leerFontBuffer,
+  leerImagenComoDataUri,
+  leerSvgComoDataUri,
+} from "@/lib/og-shared";
 import { getRates } from "@/lib/rates";
 import type { DireccionVariacion } from "@/lib/semanal";
 
@@ -46,6 +55,8 @@ interface Medidas {
   variacion: number;
   remate: number;
   remateValor: number;
+  /** Relleno del panel que sostiene las cifras sobre la foto. */
+  paddingPanel: number;
 }
 
 const MEDIDAS: Record<Proporcion, Medidas> = {
@@ -57,14 +68,15 @@ const MEDIDAS: Record<Proporcion, Medidas> = {
     wordmark: 44,
     handle: 24,
     banda: 42,
-    cifra: 150,
-    flecha: 110,
+    cifra: 132,
+    flecha: 96,
     concepto: 42,
     etiqueta: 26,
-    valorTarjeta: 62,
-    variacion: 44,
+    valorTarjeta: 56,
+    variacion: 42,
     remate: 40,
     remateValor: 46,
+    paddingPanel: 22,
   },
   "9:16": {
     padding: 72,
@@ -80,8 +92,9 @@ const MEDIDAS: Record<Proporcion, Medidas> = {
     etiqueta: 32,
     valorTarjeta: 82,
     variacion: 60,
-    remate: 48,
-    remateValor: 56,
+    remate: 42,
+    remateValor: 52,
+    paddingPanel: 40,
   },
 };
 
@@ -200,26 +213,31 @@ function BrechaImage({
   alerta,
   proporcion,
   icons,
+  fondo,
 }: {
   alerta: AlertaBrecha;
   proporcion: Proporcion;
   icons: { instagram: string; browser: string };
+  /** La foto de fondo, ya embebida como data URI. */
+  fondo: string;
 }) {
   const medidas = MEDIDAS[proporcion];
   const color = colorDe(alerta.direccion);
   const flecha = flechaDe(alerta.direccion);
   const sinComparacion = alerta.direccion === "desconocida";
 
+  const { width, height } = SIZE[proporcion];
+
   return (
     <div
       style={{
+        position: "relative",
         width: "100%",
         height: "100%",
         display: "flex",
         flexDirection: "column",
         justifyContent: "space-between",
         backgroundColor: COLOR.background,
-        backgroundImage: `linear-gradient(160deg, #1b1020 0%, ${COLOR.background} 45%, #0a1a1a 100%)`,
         paddingLeft: medidas.padding,
         paddingRight: medidas.padding,
         paddingTop: medidas.padding + medidas.reservaArriba,
@@ -227,8 +245,39 @@ function BrechaImage({
         fontFamily: "Geist",
       }}
     >
+      {/* La foto va como capa y no como `backgroundImage`: Satori no compone
+          varias capas de fondo, y aquí hacen falta dos —la foto y el velo que
+          la apaga— para que el texto se lea encima. El `<img>` se estira al
+          lienzo con `objectFit: "cover"`, que es lo que le permite servir
+          igual al cuadrado y al vertical. */}
+      {/* eslint-disable-next-line @next/next/no-img-element -- Satori rasteriza, no es una <img> de navegador. */}
+      <img
+        src={fondo}
+        width={width}
+        height={height}
+        alt=""
+        style={{ position: "absolute", top: 0, left: 0, objectFit: "cover" }}
+      />
+      {/* El velo no es estética: sobre la foto sin apagar, el gris de las
+          etiquetas y el aviso legal del pie dejan de leerse. El degradado
+          aprieta arriba y abajo, que es donde caen el titular y el pie, y deja
+          respirar el centro, donde la foto se ve entre las tarjetas. */}
       <div
         style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          width,
+          height,
+          display: "flex",
+          backgroundImage:
+            `linear-gradient(180deg, rgba(11,17,32,0.94) 0%, rgba(11,17,32,0.72) 40%, ` +
+            `rgba(11,17,32,0.9) 70%, rgba(11,17,32,0.97) 88%, rgba(11,17,32,0.98) 100%)`,
+        }}
+      />
+      <div
+        style={{
+          position: "relative",
           display: "flex",
           flexDirection: "column",
           gap: 22,
@@ -240,13 +289,22 @@ function BrechaImage({
         <Banda alerta={alerta} medidas={medidas} />
       </div>
 
+      {/* Las cifras van sobre un panel propio y no directamente sobre la foto:
+          con el fondo a la vista, el gris de las etiquetas y de la línea de
+          "sin comparación" se pierde entre los billetes. El panel es
+          semitransparente para que la foto siga leyéndose detrás. */}
       <div
         style={{
+          position: "relative",
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
-          paddingLeft: AIRE_LATERAL,
-          paddingRight: AIRE_LATERAL,
+          marginLeft: AIRE_LATERAL,
+          marginRight: AIRE_LATERAL,
+          padding: medidas.paddingPanel,
+          borderRadius: 32,
+          backgroundColor: "rgba(11,17,32,0.72)",
+          border: `1px solid ${COLOR.border}`,
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
@@ -279,11 +337,11 @@ function BrechaImage({
           // Sin dato de hace una semana no se pintan las dos tarjetas ni una
           // variación: un "0,0 pp" ahí sería un número inventado. Se dice qué
           // falta, con el mismo criterio que `Sin comparación` en el semanal.
-          <span style={{ fontSize: medidas.etiqueta + 4, color: COLOR.muted, marginTop: 32, textAlign: "center" }}>
+          <span style={{ fontSize: medidas.etiqueta + 4, color: COLOR.muted, marginTop: 26, textAlign: "center" }}>
             Sin comparación: aún no hay dato de hace una semana en el histórico.
           </span>
         ) : (
-          <div style={{ display: "flex", flexDirection: "column", width: "100%", marginTop: 32 }}>
+          <div style={{ display: "flex", flexDirection: "column", width: "100%", marginTop: 26 }}>
             <div style={{ display: "flex", gap: 20 }}>
               <TarjetaComparativa
                 etiqueta="hace una semana"
@@ -325,19 +383,28 @@ function BrechaImage({
             border: `1px solid ${COLOR.border}`,
             borderRadius: 9999,
             padding: "16px 28px",
-            marginTop: 26,
+            marginTop: 22,
           }}
         >
-          <span style={{ fontSize: medidas.remate, fontWeight: 700, color: COLOR.foreground }}>
+          {/* `nowrap` en las dos mitades: dentro del panel el ancho es menor
+              que el del lienzo, y partido en dos líneas el remate deja de
+              leerse de un vistazo, que es todo lo que tiene que hacer. */}
+          <span style={{ fontSize: medidas.remate, fontWeight: 700, color: COLOR.foreground, whiteSpace: "nowrap" }}>
             VALOR USDT HOY:
           </span>
-          <span style={{ fontSize: medidas.remateValor, fontWeight: 700, color: COLOR.accent }}>
+          <span
+            style={{ fontSize: medidas.remateValor, fontWeight: 700, color: COLOR.accent, whiteSpace: "nowrap" }}
+          >
             {alerta.valorParaleloTexto}
           </span>
         </div>
       </div>
 
-      <Pie icons={icons} aviso={AVISO_BRECHA} />
+      {/* `position: relative` para que quede por encima del velo, que es
+          absoluto y va después en el flujo. */}
+      <div style={{ position: "relative", display: "flex", flexDirection: "column" }}>
+        <Pie icons={icons} aviso={AVISO_BRECHA} />
+      </div>
     </div>
   );
 }
@@ -349,18 +416,24 @@ function proporcionDesdeQuery(request: NextRequest): Proporcion {
 export async function GET(request: NextRequest) {
   const proporcion = proporcionDesdeQuery(request);
 
-  const [snapshot, geistRegular, geistBold, instagramIcon, browserIcon] = await Promise.all([
+  const [snapshot, geistRegular, geistBold, instagramIcon, browserIcon, fondo] = await Promise.all([
     getRates(),
     leerFontBuffer("Geist-Regular.ttf"),
     leerFontBuffer("Geist-Bold.ttf"),
     leerSvgComoDataUri("instagram-icon.svg"),
     leerSvgComoDataUri("browser-icon.svg"),
+    leerImagenComoDataUri("fondo-brecha.jpg"),
   ]);
 
   const alerta = await construirAlertaBrecha(snapshot);
 
   const imagen = new ImageResponse(
-    <BrechaImage alerta={alerta} proporcion={proporcion} icons={{ instagram: instagramIcon, browser: browserIcon }} />,
+    <BrechaImage
+      alerta={alerta}
+      proporcion={proporcion}
+      icons={{ instagram: instagramIcon, browser: browserIcon }}
+      fondo={fondo}
+    />,
     {
       ...SIZE[proporcion],
       fonts: [

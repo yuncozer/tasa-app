@@ -657,6 +657,16 @@ movió entre las dos. Se dispara a mano desde `/admin/brecha`.
   reporte semanal —reservas de 110 y 130 px arriba y abajo del vertical para
   que la interfaz de Instagram no tape nada— y mismo motivo para no publicarla
   por la API: una Story de la Graph API no admite sticker de enlace.
+- **La foto de fondo va embebida y apagada bajo un velo.** Vive en
+  `app/api/og/_assets/fondo-brecha.jpg` y se lee como data URI, igual que las
+  fuentes y los SVG del pie: pedirla por red desde dentro de la misma función
+  que Meta está esperando es un viaje que puede fallar sin necesidad. Va como
+  capa `<img>` y no como `backgroundImage` porque Satori no compone varias
+  capas de fondo y aquí hacen falta dos —la foto y el velo—. Encima, las
+  cifras se apoyan en un panel semitransparente: sobre la foto a la vista, el
+  gris de las etiquetas y del aviso legal deja de leerse. El original mide
+  412×512, así que se escala bastante; si algún día hay una versión más grande,
+  se sustituye el archivo y ya.
 - **La imagen va sin firma HMAC**, como `instagram-semanal`: no recibe ni un
   carácter de texto libre —lee las tasas y el histórico del servidor— y su
   única entrada es un valor de un conjunto cerrado.

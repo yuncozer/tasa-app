@@ -94,6 +94,19 @@ export async function leerFontBuffer(nombre: string): Promise<Buffer> {
   return readFile(path.join(process.cwd(), "app/api/og/_assets", nombre));
 }
 
+/**
+ * Lee una imagen de `app/api/og/_assets` y la convierte a data URI para Satori.
+ *
+ * Va embebida y no como URL: la plantilla se renderiza dentro de la misma
+ * función que Meta está esperando, y una petición de red más ahí —a nuestro
+ * propio dominio, mientras la función corre— es un viaje que puede fallar sin
+ * necesidad. Mismo criterio que las fuentes y los SVG del pie.
+ */
+export async function leerImagenComoDataUri(nombre: string, tipo = "image/jpeg"): Promise<string> {
+  const buffer = await readFile(path.join(process.cwd(), "app/api/og/_assets", nombre));
+  return `data:${tipo};base64,${buffer.toString("base64")}`;
+}
+
 /** Lee un SVG de `public/SVG` y lo convierte a data URI para Satori. */
 export async function leerSvgComoDataUri(nombre: string): Promise<string> {
   const buffer = await readFile(path.join(process.cwd(), "public/SVG", nombre));
