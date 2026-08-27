@@ -331,10 +331,20 @@ pesos después.
 
 ### Cada diapositiva del carrusel diario publica también su propia Historia
 
-Además del carrusel de feed, cada disparo de `publicarTasasDelDia()`
-(`lib/publish-hoy.ts`) publica **dos Historias**, una por diapositiva, en el
-mismo orden en que se deslizan: bolívares primero, pesos después.
+Además del carrusel de feed, el disparo de la **mañana** de
+`publicarTasasDelDia()` (`lib/publish-hoy.ts`) publica **dos Historias**, una
+por diapositiva, en el mismo orden en que se deslizan: bolívares primero,
+pesos después.
 
+- **Solo las publica el disparo de las 9:00** (`momento === "manana"`). Una
+  Historia dura 24 h, así que las dos de la tarde se solapaban con las de la
+  mañana siguiente: cuatro Historias casi idénticas seguidas en la misma
+  barra, el mismo motivo por el que el post diario es un carrusel y no dos
+  publicaciones. La de la mañana es la que abre el día, así que es la que se
+  queda. El botón "Publicar ahora" de `/admin/hoy` tampoco las publica: va sin
+  `momento` —no es ninguna de las dos horas fijas— y sale precisamente cuando
+  ya hubo un post antes que corregir, así que no debe volver a llenar la barra
+  de Historias.
 - **Puede publicarse sola, a diferencia de la Story del reporte semanal.** La
   limitación de "no se publica desde la app… no admite sticker de enlace ni
   texto" (ver más abajo, sección del reporte semanal) es específica de esa
