@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
-import { AvisoToken } from "@/components/admin/AvisoToken";
+import { EstadoToken } from "@/components/admin/EstadoToken";
 import { ENLACE_ANALITICAS, NAV_ADMIN, type EnlaceAdmin } from "@/components/admin/nav-admin";
 import { DIAS_PARA_AVISAR, estadoToken } from "@/lib/instagram-token";
 import { leerParadaPendiente } from "@/lib/parada";
@@ -55,26 +55,30 @@ async function hayDegradacion(): Promise<boolean | null> {
 /**
  * El token de Instagram caduca a los 60 días y, cuando lo hace, no se rompe
  * nada visible: el cron simplemente deja de publicar. El cron diario lo
- * renueva solo (`app/api/cron/refrescar-token-ig`), así que esto es la red
- * por si ese cron llevara días fallando — y por eso **solo aparece cuando
- * hay algo que hacer**: con el token sano, el panel no dice nada.
+ * renueva solo (`app/api/cron/refrescar-token-ig`), así que aquí se resuelven
+ * dos cosas distintas con la misma lectura: **el aviso**, que solo existe
+ * cuando hay algo que hacer y va arriba en ámbar, y **la cuenta atrás**, que
+ * va siempre —discreta, al pie— porque "¿cuánto le queda?" es una pregunta
+ * legítima aunque la respuesta sea tranquilizadora.
  */
-async function avisoToken(): Promise<string | null> {
+async function leerToken(): Promise<
+  { diasRestantes: number | null; refrescadoEn: string | null; aviso: string | null } | null
+> {
   try {
-    const { diasRestantes } = await estadoToken();
+    const { diasRestantes, refrescadoEn } = await estadoToken();
 
-    if (diasRestantes === null) {
-      return "El token de Instagram todavía no está registrado: se publica con el del entorno y no hay forma de saber cuándo caduca. El cron diario lo registra en su próximo disparo.";
-    }
-    if (diasRestantes <= 0) {
-      return "El token de Instagram caducó. Nada se publicará hasta renovarlo.";
-    }
-    if (diasRestantes <= DIAS_PARA_AVISAR) {
-      return `El token de Instagram caduca en ${diasRestantes} ${diasRestantes === 1 ? "día" : "días"} y el cron de renovación no lo ha refrescado.`;
-    }
-    return null;
+    const aviso =
+      diasRestantes === null
+        ? "El token de Instagram todavía no está registrado: se publica con el del entorno y no hay forma de saber cuándo caduca. Renuévalo una vez para empezar a contar."
+        : diasRestantes <= 0
+          ? "El token de Instagram caducó. Nada se publicará hasta renovarlo."
+          : diasRestantes <= DIAS_PARA_AVISAR
+            ? `El token de Instagram caduca en ${diasRestantes} ${diasRestantes === 1 ? "día" : "días"} y el cron de renovación no lo ha refrescado.`
+            : null;
+
+    return { diasRestantes, refrescadoEn, aviso };
   } catch {
-    // Sin Supabase no hay nada que avisar; la publicación sigue con el token
+    // Sin Supabase no hay nada que contar: la publicación sigue con el token
     // del entorno, igual que antes de que esta vigilancia existiera.
     return null;
   }
@@ -114,11 +118,11 @@ function TarjetaSeccion({ enlace, insignia }: { enlace: EnlaceAdmin; insignia?: 
 }
 
 export default async function AdminPage() {
-  const [pendientesNoticia, paradaPendiente, degradado, aviso] = await Promise.all([
+  const [pendientesNoticia, paradaPendiente, degradado, token] = await Promise.all([
     contarPendientesNoticia(),
     hayParadaPendiente(),
     hayDegradacion(),
-    avisoToken(),
+    leerToken(),
   ]);
 
   const insignias: Partial<Record<string, React.ReactNode>> = {
@@ -137,7 +141,15 @@ export default async function AdminPage() {
       <AdminPageHeader
         titulo="Panel de La Tasa"
         descripcion="Publicar contenido, revisar borradores pendientes y armar reportes."
-        aviso={aviso ? <AvisoToken mensaje={aviso} /> : undefined}
+        aviso={
+          token?.aviso ? (
+            <EstadoToken
+              mensaje={token.aviso}
+              diasRestantes={token.diasRestantes}
+              refrescadoEn={token.refrescadoEn}
+            />
+          ) : undefined
+        }
       />
 
       <div className="flex flex-col gap-6">
@@ -161,6 +173,14 @@ export default async function AdminPage() {
             </div>
           </section>
         ))}
+
+        {/* La cuenta atrás del token, al pie y en gris: es una referencia que
+            se consulta, no algo que deba competir con las secciones. Cuando
+            de verdad hay que actuar, el mismo componente sale arriba en
+            ámbar y con el botón. */}
+        {token && !token.aviso && (
+          <EstadoToken diasRestantes={token.diasRestantes} refrescadoEn={token.refrescadoEn} />
+        )}
       </div>
     </>
   );

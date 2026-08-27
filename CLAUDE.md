@@ -1139,6 +1139,13 @@ caducidad obliga a guardar el resultado del refresco, y de ahí la tabla
 - **El panel solo habla cuando hay algo que hacer**: con el token sano, `/admin`
   no dice nada; por debajo de 10 días —o sin registrar, o ya caducado— aparece
   la franja ámbar. Mismo criterio que las insignias de las tarjetas.
+- **La cuenta atrás va siempre, el aviso solo cuando toca.** Con el token sano
+  el pie de `/admin` muestra una línea gris con los días que quedan y cuándo se
+  renovó: "¿cuánto le queda?" es una pregunta legítima aunque la respuesta sea
+  tranquilizadora, y antes no tenía dónde responderse. Es el mismo componente
+  (`components/admin/EstadoToken.tsx`) el que sale arriba en ámbar cuando de
+  verdad hay algo que hacer, porque ese caso no puede esperar a que alguien
+  baje a buscarlo.
 - **La franja lleva su propio botón de renovar**
   (`components/admin/AvisoToken.tsx` → `/api/admin/token-instagram`), que
   fuerza el refresco saltándose el umbral de veinte días. Es lo que permite
