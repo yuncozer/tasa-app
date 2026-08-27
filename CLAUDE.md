@@ -1206,6 +1206,7 @@ ahí.
 | El post lleva media hora esperando a las fuentes | `cron/publicar-tasas-pendientes`, al intento 15 |
 | Una programada terminó en `fallida` | `cron/publicar-programadas` |
 | No se pudo renovar el token de Instagram | `cron/refrescar-token-ig` |
+| El resumen del día, a las 8:00 pm | `cron/resumen-dia` |
 
 Tres reglas:
 
@@ -1222,6 +1223,15 @@ Tres reglas:
   de tasas pendientes compara `intentos === 15` con igualdad estricta
   justamente para que el correo no salga cada dos minutos. Un aviso repetido
   se convierte en ruido que se ignora, que es peor que no avisar.
+- **El resumen del día es la excepción a todo lo anterior**: es el único que
+  se manda *aunque no pase nada*, y por eso va a una hora fija en vez de en
+  respuesta a un fallo. Su valor está en llegar todos los días, para que un
+  día raro se note por contraste. `lib/resumen-dia.ts` junta lo que ya miden
+  el histórico, la analítica propia y la Graph API —no calcula nada nuevo— y
+  cada bloque falla por su cuenta: lo que no se pudo leer sale como "sin dato"
+  y nunca como cero, que sería mentir sobre un día que a lo mejor estuvo bien.
+  Si **nada** se pudo leer no se manda correo, porque un mensaje que solo dice
+  "sin dato" cuatro veces es ruido y el fallo que lo causó ya avisa aparte.
 - **El aviso del fallo de publicación va en la ruta del cron y no dentro de
   `publicarTasasDelDia()`**: lo que hay que reportar es "el disparo de las
   9:00 no publicó", y solo la ruta sabe de qué disparo se trata — la función

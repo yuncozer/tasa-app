@@ -94,6 +94,38 @@ export function notificarParadaPendiente(titulo: string): Promise<boolean> {
   );
 }
 
+/**
+ * El resumen del día. Es el único aviso que sale **aunque no pase nada**, y
+ * por eso es el único que se manda a una hora fija en vez de en respuesta a
+ * un fallo: su valor está justamente en llegar todos los días, para que un
+ * día raro se note por contraste.
+ */
+export function notificarResumenDia(resumen: {
+  fecha: string;
+  publicaciones: string[];
+  tasas: string[];
+  sitio: string[];
+  instagram: string[];
+}): Promise<boolean> {
+  const bloque = (titulo: string, lineas: string[]) =>
+    lineas.length === 0
+      ? ""
+      : `<h3 style="margin:16px 0 4px">${titulo}</h3><ul>${lineas
+          .map((linea) => `<li>${linea}</li>`)
+          .join("")}</ul>`;
+
+  const enlace = enlaceAdmin("/admin");
+
+  return notificar(
+    `La Tasa · resumen del ${resumen.fecha}`,
+    bloque("Qué salió", resumen.publicaciones) +
+      bloque("Cómo cerraron las tasas", resumen.tasas) +
+      bloque("El sitio", resumen.sitio) +
+      bloque("Instagram", resumen.instagram) +
+      `<p style="margin-top:16px"><a href="${enlace}">Abrir el panel</a></p>`,
+  );
+}
+
 /** El cron de tasas falló al publicar. Ocurre como mucho dos veces al día. */
 export function notificarFalloPublicacion(
   momento: "manana" | "tarde" | undefined,
