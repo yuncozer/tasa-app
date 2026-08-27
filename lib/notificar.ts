@@ -128,6 +128,26 @@ export function notificarEsperaLarga(
   );
 }
 
+/**
+ * Una tasa se movió tanto respecto de la última publicada que no parece
+ * mercado. El post no salió solo, a la espera de que la lectura siguiente lo
+ * confirme o lo desmienta.
+ */
+export function notificarTasaAnomala(
+  etiqueta: string,
+  valor: string,
+  referencia: string,
+  variacion: string,
+): Promise<boolean> {
+  const enlace = enlaceAdmin("/admin/hoy");
+  return notificar(
+    `${etiqueta} se movió ${variacion}: el post quedó en espera`,
+    `<p><strong>${etiqueta}</strong> pasó de ${referencia} a ${valor} (${variacion}) respecto de la última lectura publicada.</p>` +
+      `<p>Un salto así casi siempre es un fallo de la fuente, así que el post del día no se publicó solo. Si la próxima lectura vuelve a la normalidad, sale automáticamente en un par de minutos.</p>` +
+      `<p>Si el movimiento es real, publicá a mano desde <a href="${enlace}">${enlace}</a>.</p>`,
+  );
+}
+
 /** Una publicación programada terminó en `fallida` y ya no se reintenta sola. */
 export function notificarProgramadaFallida(resumen: string, error: string): Promise<boolean> {
   const enlace = enlaceAdmin("/admin/noticia");

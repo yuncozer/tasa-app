@@ -1,6 +1,8 @@
 import type { NextRequest } from "next/server";
 import { apiError, apiJson } from "@/lib/api";
-import { notificarFalloPublicacion } from "@/lib/notificar";
+import { revisarCordura } from "@/lib/cordura-tasas";
+import { formatPercent, formatRate } from "@/lib/format";
+import { notificarFalloPublicacion, notificarTasaAnomala } from "@/lib/notificar";
 import { publicarTasasDelDia } from "@/lib/publish-hoy";
 import { getRates } from "@/lib/rates";
 import { fechaDeHoy, registrarPendiente, tasasBaseCompletas } from "@/lib/tasas-pendientes";
@@ -79,9 +81,29 @@ export async function GET(request: NextRequest) {
 
     if (momento) {
       const snapshot = await getRates();
+
       if (!tasasBaseCompletas(snapshot)) {
         await registrarPendiente(fechaDeHoy(), momento);
         return apiJson({ ok: true, estado: "pendiente" }, { cachear: false });
+      }
+
+      // La otra mitad de la puerta: una tasa presente pero imposible (ver
+      // `lib/cordura-tasas.ts`). Se avisa **aquí y no en el cron que
+      // reintenta**, que corre cada dos minutos: un correo por disparo, no
+      // uno cada dos minutos.
+      const anomalia = await revisarCordura(snapshot);
+      if (anomalia) {
+        await registrarPendiente(fechaDeHoy(), momento);
+        await notificarTasaAnomala(
+          anomalia.etiqueta,
+          formatRate(anomalia.valor),
+          formatRate(anomalia.referencia),
+          formatPercent(anomalia.variacion * 100),
+        );
+        return apiJson(
+          { ok: true, estado: "pendiente", motivo: "salto_anomalo", clave: anomalia.clave },
+          { cachear: false },
+        );
       }
     }
 

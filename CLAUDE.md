@@ -417,6 +417,41 @@ después, ya tenía precio: peor que esperar un poco.
   recoge solo, mismo criterio de "el reintento es automático" que ya rige el
   resto de los crons del proyecto.
 
+### Una tasa presente pero imposible tampoco publica
+
+`tasasBaseCompletas()` cubre que **falte** una tasa. `lib/cordura-tasas.ts`
+cubre el caso contrario: un dólar Binance que salta un 40 % entre una lectura
+y la siguiente casi nunca es mercado —es un anuncio raro, un cambio de formato
+en la fuente o un scrapeo que leyó otra cosa— y publicarlo lo convierte en una
+imagen con la marca de La Tasa afirmando un número que no existe. Eso no se
+corrige después: el post ya salió.
+
+- **Se compara contra la última lectura archivada** en `historico_tasas`, que
+  es la que ya se publicó y la que el lector tiene delante. No hay referencia
+  propia ni una segunda fuente que consultar.
+- **El umbral es alto (30 %) a propósito.** No pretende detectar un
+  movimiento fuerte —eso es noticia y hay que publicarlo— sino un valor
+  imposible. En esta frontera una devaluación real de dos dígitos ocurre, y
+  bloquearla sería peor que el fallo que se quiere evitar.
+- **Con la referencia vieja no se opina**: si la última lectura archivada
+  tiene más de cuatro días, no hay con qué comparar y se deja pasar. Misma
+  regla de "sin dato no se inventa un dato" que rige el resto del proyecto.
+- **No bloquea en silencio ni para siempre.** El disparo deja la fila en
+  `tasas_pendientes` —la misma cola que ya existía para las tasas
+  incompletas— y manda el correo. Si el valor era basura, la lectura de dos
+  minutos después publica sola; si era real, el admin publica a mano desde
+  `/admin/hoy`, que es el botón que siempre publica con lo que haya.
+- **El aviso sale del cron que la detecta, no del que reintenta.** Aquel
+  corre dos veces al día y este cada dos minutos: avisar en el segundo sería
+  un correo cada dos minutos. El seguimiento ya lo cubre el aviso de espera
+  larga (intento 15).
+- **La guardia se aplica también en el cron de reintento**, aunque no avise:
+  si no, el dato imposible saldría dos minutos más tarde y la puerta no habría
+  servido de nada.
+- `revisarCordura()` **nunca lanza**: si el histórico no responde, se deja
+  pasar. Existe para atrapar un dato imposible, no para añadir un motivo nuevo
+  por el que el post no salga.
+
 ### El pie de tres enlaces es solo para WhatsApp; en Instagram se cierra con hashtags
 
 Existe un pie de tres enlaces —el post, la calculadora y el canal—

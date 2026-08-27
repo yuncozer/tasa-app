@@ -1,4 +1,5 @@
 import { apiError, apiJson } from "@/lib/api";
+import { revisarCordura } from "@/lib/cordura-tasas";
 import { notificarEsperaLarga } from "@/lib/notificar";
 import { publicarTasasDelDia } from "@/lib/publish-hoy";
 import { getRates } from "@/lib/rates";
@@ -58,6 +59,14 @@ export async function GET(request: Request) {
     if (!tasasBaseCompletas(snapshot)) {
       await liberarPendiente(pendiente.id);
       return apiJson({ ok: true, estado: "sigue_incompleta" }, { cachear: false });
+    }
+
+    // La misma guardia que aplicó el cron normal: si publicara aquí, el dato
+    // imposible saldría dos minutos más tarde y la puerta no habría servido
+    // de nada. Sin avisar: el correo ya salió en el disparo que la detectó.
+    if (await revisarCordura(snapshot)) {
+      await liberarPendiente(pendiente.id);
+      return apiJson({ ok: true, estado: "salto_anomalo" }, { cachear: false });
     }
 
     const { mediaId, enlace } = await publicarTasasDelDia(siteUrl, pendiente.momento);

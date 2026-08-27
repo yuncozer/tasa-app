@@ -66,9 +66,11 @@ function estadoDelPost(
   // de ayer no dice nada del disparo de esta mañana.
   if (pendiente?.momento === momento && pendiente.fecha === hoy) {
     return {
-      // Que esté en la cola no es un fallo: es el sistema esperando a que una
-      // fuente responda, y reintentando solo cada dos minutos.
-      detalle: "Esperando a que respondan las tasas · reintentando",
+      // Que esté en la cola no es un fallo: es el sistema esperando a que las
+      // tasas estén completas y sean creíbles, y reintentando solo cada dos
+      // minutos. El motivo exacto viaja en el correo, no aquí: la fila no lo
+      // guarda y adivinarlo sería inventarlo.
+      detalle: "En espera · reintentando cada 2 minutos",
       estado: "pendiente",
     };
   }
