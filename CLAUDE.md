@@ -622,7 +622,7 @@ una con su valor y **cuánto se movió en siete días**. Se dispara a mano desde
 ### La alerta de brecha se publica cuando el admin ve que se movió, no por cron
 
 Además del post diario y del reporte semanal, hay una pieza suelta —"URGENTE |
-SE ABRIÓ LA BRECHA"— con la brecha de hoy, la de hace una semana y cuánto se
+AUMENTA LA BRECHA"— con la brecha de hoy, la de hace una semana y cuánto se
 movió entre las dos. Se dispara a mano desde `/admin/brecha`.
 
 - **No tiene cron, y esa es su razón de ser.** Lo que la justifica no es la
@@ -638,12 +638,12 @@ movió entre las dos. Se dispara a mano desde `/admin/brecha`.
   publicar una cuenta propia. La comparación contra hace una semana usa
   `leerComparativa()` con la misma ventana de ±3 días que el semanal.
 - **El titular lo decide la dirección, no la interfaz** (`titularDe()` en
-  `lib/alerta-brecha.ts`): "SE ABRIÓ LA BRECHA" si subió, "SE CERRÓ" si bajó,
+  `lib/alerta-brecha.ts`): "AUMENTA LA BRECHA" si subió, "BAJA LA BRECHA" si bajó,
   "SE MANTIENE" si no se movió y "ASÍ ESTÁ LA BRECHA" cuando no hay con qué
-  comparar. Dejarlo editable permitiría publicar un "se abrió" encima de unas
+  comparar. Dejarlo editable permitiría publicar un "aumenta" encima de unas
   cifras que dicen lo contrario, que están justo debajo en la misma imagen. La
-  palabra **URGENTE** solo aparece cuando se abrió: ponerla también sobre un
-  "se cerró" la convertiría en decoración.
+  palabra **URGENTE** solo aparece cuando aumenta: ponerla también sobre un
+  "baja" la convertiría en decoración.
 - **Sin brecha no se publica.** Aquí no vale la degradación a `Sin dato` de la
   portada: aquella muestra un estado y esto produce un post que sale a la
   cuenta real y no se corrige después —mismo criterio que el video de tasas—.

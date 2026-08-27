@@ -72,8 +72,8 @@ function direccionDe(variacion: number | null): DireccionVariacion {
  * diciendo lo contrario de sus propias cifras, que están justo debajo.
  */
 function titularDe(direccion: DireccionVariacion): string {
-  if (direccion === "sube") return "SE ABRIÓ LA BRECHA";
-  if (direccion === "baja") return "SE CERRÓ LA BRECHA";
+  if (direccion === "sube") return "AUMENTA LA BRECHA";
+  if (direccion === "baja") return "BAJA LA BRECHA";
   if (direccion === "igual") return "LA BRECHA SE MANTIENE";
   return "ASÍ ESTÁ LA BRECHA";
 }
