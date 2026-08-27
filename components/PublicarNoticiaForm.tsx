@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import type { ElementoCarruselEntrada, ProporcionCarrusel, PublicacionPayload } from "@/lib/publish-news";
 import { ImagenConCarga } from "@/components/admin/ImagenConCarga";
 import { Spinner } from "@/components/admin/Spinner";
@@ -10,6 +10,7 @@ import type { Cintillo } from "@/components/ControlCintillo";
 import { ControlCintillo } from "@/components/ControlCintillo";
 import { ProgramarPublicacion } from "@/components/ProgramarPublicacion";
 import { SelectorMedia, type ItemMedia } from "@/components/SelectorMedia";
+import { hayPortapapeles, noEnServidor, sinCambios } from "@/lib/portapapeles";
 import { subirMediaConProgreso, type FaseSubida } from "@/lib/subida";
 
 interface Preview {
@@ -286,6 +287,25 @@ export function PublicarNoticiaForm({
   const semilla = semillaDeEdicion(edicion?.payload);
   const [modo, setModo] = useState<Modo>(edicion ? "manual" : "url");
   const [url, setUrl] = useState("");
+
+  // Mismo criterio que la calculadora: el botón solo existe donde el
+  // navegador deja leer el portapapeles. La lectura se hace **al pulsarlo** y
+  // no al abrir la pantalla, que es lo que evita el diálogo de permiso al
+  // entrar y lo que exige Safari para conceder el acceso.
+  const puedePegar = useSyncExternalStore(sinCambios, hayPortapapeles, noEnServidor);
+
+  async function pegarUrl() {
+    try {
+      const texto = (await navigator.clipboard.readText()).trim();
+      // Si lo copiado no es un enlace no se toca lo que ya había: vaciar el
+      // campo por pegar cualquier cosa sería peor que no hacer nada.
+      if (!/^https?:\/\//i.test(texto)) return;
+      setUrl(texto);
+      setEstado({ paso: "inicial" });
+    } catch {
+      // El permiso se puede denegar en el momento; no hay nada que reportar.
+    }
+  }
   const [title, setTitle] = useState(semilla?.title ?? "");
   const [sourceHost, setSourceHost] = useState(semilla?.sourceHost ?? "");
   const [caption, setCaption] = useState(semilla?.caption ?? "");
@@ -884,6 +904,15 @@ export function PublicarNoticiaForm({
               }}
               className="flex-1 rounded-xl border border-border-soft bg-surface-strong px-4 py-3 text-base text-foreground outline-none"
             />
+            {!url && puedePegar && (
+              <button
+                type="button"
+                onClick={pegarUrl}
+                className="rounded-xl border border-border-soft bg-surface-strong px-4 py-3 text-sm font-semibold text-muted transition active:scale-95"
+              >
+                Pegar
+              </button>
+            )}
             {url && (
               <button
                 type="button"

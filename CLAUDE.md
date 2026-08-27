@@ -186,6 +186,13 @@ renderizar sin fin.
 - **Se recuerda la moneda, nunca el monto.** Una cifra vieja reaparecida en
   pantalla se confunde con el resultado de ahora, que es justo el daño que esta
   app no puede causar.
+- **La comprobación del portapapeles vive en `lib/portapapeles.ts`**, no en la
+  calculadora: `/admin/noticia` tiene su propio botón "Pegar" para la URL del
+  artículo y necesita exactamente la misma. La regla que comparten es la misma
+  que ya justificaba el de aquí — un botón que nunca funciona es peor que
+  ninguno— y en los dos sitios la lectura ocurre **al pulsarlo**, nunca al
+  abrir la pantalla: así no salta el diálogo de permiso al entrar, y es lo que
+  exige Safari para concederlo.
 - **Copiar y pegar existen porque la cifra viaja por WhatsApp.** Sin copiar hay
   que transcribir el número a mano, que es donde se cuela un dígito cambiado;
   sin pegar no hay forma de meter un monto que llega por chat, porque el

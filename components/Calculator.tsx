@@ -7,6 +7,9 @@ import { registrarEvento } from "@/lib/analitica-cliente";
 import { Keypad, type KeypadKey } from "@/components/Keypad";
 import { convert } from "@/lib/convert";
 import { normalizarMontoPegado, parseInput } from "@/lib/format";
+// Las tres viven en `lib/portapapeles.ts` porque el botón "Pegar" de
+// `/admin/noticia` necesita exactamente la misma comprobación.
+import { hayPortapapeles, noEnServidor, sinCambios } from "@/lib/portapapeles";
 import {
   guardarMoneda,
   monedaEnServidor,
@@ -36,19 +39,6 @@ const MAX_DECIMALS = 2;
 function primeraDisponible(snapshot: RatesSnapshot): RateKey {
   return RATE_ORDER.find((key) => snapshot.rates[key].bsPerUnit !== null) ?? "USD_BCV";
 }
-
-/**
- * Si este navegador deja leer el portapapeles.
- *
- * Se consulta con `useSyncExternalStore` y no en el propio render porque en el
- * servidor no existe `navigator`: declarar aparte el valor del servidor es lo
- * que evita el desajuste de hidratación, el mismo motivo por el que se lee así
- * la preferencia de moneda. No hay a qué suscribirse —la capacidad no cambia
- * mientras la página vive—, de ahí la baja vacía.
- */
-const sinCambios = () => () => {};
-const hayPortapapeles = () => typeof navigator?.clipboard?.readText === "function";
-const noEnServidor = () => false;
 
 /** Aplica una tecla al monto que se está escribiendo. */
 function applyKey(current: string, key: KeypadKey): string {
