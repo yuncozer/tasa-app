@@ -1696,11 +1696,30 @@ Ahora todas cuelgan de `app/admin/(dashboard)/layout.tsx` — un grupo de rutas
 resolviendo a `/admin/hoy`) que queda **fuera** de `/admin/login`, la única
 página que no comparte sesión ni chrome con el resto. Ese layout hace la
 comprobación de sesión una sola vez y envuelve todo en `AdminShell`
-(`components/admin/AdminShell.tsx`): sidebar fija en escritorio, barra +
-tira de navegación horizontal (scroll, sin JavaScript para navegar) en
-móvil. Es `"use client"` únicamente por `usePathname()` — resaltar la
-sección activa es lo único que necesita el navegador; los enlaces siguen
-siendo `<Link>` normales.
+(`components/admin/AdminShell.tsx`): sidebar fija en escritorio y, en móvil,
+**la misma sidebar servida como cajón** desde la hamburguesa del header.
+
+Ahí hubo una tira de píldoras con scroll horizontal y se cambió: con nueve
+secciones no cabía entera —había que arrastrarla para descubrir qué más
+hay—, no dejaba ver los grupos y se comía una franja fija de pantalla en
+todas las pantallas del panel, justo donde se llenan formularios largos. El
+cajón enseña la lista completa y agrupada cuando se pide, y no ocupa nada
+cuando no. La lista es **la misma en los dos sitios** (`Secciones`), no dos
+copias que se desincronizan.
+
+El cajón se queda montado y se mueve con `translate` para entrar y salir
+deslizándose; `inert` mientras está cerrado lo saca del foco y de los
+lectores de pantalla, para que su copia de la nav no se recorra dos veces
+con el teclado. Cierra al tocar el fondo, con la X, con `Escape` y al pulsar
+cualquier enlace — eso último lo hace cada enlace (`alNavegar`) y **no** un
+efecto sobre el `pathname`: cerrar desde un efecto es `setState` dentro de
+uno, el patrón que este proyecto evita y que el linter rechaza. Mientras
+está abierto se bloquea el scroll del cuerpo, o arrastrar sobre el cajón
+movería la página de detrás.
+
+Es `"use client"` por `usePathname()` y por el estado del cajón; los enlaces
+siguen siendo `<Link>` normales y el logout un `<form method="POST">` real,
+así que navegar y cerrar sesión funcionan igual sin JavaScript.
 
 Toda la nav —qué páginas hay, en qué orden, con qué ícono y bajo qué grupo
 ("Publicar", "Reportes y difusión", "Herramientas")— sale de una sola fuente,
