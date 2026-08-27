@@ -1,5 +1,19 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import {
+  Copy,
+  Eye,
+  Heart,
+  AtSign,
+  Link2,
+  MessageCircle,
+  MousePointerClick,
+  Repeat,
+  Smartphone,
+  Sparkles,
+  Users,
+  WifiOff,
+} from "lucide-react";
 import { Suspense } from "react";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { BarrasDias } from "@/components/admin/BarrasDias";
@@ -181,10 +195,11 @@ function BloqueWeb({ datos, dias }: { datos: AnaliticasWeb; dias: number }) {
   return (
     <Seccion titulo={`Últimos ${dias} días`}>
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <TarjetaMetrica etiqueta="Sesiones" valor={totales.sesiones} apoyo="Pestañas distintas" />
-        <TarjetaMetrica etiqueta="Visitas" valor={totales.visitas} apoyo="Pantallas abiertas" />
+        <TarjetaMetrica etiqueta="Sesiones" valor={totales.sesiones} apoyo="Pestañas distintas" icono={Users} />
+        <TarjetaMetrica etiqueta="Visitas" valor={totales.visitas} apoyo="Pantallas abiertas" icono={Eye} />
         <TarjetaMetrica
           etiqueta="Conversiones"
+          icono={Repeat}
           valor={totales.conversiones}
           apoyo={
             tasaConversion === null
@@ -194,6 +209,7 @@ function BloqueWeb({ datos, dias }: { datos: AnaliticasWeb; dias: number }) {
         />
         <TarjetaMetrica
           etiqueta="Cifras copiadas"
+          icono={Copy}
           valor={totales.copias}
           apoyo="El número que viaja por WhatsApp"
         />
@@ -208,14 +224,16 @@ function BloqueWeb({ datos, dias }: { datos: AnaliticasWeb; dias: number }) {
 
       <div className="grid gap-3 grid-cols-2 lg:grid-cols-3">
         <TarjetaMetrica
-          etiqueta="Sesiones desde la app instalada"
+          etiqueta="Desde la app instalada"
+          icono={Smartphone}
           valor={totales.sesionesInstaladas}
-          apoyo={`${formatEntero(totales.instalaciones)} instalaciones nuevas`}
+          apoyo={`Sesiones · ${formatEntero(totales.instalaciones)} instalaciones nuevas`}
         />
         <TarjetaMetrica
-          etiqueta="Sesiones sin conexión"
+          etiqueta="Sin conexión"
+          icono={WifiOff}
           valor={totales.sesionesSinConexion}
-          apoyo="Llegaron a usarla sin señal"
+          apoyo="Sesiones que llegaron a usarla sin señal"
         />
       </div>
 
@@ -275,13 +293,19 @@ function BloqueEnlaces({ datos, dias }: { datos: AnaliticasWeb; dias: number }) 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
         <TarjetaMetrica
           etiqueta="Clics en atajos"
+          icono={MousePointerClick}
           valor={datos.totales.atajos}
           apoyo="Sin rastreadores"
         />
-        <TarjetaMetrica etiqueta="Al canal de WhatsApp" valor={clics("/wa")} apoyo="/wa" />
-        <TarjetaMetrica etiqueta="Al post del día" valor={clics("/hoy")} apoyo="/hoy" />
-        <TarjetaMetrica etiqueta="Al post de La Parada" valor={clics("/laparada")} apoyo="/laparada" />
-        <TarjetaMetrica etiqueta="Al perfil" valor={clics("/ig")} apoyo="/ig" />
+        <TarjetaMetrica etiqueta="Canal de WhatsApp" icono={MessageCircle} valor={clics("/wa")} apoyo="/wa" />
+        <TarjetaMetrica etiqueta="Post del día" icono={Link2} valor={clics("/hoy")} apoyo="/hoy" />
+        <TarjetaMetrica
+          etiqueta="La Parada"
+          icono={Link2}
+          valor={clics("/laparada")}
+          apoyo="/laparada"
+        />
+        <TarjetaMetrica etiqueta="Perfil" icono={AtSign} valor={clics("/ig")} apoyo="/ig" />
       </div>
 
       <div className="rounded-2xl border border-border-soft bg-surface px-4 py-4">
@@ -326,16 +350,27 @@ function BloqueInstagram({ datos, dias }: { datos: AnaliticasInstagram; dias: nu
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <TarjetaMetrica
           etiqueta="Seguidores"
+          icono={Users}
           valor={datos.perfil.seguidores}
           apoyo={datos.perfil.username ? `@${datos.perfil.username}` : undefined}
         />
-        <TarjetaMetrica etiqueta="Alcance" valor={datos.totales.reach} apoyo="Cuentas distintas" />
+        <TarjetaMetrica
+          etiqueta="Alcance"
+          icono={Eye}
+          valor={datos.totales.reach}
+          apoyo="Cuentas distintas"
+        />
         <TarjetaMetrica
           etiqueta="Interacciones"
+          icono={Heart}
           valor={datos.totales.total_interactions}
           apoyo="Me gusta, comentarios y guardados"
         />
-        <TarjetaMetrica etiqueta="Visitas al perfil" valor={datos.totales.profile_views} />
+        <TarjetaMetrica
+          etiqueta="Visitas al perfil"
+          icono={Sparkles}
+          valor={datos.totales.profile_views}
+        />
       </div>
 
       {datos.alcanceDiario.length > 0 && (

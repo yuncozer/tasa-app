@@ -200,6 +200,26 @@ rounded-full border border-border-soft px-3 py-1 text-xs font-medium text-muted
 transition active:scale-95 disabled:opacity-50
 ```
 
+**Tarjeta de métrica** (`components/admin/TarjetaMetrica.tsx`, para filas de
+cifras en `/admin/analiticas`)
+
+```
+flex h-full flex-col gap-3 rounded-2xl border border-border-soft bg-surface px-4 py-4
+etiqueta:  min-h-8 text-xs font-semibold uppercase leading-4 tracking-wide text-muted
+ícono:     size-7 rounded-xl bg-accent/10 text-accent   (el glifo, size-3.5)
+cifra:     tabular text-2xl font-semibold leading-none sm:text-3xl
+apoyo:     mt-auto text-xs leading-4 text-muted
+```
+
+Se lee en fila, no de una en una, y de ahí sus dos reglas propias: `h-full`
+más el `mt-auto` del apoyo alinean las cifras entre sí aunque una etiqueta
+ocupe dos líneas y la de al lado una, y el `min-h-8` reserva esas dos líneas
+para que la cifra no baile. **La etiqueta tiene que caber en dos líneas al
+ancho más angosto en que se use** —en una fila de cinco columnas eso son unos
+110 px— o vuelve el desnivel: es más corto renombrar la etiqueta ("La Parada",
+no "Al post de La Parada", que además ya lo dice el `/laparada` de abajo) que
+recortar el texto por CSS.
+
 **Bloque destacado (resultado)**
 
 ```
