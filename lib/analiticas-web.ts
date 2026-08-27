@@ -26,6 +26,7 @@ const TIMEOUT_MS = 10_000;
  */
 const TIPOS = new Set([
   "visita",
+  "atajo",
   "conversion",
   "copiar",
   "pegar",
@@ -130,6 +131,78 @@ export async function guardarEvento(fila: FilaEvento): Promise<void> {
   await rest("/eventos_web", { method: "POST", body: JSON.stringify(fila) });
 }
 
+/**
+ * Quién pidió la página: una persona o el rastreador que arma la vista previa.
+ *
+ * Los atajos se cuentan **en el servidor** y no en el navegador porque `/wa` y
+ * `/ig` no sirven HTML donde pudiera correr nada, y porque `/hoy`, `/laparada`
+ * y `/p/<slug>` redirigen con un `<meta refresh>` inmediato: un evento
+ * disparado al hidratar llegaría tarde la mitad de las veces. La contrapartida
+ * es que aquí sí pasan los rastreadores —el de WhatsApp pide `/hoy` cada vez
+ * que alguien pega el enlace en un chat— y contarlos inflaría justo la cifra
+ * que se mira para saber cuánta gente abre el enlace. De ahí este filtro.
+ *
+ * Es deliberadamente burdo: reconocer bots por su user-agent nunca es exacto,
+ * pero los que importan aquí se anuncian con todas las letras, y el error de
+ * los que no se declaran es mucho menor que el de contarlos todos.
+ */
+const RASTREADORES = /bot|crawler|spider|facebookexternalhit|whatsapp|preview|curl|wget|headless/i;
+
+/**
+ * Los atajos que se miden. Conjunto cerrado, igual que los tipos de evento:
+ * lo que llega desde una ruta se guarda tal cual, así que tiene que estar
+ * enumerado aquí y no venir de la URL.
+ */
+export type Atajo = "/hoy" | "/wa" | "/ig" | "/laparada" | "/p";
+
+/**
+ * Anota un clic en un atajo del dominio.
+ *
+ * Nunca lanza: estas rutas existen para llevar a alguien a otro sitio, y un
+ * Supabase caído no puede impedir que el enlace funcione — mismo criterio que
+ * `anotarEnlacePost()` con la publicación ya hecha.
+ *
+ * La `sesion` es aleatoria por visita y no se comparte con la del navegador:
+ * aquí no hay pestaña con la que correlacionar nada, y la columna es `not
+ * null` porque para todo lo demás sí lo es. En la práctica significa que cada
+ * clic en un atajo cuenta como una sesión distinta, que es lo que de verdad
+ * describe: quien abre `/hoy` se va del sitio.
+ */
+export async function registrarAtajo(
+  atajo: Atajo,
+  cabeceras: { userAgent: string | null; referer: string | null },
+): Promise<void> {
+  try {
+    if (cabeceras.userAgent && RASTREADORES.test(cabeceras.userAgent)) return;
+
+    await guardarEvento({
+      fecha: diaCaracasISO(Date.now()),
+      tipo: "atajo",
+      ruta: atajo,
+      detalle: atajo,
+      sesion: `atajo-${crypto.randomUUID()}`,
+      // El servidor no puede saber si el teléfono es táctil ni si la app está
+      // instalada, y adivinarlo del user-agent sería inventarlo.
+      dispositivo: null,
+      instalada: false,
+      referente: hostDe(cabeceras.referer),
+    });
+  } catch {
+    // Perder el conteo de un clic no es un incidente; no llevar a nadie a
+    // ninguna parte, sí.
+  }
+}
+
+/** Solo el host, nunca la URL completa: mismo criterio que en el navegador. */
+function hostDe(referer: string | null): string | null {
+  if (!referer) return null;
+  try {
+    return new URL(referer).hostname;
+  } catch {
+    return null;
+  }
+}
+
 /** Una fila del desglose: una clave y cuántas veces salió. */
 export interface Conteo {
   clave: string;
@@ -141,6 +214,7 @@ export interface DiaAnalitica {
   visitas: number;
   sesiones: number;
   conversiones: number;
+  atajos: number;
 }
 
 export interface AnaliticasWeb {
@@ -154,11 +228,16 @@ export interface AnaliticasWeb {
     instalaciones: number;
     sesionesInstaladas: number;
     sesionesSinConexion: number;
+    atajos: number;
   };
   serie: DiaAnalitica[];
   tipos: Conteo[];
   rutas: Conteo[];
   monedas: Conteo[];
+  /** Clics en los atajos del dominio (`/hoy`, `/wa`, `/ig`, `/laparada`, `/p`). */
+  atajos: Conteo[];
+  /** De dónde venía el clic en un atajo: el host que lo refirió. */
+  referentesAtajos: Conteo[];
   dispositivos: Conteo[];
   referentes: Conteo[];
 }

@@ -31,12 +31,14 @@ export const metadata: Metadata = {
  * abre para mirar, así que media pantalla con datos vale más que una pantalla
  * de error — mismo criterio que las insignias del dashboard.
  *
- * **Son dos pestañas y no una página larga.** Las dos mitades no se comparan
- * entre sí —nadie lee "sesiones de la calculadora" al lado de "alcance del
- * post" para sacar una conclusión— y juntas obligaban a bajar media pantalla
- * en el teléfono para llegar a Instagram. Separadas, además, cada una se
- * **carga sola**: mirar la calculadora ya no gasta cuatro llamadas a la Graph
- * API que nadie va a leer.
+ * **Son tres pestañas y no una página larga**: Calculadora, Enlaces e
+ * Instagram. No se comparan entre sí —nadie lee "sesiones de la calculadora"
+ * al lado de "alcance del post" para sacar una conclusión— y juntas obligaban
+ * a bajar media pantalla en el teléfono. Separadas, además, cada una se
+ * **carga sola**: mirar la calculadora ya no gasta las cinco llamadas a la
+ * Graph API que nadie va a leer. Calculadora y Enlaces comparten la misma
+ * consulta —la de `analiticas_web`, que devuelve el panel entero en un solo
+ * viaje— así que separarlas no cuesta nada.
  *
  * La pestaña y el período viajan por query string (`?vista=` y `?dias=`) y no
  * en estado de cliente: la página ya se renderiza en el servidor y un enlace
@@ -55,7 +57,7 @@ const POR_DEFECTO = 30;
  */
 const MAX_DIAS_INSTAGRAM = 30;
 
-const VISTAS = ["calculadora", "instagram"] as const;
+const VISTAS = ["calculadora", "enlaces", "instagram"] as const;
 type Vista = (typeof VISTAS)[number];
 
 /** La calculadora primero: es el sitio propio, y lo de Instagram ya se ve en Instagram. */
@@ -78,6 +80,7 @@ function leerVista(valor: string | undefined): Vista {
 function Pestanas({ vista, dias }: { vista: Vista; dias: number }) {
   const etiquetas: Record<Vista, string> = {
     calculadora: "Calculadora",
+    enlaces: "Enlaces",
     instagram: "Instagram",
   };
 
@@ -224,6 +227,80 @@ function BloqueWeb({ datos, dias }: { datos: AnaliticasWeb; dias: number }) {
   );
 }
 
+/**
+ * Los atajos del dominio: `/hoy`, `/wa`, `/ig`, `/laparada` y `/p/<slug>`.
+ *
+ * Son los enlaces que viajan en los captions de Instagram y en el mensaje del
+ * canal de WhatsApp, así que esta pestaña responde lo único que se puede
+ * responder sobre el canal: **cuánta gente lo abre desde aquí**. El canal en
+ * sí no tiene API —ni de publicación ni de lectura—, que es el mismo motivo
+ * por el que `/admin/canal` arma el mensaje para pegarlo a mano; de sus
+ * seguidores o del alcance de cada mensaje no hay forma de saber nada sin
+ * teclearlo, y un número tecleado a mano en un panel envejece mintiendo.
+ *
+ * Se cuenta por clics y no por sesiones distintas: se registran en el
+ * servidor, donde no hay pestaña con la que correlacionar nada. Los
+ * rastreadores quedan fuera (`registrarAtajo`), que es lo que hace utilizable
+ * la cifra de `/hoy` — el de WhatsApp la pide cada vez que alguien pega el
+ * enlace en un chat.
+ */
+const NOMBRE_ATAJO: Record<string, string> = {
+  "/hoy": "/hoy · post de tasas del día",
+  "/wa": "/wa · canal de WhatsApp",
+  "/ig": "/ig · perfil de Instagram",
+  "/laparada": "/laparada · post de La Parada",
+  "/p": "/p/… · posts de noticia",
+};
+
+function BloqueEnlaces({ datos, dias }: { datos: AnaliticasWeb; dias: number }) {
+  return (
+    <Seccion titulo={`Últimos ${dias} días`}>
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <TarjetaMetrica
+          etiqueta="Clics en atajos"
+          valor={datos.totales.atajos}
+          apoyo="Sin rastreadores"
+        />
+        <TarjetaMetrica
+          etiqueta="Al canal de WhatsApp"
+          valor={datos.atajos.find((fila) => fila.clave === "/wa")?.total ?? 0}
+          apoyo="/wa"
+        />
+        <TarjetaMetrica
+          etiqueta="Al post del día"
+          valor={datos.atajos.find((fila) => fila.clave === "/hoy")?.total ?? 0}
+          apoyo="/hoy"
+        />
+        <TarjetaMetrica
+          etiqueta="Al perfil"
+          valor={datos.atajos.find((fila) => fila.clave === "/ig")?.total ?? 0}
+          apoyo="/ig"
+        />
+      </div>
+
+      <div className="rounded-2xl border border-border-soft bg-surface px-4 py-4">
+        <BarrasDias
+          etiqueta="Clics por día"
+          serie={datos.serie.map((dia) => ({ fecha: dia.fecha, valor: dia.atajos }))}
+        />
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <ListaConteo
+          titulo="Por enlace"
+          filas={datos.atajos}
+          etiquetar={(clave) => NOMBRE_ATAJO[clave] ?? clave}
+        />
+        <ListaConteo
+          titulo="De dónde venía el clic"
+          filas={datos.referentesAtajos}
+          vacio="Ningún clic llegó con referente: es lo normal cuando el enlace se abre desde la app de Instagram o desde WhatsApp, que no lo declaran."
+        />
+      </div>
+    </Seccion>
+  );
+}
+
 function BloqueInstagram({ datos, dias }: { datos: AnaliticasInstagram; dias: number }) {
   const periodo = Math.min(dias, MAX_DIAS_INSTAGRAM);
 
@@ -310,9 +387,7 @@ export default async function AdminAnaliticasPage({
   // hacerlas para una pantalla que nadie va a mirar es gastar cuota y
   // segundos de carga en nada.
   const web =
-    vista === "calculadora"
-      ? await leerAnaliticasWeb(dias).catch((error: Error) => error)
-      : null;
+    vista === "instagram" ? null : await leerAnaliticasWeb(dias).catch((error: Error) => error);
   const instagram =
     vista === "instagram" ? await leerAnaliticasInstagram(Math.min(dias, MAX_DIAS_INSTAGRAM)) : null;
 
@@ -330,6 +405,8 @@ export default async function AdminAnaliticasPage({
       {web !== null &&
         (web instanceof Error ? (
           <Aviso>No se pudieron leer las analíticas del sitio: {web.message}</Aviso>
+        ) : vista === "enlaces" ? (
+          <BloqueEnlaces datos={web} dias={dias} />
         ) : (
           <BloqueWeb datos={web} dias={dias} />
         ))}

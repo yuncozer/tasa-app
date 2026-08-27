@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
+import { registrarAtajo } from "@/lib/analiticas-web";
 import { destinoDeLaParada } from "@/lib/enlaces";
 
 /**
@@ -40,6 +42,17 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function LaParada() {
   const destino = await destinoDeLaParada();
+
+  // El clic se anota aquí, en el servidor, y no al hidratar: el `<meta
+  // refresh>` de abajo dispara de inmediato y un evento del navegador
+  // llegaría tarde la mitad de las veces. `registrarAtajo` descarta a los
+  // rastreadores —el de WhatsApp pide esta página cada vez que alguien pega
+  // el enlace— y nunca lanza.
+  const cabeceras = await headers();
+  await registrarAtajo("/laparada", {
+    userAgent: cabeceras.get("user-agent"),
+    referer: cabeceras.get("referer"),
+  });
 
   return (
     <main className="mx-auto flex w-full max-w-4xl flex-1 flex-col items-center justify-center gap-4 px-4 text-center sm:px-6">

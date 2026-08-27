@@ -20,7 +20,7 @@ export function perfilInstagram(): string {
 /**
  * Sin respaldo en el código, al contrario que el perfil: un número de WhatsApp
  * no se puede adivinar, y uno inventado mandaría a un chat ajeno. Si no está
- * configurado, `/wa` simplemente no existe (404) — ver `next.config.ts`.
+ * configurado, `/wa` simplemente no existe (404) — ver `app/wa/route.ts`.
  */
 export function enlaceWhatsapp(): string | undefined {
   return process.env.ENLACE_WHATSAPP || undefined;

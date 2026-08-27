@@ -814,13 +814,43 @@ hace la gente en la calculadora y cómo le va a lo que se publica en Instagram.
 - **Los gráficos son SVG a mano** (`components/admin/BarrasDias.tsx`), sin
   librería, por lo mismo que `components/Sparkline.tsx`. Barras y no línea
   porque lo que se compara son días sueltos, no una tendencia continua.
-- **Son dos pestañas —Calculadora e Instagram— y no una página larga.** Las
-  dos mitades no se comparan entre sí: nadie lee "sesiones de la calculadora"
-  al lado de "alcance del post" para sacar una conclusión, y juntas obligaban
-  a bajar media pantalla en el teléfono para llegar a Instagram. Separadas,
-  además, **cada mitad se carga sola**: mirar la calculadora ya no gasta las
-  cinco llamadas a la Graph API de la otra pestaña. Cambiar de pestaña
-  conserva el período elegido —cambiar de mitad no es cambiar de pregunta—.
+- **Son tres pestañas —Calculadora, Enlaces e Instagram— y no una página
+  larga.** No se comparan entre sí: nadie lee "sesiones de la calculadora" al
+  lado de "alcance del post" para sacar una conclusión, y juntas obligaban a
+  bajar media pantalla en el teléfono. Separadas, además, **cada una se carga
+  sola**: mirar la calculadora ya no gasta las cinco llamadas a la Graph API
+  de la pestaña de Instagram. Cambiar de pestaña conserva el período elegido
+  —cambiar de mitad no es cambiar de pregunta—.
+- **La pestaña de Enlaces cuenta los atajos del dominio** (`/hoy`, `/wa`,
+  `/ig`, `/laparada` y `/p/<slug>`), que son los que viajan en los captions de
+  Instagram y en el mensaje del canal. Es también lo único que se puede
+  responder sobre el canal de WhatsApp: **cuánta gente lo abre desde aquí**.
+  De sus seguidores o del alcance de cada mensaje no hay forma de saber nada
+  —no existe API de Canales, que es el mismo motivo por el que `/admin/canal`
+  arma el mensaje para pegarlo a mano— y un número tecleado a mano en un panel
+  envejece mintiendo, así que no se inventó una pestaña de canal.
+- **`/wa` y `/ig` dejaron de ser `redirects()` de `next.config.ts`** y ahora
+  son routes (`app/wa/route.ts`, `app/ig/route.ts`) que anotan el clic y
+  devuelven el mismo 307 de antes. El motivo es exactamente ese: un
+  `redirects()` lo resuelve la CDN sin ejecutar código nuestro, así que no
+  había forma de contar nada. El 307 se arma a mano en vez de con
+  `Response.redirect()` para poder ponerle `no-store`: una redirección
+  cacheada dejaría de pasar por la ruta y el clic no se contaría. Lo demás no
+  cambia — sin `ENLACE_WHATSAPP`, `/wa` sigue siendo un 404.
+- **El clic en un atajo se anota en el servidor, no al hidratar.** `/wa` y
+  `/ig` no sirven HTML donde pudiera correr nada, y `/hoy`, `/laparada` y
+  `/p/<slug>` redirigen con un `<meta refresh>` inmediato: un evento del
+  navegador llegaría tarde la mitad de las veces. La contrapartida es que ahí
+  sí pasan los rastreadores —el de WhatsApp pide `/hoy` cada vez que alguien
+  pega el enlace en un chat— y contarlos inflaría justo la cifra que se mira,
+  así que `registrarAtajo()` los descarta por user-agent. Es un filtro burdo a
+  sabiendas: los que importan se anuncian con todas las letras, y el error de
+  los que no se declaran es mucho menor que el de contarlos todos.
+- **Los atajos se cuentan por clics y no por sesiones distintas**, y quedan
+  **fuera del listado general de referentes**: al registrarse en el servidor
+  cada clic trae su propia `sesion`, así que contar sesiones sería contar lo
+  mismo con otro nombre, y mezclarlos taparía de dónde llega el tráfico que sí
+  se queda en el sitio. Tienen su propia lista de referentes.
 - **En la nav va suelta, justo debajo de Inicio**, fuera de los tres grupos
   (`ENLACES_SUPERIORES` en `nav-admin.ts`). Los grupos son cosas que se
   *disparan* sobre una sección concreta; estas dos son la mirada de conjunto,
