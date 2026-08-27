@@ -1,6 +1,6 @@
 import { apiError, apiJson } from "@/lib/api";
 import { buildParadaCaption } from "@/lib/caption";
-import { notificarParadaPendiente } from "@/lib/notificar-parada";
+import { notificarParadaPendiente } from "@/lib/notificar";
 import { guardarParadaPendiente, leerParadaPendiente } from "@/lib/parada";
 import { fetchArticle } from "@/lib/providers/news";
 import { buscarArticuloParada } from "@/lib/providers/parada";
@@ -65,11 +65,8 @@ export async function GET(request: Request) {
     // El borrador ya quedó guardado y `/admin/parada` lo muestra igual sin
     // el correo: un fallo al avisar no puede tumbar la detección, mismo
     // criterio que `calentarVideo` y el resto de notificaciones "de más".
-    try {
-      await notificarParadaPendiente(article.title);
-    } catch {
-      // El admin igual puede enterarse abriendo /admin/parada a mano.
-    }
+    // `notificar()` nunca lanza, así que aquí ya no hace falta envolverlo.
+    await notificarParadaPendiente(article.title);
 
     return apiJson({ ok: true, detectado: true, url: encontrado.url }, { cachear: false });
   } catch (error) {

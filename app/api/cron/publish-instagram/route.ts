@@ -1,5 +1,6 @@
 import type { NextRequest } from "next/server";
 import { apiError, apiJson } from "@/lib/api";
+import { notificarFalloPublicacion } from "@/lib/notificar";
 import { publicarTasasDelDia } from "@/lib/publish-hoy";
 import { getRates } from "@/lib/rates";
 import { fechaDeHoy, registrarPendiente, tasasBaseCompletas } from "@/lib/tasas-pendientes";
@@ -72,8 +73,9 @@ export async function GET(request: NextRequest) {
     return apiError("Falta configurar SITE_URL", undefined, 500);
   }
 
+  const momento = momentoDesdeQuery(request);
+
   try {
-    const momento = momentoDesdeQuery(request);
 
     if (momento) {
       const snapshot = await getRates();
@@ -86,6 +88,10 @@ export async function GET(request: NextRequest) {
     const { mediaId, enlace } = await publicarTasasDelDia(siteUrl, momento);
     return apiJson({ ok: true, mediaId, enlace }, { cachear: false });
   } catch (error) {
+    // El aviso va aquí y no dentro de `publicarTasasDelDia()`: lo que hay que
+    // reportar es "el disparo de las 9:00 no publicó", y solo esta ruta sabe
+    // de qué disparo se trata. Como mucho son dos correos al día.
+    await notificarFalloPublicacion(momento, error);
     return apiError("No se pudo publicar el post de Instagram", error);
   }
 }

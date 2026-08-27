@@ -1,5 +1,7 @@
 import type { NextRequest } from "next/server";
 import { apiError, apiJson } from "@/lib/api";
+import { notificarProgramadaFallida } from "@/lib/notificar";
+import { resumenPublicacion } from "@/lib/publish-news";
 import { reclamarEnProceso, reclamarVencida } from "@/lib/programadas";
 import { avanzarPublicacion } from "@/lib/worker-programadas";
 
@@ -43,5 +45,16 @@ export async function GET(request: NextRequest) {
   }
 
   const resultado = await avanzarPublicacion(programada);
+
+  // Una `fallida` ya no se reintenta sola: se queda en la cola esperando que
+  // alguien decida. Es justo el caso que hay que contar, y ocurre una vez por
+  // publicación, así que el aviso no puede repetirse.
+  if (resultado.estado === "fallida") {
+    await notificarProgramadaFallida(
+      resumenPublicacion(programada.payload),
+      resultado.error ?? "Sin detalle",
+    );
+  }
+
   return apiJson({ ok: true, id: programada.id, ...resultado }, { cachear: false });
 }

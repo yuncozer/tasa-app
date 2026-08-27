@@ -1,4 +1,5 @@
 import { apiError, apiJson } from "@/lib/api";
+import { notificarEsperaLarga } from "@/lib/notificar";
 import { publicarTasasDelDia } from "@/lib/publish-hoy";
 import { getRates } from "@/lib/rates";
 import { liberarPendiente, marcarPublicada, reclamarPendiente, tasasBaseCompletas } from "@/lib/tasas-pendientes";
@@ -20,6 +21,18 @@ import { liberarPendiente, marcarPublicada, reclamarPendiente, tasasBaseCompleta
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
+/**
+ * A los cuántos intentos se avisa por correo. Con un disparo cada 2 minutos,
+ * quince son media hora: pasada esa marca, una fuente que no responde deja de
+ * ser una espera normal.
+ *
+ * Se compara con `===` y no con `>=` a propósito: así el correo sale **una
+ * vez**, en el intento quince, y no cada dos minutos a partir de ahí. Un aviso
+ * repetido se convierte en ruido que se ignora, que es peor que no avisar.
+ */
+const INTENTOS_PARA_AVISAR = 15;
+const MINUTOS_DE_ESPERA = INTENTOS_PARA_AVISAR * 2;
+
 export async function GET(request: Request) {
   const auth = request.headers.get("authorization");
   if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
@@ -34,6 +47,10 @@ export async function GET(request: Request) {
   const pendiente = await reclamarPendiente().catch(() => null);
   if (!pendiente) {
     return apiJson({ ok: true, estado: "nada_pendiente" }, { cachear: false });
+  }
+
+  if (pendiente.intentos === INTENTOS_PARA_AVISAR) {
+    await notificarEsperaLarga(pendiente.momento, MINUTOS_DE_ESPERA);
   }
 
   try {

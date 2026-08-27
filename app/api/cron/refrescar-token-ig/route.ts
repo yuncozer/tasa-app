@@ -1,5 +1,6 @@
 import { apiError, apiJson } from "@/lib/api";
 import { DIAS_PARA_AVISAR, estadoToken, refrescarToken } from "@/lib/instagram-token";
+import { notificarFalloToken } from "@/lib/notificar";
 
 /**
  * Renueva el token de Instagram antes de que caduque.
@@ -42,6 +43,10 @@ export async function GET(request: Request) {
       { cachear: false },
     );
   } catch (error) {
+    // Es el aviso más importante de todos: si el refresco falla varios días
+    // seguidos, el token caduca y deja de publicarse absolutamente todo.
+    await notificarFalloToken(error);
+
     // Aquí sí es un error de verdad: si el refresco falla varias veces
     // seguidas, el token acabará caducando y con él las publicaciones. Que
     // salga como 502 es lo que hace que cron-job.org lo marque en rojo.

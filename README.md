@@ -123,6 +123,9 @@ ellas, el resto de la app funciona igual. Ver `.env.example`.
 | `ADMIN_PASSWORD` | — | Contraseña de `/admin`. Secreto aparte de `CRON_SECRET` |
 | `OPENROUTER_API_KEY` | — | Clave de OpenRouter. Sin ella no aparecen los botones de "Redactar con IA" (ver [Textos con IA](#textos-con-ia)) |
 | `OPENROUTER_MODELOS` | lista de `lib/ia.ts` | Modelos a probar, en orden, separados por comas |
+| `RESEND_API_KEY` | — | Clave de Resend para los avisos por correo. Sin ella no se manda ninguno y todo lo demás sigue igual |
+| `RESEND_FROM` | `La Tasa <onboarding@resend.dev>` | Remitente de esos correos |
+| `NOTIFICAR_EMAIL` | — | A dónde llegan los avisos (borrador de La Parada, post que no salió, programada fallida, token que no se pudo renovar). Se sigue aceptando el nombre anterior `NOTIFICAR_PARADA_EMAIL` |
 
 ## Caché y actualización
 

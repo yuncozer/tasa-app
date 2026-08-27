@@ -1063,13 +1063,10 @@ antes de que salga nada.
   en `null` — nunca intenta leerlos del cuerpo del artículo. El admin los
   confirma a mano en `/admin/parada`, leyendo el artículo original, antes de
   que el botón "Publicar ahora" se habilite.
-- **El correo de aviso es de conveniencia, no un requisito.**
-  `lib/notificar-parada.ts` llama a la API HTTP de Resend (sin su SDK, mismo
-  criterio que `lib/ia.ts` con OpenRouter) justo después de guardar un
-  borrador nuevo, en su propio `try/catch` tragado: si el correo falla, el
-  borrador ya quedó guardado y `/admin/parada` lo sigue ofreciendo igual. Sin
-  `RESEND_API_KEY` o `NOTIFICAR_PARADA_EMAIL` configuradas, se omite en
-  silencio.
+- **El correo de aviso es de conveniencia, no un requisito.** Lo manda
+  `lib/notificar.ts` (ver más abajo) justo después de guardar un borrador
+  nuevo: si el correo falla, el borrador ya quedó guardado y `/admin/parada`
+  lo sigue ofreciendo igual.
 - **La imagen es una plantilla dedicada, no una variante de la de noticia.**
   `/api/og/instagram-post-parada` no recibe título/imagen/cifras por query
   string —a diferencia de `instagram-post-news`— sino que lee el borrador
@@ -1158,6 +1155,42 @@ caducidad obliga a guardar el resultado del refresco, y de ahí la tabla
   con RLS sin políticas ya no se vería ninguna fila, pero esta guarda una
   credencial y conviene que PostgREST responda "permiso denegado" en vez de una
   lista vacía.
+
+### Los avisos por correo viven en un solo sitio
+
+`lib/notificar.ts` empezó siendo `notificar-parada.ts` y avisaba de una sola
+cosa —el borrador nuevo de La Parada— mientras los fallos de verdad seguían
+siendo silenciosos: si el cron de las 9:00 no publicaba, uno se enteraba
+mirando el feed. Ahora todos los puntos donde algo se queda a medias pasan por
+ahí.
+
+| Cuándo | Quién lo dispara |
+| --- | --- |
+| Borrador nuevo de La Parada | `cron/vigilar-parada`, tras guardarlo |
+| El cron de tasas no pudo publicar | `cron/publish-instagram`, en su `catch` |
+| El post lleva media hora esperando a las fuentes | `cron/publicar-tasas-pendientes`, al intento 15 |
+| Una programada terminó en `fallida` | `cron/publicar-programadas` |
+| No se pudo renovar el token de Instagram | `cron/refrescar-token-ig` |
+
+Tres reglas:
+
+- **`notificar()` nunca lanza.** Un correo que no sale no puede convertir una
+  publicación correcta en un error que invite a reintentar y duplique el post
+  — mismo criterio que `guardarEnlace()` y `calentarVideo()`. Por eso quien
+  llama ya no lo envuelve en `try/catch`.
+- **Sin `RESEND_API_KEY` o sin destino, se omite en silencio.** Todo lo que se
+  avisa sigue estando en `/admin` de todas formas. `NOTIFICAR_EMAIL` es la
+  variable general y `NOTIFICAR_PARADA_EMAIL` se sigue aceptando: renombrarla
+  no puede dejar sin avisos a una instalación que ya funcionaba.
+- **Se avisa de lo que pide una persona, no de cada intento.** Los crons que
+  reintentan solos avisan **una vez**, cuando la espera deja de ser normal: el
+  de tasas pendientes compara `intentos === 15` con igualdad estricta
+  justamente para que el correo no salga cada dos minutos. Un aviso repetido
+  se convierte en ruido que se ignora, que es peor que no avisar.
+- **El aviso del fallo de publicación va en la ruta del cron y no dentro de
+  `publicarTasasDelDia()`**: lo que hay que reportar es "el disparo de las
+  9:00 no publicó", y solo la ruta sabe de qué disparo se trata — la función
+  la comparten también el botón manual y la cola de pendientes.
 
 ### La IA solo redacta prosa, y siempre con revisión humana
 
