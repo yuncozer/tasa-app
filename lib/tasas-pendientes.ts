@@ -107,6 +107,19 @@ const ABANDONADA_MS = 60_000;
  * filtro viaja al `WHERE` del `UPDATE`, así que si dos disparos del cron se
  * solapan, solo uno se lleva la fila.
  */
+/**
+ * La fila que sigue esperando, si la hay. Solo lectura: no reclama nada, así
+ * que la agenda de `/admin` puede consultarla sin competir con el cron que
+ * reintenta cada dos minutos.
+ */
+export async function pendienteActual(): Promise<TasaPendiente | null> {
+  const filas = await rest<TasaPendiente[]>(
+    "?estado=eq.pendiente&order=creada_en.desc&limit=1",
+    { method: "GET" },
+  );
+  return filas[0] ?? null;
+}
+
 export async function reclamarPendiente(): Promise<TasaPendiente | null> {
   const limite = new Date(Date.now() - ABANDONADA_MS).toISOString();
   const candidatas = await rest<TasaPendiente[]>(

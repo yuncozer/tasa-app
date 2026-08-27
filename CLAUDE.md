@@ -1783,6 +1783,37 @@ deja este chrome portable si el panel se separa algún día a un proyecto de
 gestor de redes aparte: dos archivos, ninguna página conoce su posición en
 la nav.
 
+`/admin` abre con la **agenda del día** (`lib/agenda-hoy.ts`,
+`components/admin/AgendaDelDia.tsx`): qué salió, qué está en camino y qué
+necesita una persona. Va antes que las secciones porque responde la pregunta
+con la que se abre el panel —"¿está todo bien?"— y las secciones responden la
+siguiente: "¿dónde lo arreglo?"; por eso cada fila enlaza a donde se resuelve.
+
+No mide nada nuevo: junta lo que ya estaba en la base. Los dos posts de tasas
+salen de `historico_tasas` —`registrarSnapshot()` corre dentro de
+`publicarTasasDelDia()` y solo con `momento` explícito, así que la presencia de
+filas de un momento es el rastro más fiable de que ese disparo llegó a
+publicar, y no un registro aparte que pudiera desincronizarse—, la espera sale
+de `tasas_pendientes`, el borrador de `parada_pendiente` y lo programado de la
+cola.
+
+Dos criterios que la gobiernan:
+
+- **El reloj decide si algo es un problema o todavía no.** A las 8 de la
+  mañana que el post de las 9:00 no esté publicado es lo normal; a las 11 es un
+  fallo. Sin esa distinción el panel estaría en ámbar media jornada y el ámbar
+  dejaría de significar nada — `--warning` es semántico también aquí. El margen
+  es de una hora: la publicación tarda (Meta procesa los contenedores) y, si
+  faltaba una tasa base, el reintento va cada dos minutos.
+- **Cada fuente se lee y falla por separado.** Un Supabase caído deja esa fila
+  en "no se pudo consultar", no tumba la agenda ni el panel. Y lo que no tiene
+  nada que decir no dice nada: sin programadas para hoy, esa fila no aparece —
+  una línea que solo repite "no hay nada" es ruido en una lista de pendientes.
+
+El **reporte semanal no está en la agenda** a propósito: nada en la base
+registra cuándo se publicó el último, y la única fuente sería la Graph API —
+una llamada por visita al panel para un dato que se mira una vez a la semana.
+
 El dashboard de `/admin` no es una lista estática: cada tarjeta trae, cuando
 hay algo real que atender, una insignia de estado —proveedores degradados en
 "Publicar tasas", un borrador de La Parada sin publicar, publicaciones en

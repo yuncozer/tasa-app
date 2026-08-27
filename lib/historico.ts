@@ -151,6 +151,29 @@ export async function registrarSnapshot(snapshot: RatesSnapshot, momento: Moment
  * día porque "tarde" es alfabéticamente mayor que "manana" — no hace falta
  * `capturado_en`.
  */
+/**
+ * Qué disparos del día quedaron archivados: `["manana"]`, `["manana",
+ * "tarde"]`, o vacío.
+ *
+ * `registrarSnapshot()` corre dentro de `publicarTasasDelDia()` y solo con
+ * `momento` explícito, o sea únicamente desde el cron. Por eso la presencia
+ * de filas de un momento es el rastro más fiable de que **ese** disparo llegó
+ * a publicar: es la misma escritura que acompaña al post, no un registro
+ * aparte que pudiera desincronizarse.
+ *
+ * Se pide una sola clave (`USD_BCV`) en vez de todas: basta una para saber si
+ * el disparo ocurrió, y traer las siete multiplicaría por siete unas filas
+ * que solo se van a contar.
+ */
+export async function momentosArchivados(fecha: string): Promise<Momento[]> {
+  const filas = await rest<{ momento: string }[]>(
+    `?fecha=eq.${fecha}&clave=eq.USD_BCV&select=momento`,
+  );
+  return filas
+    .map((fila) => fila.momento)
+    .filter((momento): momento is Momento => momento === "manana" || momento === "tarde");
+}
+
 export async function listarHistorico(clave: ClaveHistorico, limite: number = 60): Promise<PuntoHistorico[]> {
   const filas = await rest<FilaHistorico[]>(
     `?clave=eq.${encodeURIComponent(clave)}` +

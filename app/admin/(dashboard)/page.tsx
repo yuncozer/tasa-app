@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
+import { AgendaDelDia } from "@/components/admin/AgendaDelDia";
 import { EstadoToken } from "@/components/admin/EstadoToken";
+import { construirAgendaHoy } from "@/lib/agenda-hoy";
 import { ENLACE_ANALITICAS, NAV_ADMIN, type EnlaceAdmin } from "@/components/admin/nav-admin";
 import { DIAS_PARA_AVISAR, estadoToken } from "@/lib/instagram-token";
 import { leerParadaPendiente } from "@/lib/parada";
@@ -118,11 +120,12 @@ function TarjetaSeccion({ enlace, insignia }: { enlace: EnlaceAdmin; insignia?: 
 }
 
 export default async function AdminPage() {
-  const [pendientesNoticia, paradaPendiente, degradado, token] = await Promise.all([
+  const [pendientesNoticia, paradaPendiente, degradado, token, agenda] = await Promise.all([
     contarPendientesNoticia(),
     hayParadaPendiente(),
     hayDegradacion(),
     leerToken(),
+    construirAgendaHoy(),
   ]);
 
   const insignias: Partial<Record<string, React.ReactNode>> = {
@@ -153,6 +156,11 @@ export default async function AdminPage() {
       />
 
       <div className="flex flex-col gap-6">
+        {/* La agenda va antes que las secciones porque responde la pregunta
+            con la que se abre el panel —"¿está todo bien?"— y las secciones
+            responden la siguiente: "¿dónde lo arreglo?". */}
+        <AgendaDelDia agenda={agenda} />
+
         {/* Analíticas va suelta y primero, fuera de los grupos, igual que en
             la sidebar: es la mirada de conjunto sobre lo que ya salió, no una
             acción que se dispare sobre una sección. */}

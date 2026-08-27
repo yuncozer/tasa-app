@@ -163,6 +163,18 @@ export function diaCaracasISO(ms: number): string {
   return new Date(ms - CARACAS_OFFSET_MS).toISOString().slice(0, 10);
 }
 
+/**
+ * La hora del día en Caracas (0–23), para decidir si algo "ya debería haber
+ * pasado". La usa la agenda de `/admin`: a las 8 de la mañana que el post de
+ * las 9:00 no esté publicado es lo normal, y a las 11 es un problema.
+ *
+ * Va aquí y no en quien la usa por lo mismo que `diaCaracasISO`: el huso de
+ * Caracas se aplica en un solo sitio.
+ */
+export function horaCaracas(ms: number): number {
+  return new Date(ms - CARACAS_OFFSET_MS).getUTCHours();
+}
+
 /** El mismo formato, de vuelta: sirve para el `min` del input. */
 export function horaCaracasDesdeIso(iso: string): string {
   const caracas = new Date(new Date(iso).getTime() - CARACAS_OFFSET_MS);
