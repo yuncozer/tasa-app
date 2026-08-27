@@ -167,18 +167,23 @@ caption ("Tasas de hoy por la mañana/tarde").
 Quien dispara es **cron-job.org**, no Vercel Cron. En el plan Hobby los crons se
 ejecutan "dentro de la hora" y no a la hora exacta, así que el post de las 9:00 podía
 salir a las 9:50; y además solo admiten un disparo diario, lo que no sirve para la
-cola de publicaciones programadas. Los tres disparos viven ahí, con el header
+cola de publicaciones programadas. Todos los disparos viven ahí, con el header
 `Authorization: Bearer <CRON_SECRET>`:
 
-| Tarea | Cuándo (UTC) |
-| --- | --- |
-| `/api/cron/publish-instagram?momento=manana` | `0 13 * * *` |
-| `/api/cron/publish-instagram?momento=tarde` | `0 22 * * *` |
-| `/api/cron/publicar-programadas` | cada 10 min |
+| Tarea | Cuándo (UTC) | Para qué |
+| --- | --- | --- |
+| `/api/cron/publish-instagram?momento=manana` | `0 13 * * *` | El carrusel de las 9:00 am de Caracas |
+| `/api/cron/publish-instagram?momento=tarde` | `0 22 * * *` | El carrusel de las 6:00 pm de Caracas |
+| `/api/cron/publicar-programadas` | cada 2 min | Avanza la cola de publicaciones programadas, una fase por disparo |
+| `/api/cron/publicar-tasas-pendientes` | cada 2 min | Reintenta el post del día cuando faltaba una tasa base |
+| `/api/cron/vigilar-parada` | cada 10 min | Detecta la columna diaria de "Dólar en La Parada" |
+| `/api/cron/refrescar-token-ig` | `0 10 * * *` | Renueva el token de Instagram antes de que caduque |
 
-Al configurarlas, **desactivar los reintentos automáticos**: el post diario no es
-idempotente, y si una ejecución se pasa del tope de tiempo pero Meta ya publicó, un
-reintento duplicaría el post.
+Al configurarlas, **desactivar los reintentos automáticos**. El post diario no es
+idempotente: si una ejecución se pasa del tope de tiempo pero Meta ya publicó, un
+reintento duplicaría el post. El reintento vive dentro de cada cola, que sí sabe por
+dónde iba. Y en el refresco del token un reintento inmediato falla siempre, porque
+Meta exige que el token tenga al menos 24 horas.
 
 Cada disparo publica **un carrusel de dos diapositivas**: las tasas en bolívares y
 las mismas tasas en pesos colombianos. Son un solo post y no dos porque cuatro
