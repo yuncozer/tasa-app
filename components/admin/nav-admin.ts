@@ -5,6 +5,7 @@ import {
   MessageCircle,
   Newspaper,
   Send,
+  TrendingUp,
   Video,
   type LucideIcon,
 } from "lucide-react";
@@ -67,6 +68,12 @@ export const NAV_ADMIN: GrupoAdmin[] = [
         label: "Semanal",
         descripcion: "Cómo se movieron las tasas en los últimos 7 días.",
         icon: BarChart3,
+      },
+      {
+        href: "/admin/brecha",
+        label: "Brecha",
+        descripcion: "Alerta suelta cuando la distancia entre el BCV y Binance se mueve.",
+        icon: TrendingUp,
       },
       {
         href: "/admin/canal",
