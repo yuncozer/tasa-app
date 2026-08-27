@@ -1,0 +1,18 @@
+{
+  "id": "/admin",
+  "name": "La Tasa Admin",
+  "short_name": "Admin",
+  "description": "Panel de publicación y analíticas de La Tasa.",
+  "lang": "es-VE",
+  "start_url": "/admin",
+  "scope": "/admin",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0b1120",
+  "theme_color": "#0b1120",
+  "icons": [
+    { "src": "/icon-admin-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-admin-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-admin-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

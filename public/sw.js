@@ -10,7 +10,7 @@
  * respuesta de `/api/` desde la caché, porque ahí sí pasaría por fresca.
  */
 
-const VERSION = "v7";
+const VERSION = "v8";
 const ATAJOS = ["/hoy", "/laparada", "/ig", "/wa"];
 const CACHE_PAGINA = `latasa-pagina-${VERSION}`;
 const CACHE_ESTATICOS = `latasa-estaticos-${VERSION}`;
@@ -174,6 +174,15 @@ self.addEventListener("fetch", (event) => {
   // misma idea pero con un slug por post en vez de una ruta fija, así que se
   // deja pasar por prefijo.
   if (ATAJOS.includes(url.pathname) || url.pathname.startsWith("/p/")) return;
+
+  // El panel no se cachea nunca, ni su HTML ni sus navegaciones. Tres motivos
+  // que apuntan al mismo sitio: sus pantallas muestran estado del momento
+  // (cola de publicaciones, borradores, analíticas) y una copia vieja se
+  // leería como el estado de ahora; al cerrar sesión, la copia guardada
+  // seguiría pintando el panel; y sin conexión no hay nada que hacer aquí,
+  // porque publicar necesita red de todas formas. Es la misma regla que ya
+  // rige `/api/`, aplicada a las pantallas que solo tienen sentido en vivo.
+  if (url.pathname === "/admin" || url.pathname.startsWith("/admin/")) return;
 
   if (request.mode === "navigate") {
     event.respondWith(navegacion(request));

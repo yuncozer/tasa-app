@@ -19,15 +19,15 @@ const ACENTO = "#34d399";
  * iconos `maskable` necesitan holgura porque Android los recorta en círculo o en
  * cuadrado redondeado, y con poco margen se comería el asa y el plato.
  */
-function taza({ lado, margen, radio }) {
+function taza({ lado, margen, radio, fondo = FONDO, trazo = ACENTO }) {
   const dibujo = lado * (1 - 2 * margen);
   const escala = dibujo / 24;
   const desplazamiento = lado * margen;
 
   return Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${lado}" height="${lado}" viewBox="0 0 ${lado} ${lado}">
-  <rect width="${lado}" height="${lado}" rx="${radio}" fill="${FONDO}"/>
+  <rect width="${lado}" height="${lado}" rx="${radio}" fill="${fondo}"/>
   <g transform="translate(${desplazamiento} ${desplazamiento}) scale(${escala})"
-     fill="none" stroke="${ACENTO}" stroke-width="1.8"
+     fill="none" stroke="${trazo}" stroke-width="1.8"
      stroke-linecap="round" stroke-linejoin="round">
     <path d="M7.5 2.2c-.7.9-.7 1.8 0 2.7"/>
     <path d="M11 2.2c-.7.9-.7 1.8 0 2.7"/>
@@ -39,6 +39,15 @@ function taza({ lado, margen, radio }) {
 </svg>`);
 }
 
+/**
+ * El panel se instala aparte, con su propio icono: en el teléfono conviven
+ * los dos —la calculadora y el admin— y dos iconos idénticos en la pantalla
+ * de inicio no se distinguen de un vistazo. Es la misma taza con la paleta
+ * invertida (fondo acento, taza en el color del fondo), así que se lee como
+ * la misma marca sin necesidad de texto, que a este tamaño no se leería.
+ */
+const INVERTIDO = { fondo: ACENTO, trazo: FONDO };
+
 const ICONOS = [
   { archivo: "public/icon-192.png", lado: 192, margen: 0.12, radio: 42 },
   { archivo: "public/icon-512.png", lado: 512, margen: 0.12, radio: 112 },
@@ -46,12 +55,18 @@ const ICONOS = [
   { archivo: "public/icon-maskable-512.png", lado: 512, margen: 0.2, radio: 0 },
   // iOS aplica su propio redondeo, así que el lienzo va cuadrado y opaco.
   { archivo: "app/apple-icon.png", lado: 180, margen: 0.14, radio: 0 },
+
+  { archivo: "public/icon-admin-192.png", lado: 192, margen: 0.12, radio: 42, ...INVERTIDO },
+  { archivo: "public/icon-admin-512.png", lado: 512, margen: 0.12, radio: 112, ...INVERTIDO },
+  { archivo: "public/icon-admin-maskable-512.png", lado: 512, margen: 0.2, radio: 0, ...INVERTIDO },
+  // El icono que usa iOS al añadir `/admin` a la pantalla de inicio.
+  { archivo: "app/admin/apple-icon.png", lado: 180, margen: 0.14, radio: 0, ...INVERTIDO },
 ];
 
 await mkdir("public", { recursive: true });
 
-for (const { archivo, lado, margen, radio } of ICONOS) {
-  const png = await sharp(taza({ lado, margen, radio })).png().toBuffer();
+for (const { archivo, lado, margen, radio, fondo, trazo } of ICONOS) {
+  const png = await sharp(taza({ lado, margen, radio, fondo, trazo })).png().toBuffer();
   await writeFile(archivo, png);
   console.log(`${archivo} · ${lado}×${lado}`);
 }

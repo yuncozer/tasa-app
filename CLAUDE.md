@@ -1652,6 +1652,37 @@ a "Actualización del día" en vez de "de la mañana/tarde". Existe porque un
 BCV que falla a las 9:00 y responde a las 9:20 antes no tenía forma de
 corregirse sin esperar al disparo de la tarde.
 
+#### El panel se instala aparte, como una segunda app
+
+Con la calculadora instalada en el teléfono no hay barra de direcciones donde
+escribir `/admin`, y la app pública no lleva —ni debe llevar— ningún enlace al
+panel. Desde la app instalada, sencillamente, no había forma de entrar.
+
+La salida no fue abrir un hueco en la app pública sino declarar el panel como
+**otra aplicación instalable**: `app/admin/layout.tsx` reemplaza el manifiesto
+del layout raíz por `public/admin.webmanifest` para todo `/admin`. Se abre
+`latasa.online/admin` en el navegador, se añade a la pantalla de inicio y
+queda un segundo icono que entra directo al panel a pantalla completa.
+
+- **El manifiesto cubre también `/admin/login`**, y eso no es un descuido: esa
+  es justo la pantalla desde la que se instala. Si ahí se sirviera el
+  manifiesto público, "Añadir a inicio" crearía otro acceso a la calculadora.
+- **`scope: "/admin"`** mantiene las dos apps separadas: un enlace fuera del
+  panel abre el navegador en vez de sacarte de contexto dentro de la app.
+- **El icono va con la paleta invertida** (fondo acento, taza en el color del
+  fondo, `INVERTIDO` en `scripts/generar-iconos.mjs`). Dos iconos idénticos en
+  la pantalla de inicio no se distinguen de un vistazo, y a ese tamaño una
+  palabra no se lee. Se regenera con `npm run iconos`, igual que los demás.
+- **En iOS el nombre de la app instalada sale de `appleWebApp.title`**, no del
+  manifiesto, así que se declara en el mismo layout.
+- **El service worker no cachea nada de `/admin`** (`public/sw.js`, y por eso
+  subió `VERSION`). Sus pantallas muestran estado del momento —cola,
+  borradores, analíticas— y una copia vieja se leería como el estado de ahora;
+  además, al cerrar sesión la copia guardada seguiría pintando el panel. Sin
+  conexión no hay nada que hacer aquí: publicar necesita red de todos modos.
+  Es la misma regla de `/api/` aplicada a las pantallas que solo tienen
+  sentido en vivo.
+
 #### El chrome de `/admin` vive en un layout, no repetido en cada página
 
 Al principio cada página traía su propio `<header>` (logo, título, nav) y su
