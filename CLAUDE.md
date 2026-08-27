@@ -855,6 +855,25 @@ hace la gente en la calculadora y cómo le va a lo que se publica en Instagram.
   (`ENLACES_SUPERIORES` en `nav-admin.ts`). Los grupos son cosas que se
   *disparan* sobre una sección concreta; estas dos son la mirada de conjunto,
   y a media lista es donde no se busca un panorama.
+- **Los controles se pintan antes que los datos.** Cada bloque cuelga de un
+  `<Suspense>` con su propio esqueleto (`EsqueletoAnaliticas`), de modo que al
+  cambiar de pestaña o de período las pestañas y el selector siguen en
+  pantalla y solo se repinta el contenido; antes, la pantalla entera se
+  sustituía por el esqueleto genérico de `/admin` y se perdía de vista dónde
+  se había pulsado. La `key` del `Suspense` es lo que lo hace suspender de
+  nuevo en cada cambio: sin ella React reutilizaría el subárbol y dejaría las
+  cifras viejas mientras llegan las nuevas, que en un panel de cifras se lee
+  como un dato que no cuadra. Este esqueleto **sí imita la página**, al
+  contrario que el de `/admin`: esta pantalla tiene siempre la misma forma
+  —cuatro cifras, una serie, dos listas— así que no hay nada que mantener
+  sincronizado y el contenido no salta al aparecer.
+- **Tres niveles de fallo, y cada uno se ve distinto**: una métrica que la
+  fuente no expone sale como `—`; una lectura fallida de Supabase, como aviso
+  dentro del bloque, diciendo que las tasas y la publicación no dependen de
+  esto; y lo imprevisto lo recoge `error.tsx` del propio segmento, con un
+  botón de reintentar —`reset()` reintenta el render sin recargar, que es lo
+  que hace falta cuando falla una lectura de red— y sin tumbar el resto de
+  `/admin`, porque el boundary vive en este segmento y no en el layout.
 - El período y la pestaña viajan por query string (`?dias=` y `?vista=`), como
   el `?vista=` de `/historial`, y la página **no lleva cabecera de CDN**: cuelga de la sesión
   de `/admin`, la abre una sola persona y cachearla serviría cifras viejas
@@ -1230,6 +1249,19 @@ botón que arma el Reel con esas mismas cifras, su vista previa y su descarga.
 - **Sin las dos variables de entorno cae al render local**, que es lo cómodo en
   desarrollo y no gasta créditos. Se prefiere la nube cuando está configurada
   para que lo que se prueba sea lo que va a pasar en producción.
+
+### Una dirección equivocada cae en una pantalla propia, no en la de Next
+
+`app/not-found.tsx`. La página por defecto de Next —fondo blanco, tipografía
+del sistema, "404 | This page could not be found"— se lee como "el sitio se
+rompió" y encima parece otro sitio distinto, que es lo peor que puede pasar
+cuando alguien llega con un enlace mal copiado desde WhatsApp.
+
+Lo que importa no es el 404 sino la salida: el botón grande va a la
+calculadora, que es a lo que venía casi todo el que aterriza aquí, y debajo
+queda `/historial` como el otro destino que alguien puede estar buscando. Es
+estática y sin JavaScript, así que también sirve servida por el service worker
+sin conexión.
 
 ### El aviso legal se queda
 

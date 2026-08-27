@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Suspense } from "react";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { BarrasDias } from "@/components/admin/BarrasDias";
+import { EsqueletoAnaliticas } from "@/components/admin/Esqueleto";
 import { ListaConteo } from "@/components/admin/ListaConteo";
 import { TarjetaMetrica } from "@/components/admin/TarjetaMetrica";
 import { leerAnaliticasWeb, type AnaliticasWeb } from "@/lib/analiticas-web";
@@ -39,6 +41,16 @@ export const metadata: Metadata = {
  * Graph API que nadie va a leer. Calculadora y Enlaces comparten la misma
  * consulta —la de `analiticas_web`, que devuelve el panel entero en un solo
  * viaje— así que separarlas no cuesta nada.
+ *
+ * **Las pestañas y el selector se pintan antes que los datos.** Cada bloque
+ * cuelga de un `<Suspense>` con su propio esqueleto, así que al cambiar de
+ * pestaña o de período los controles siguen ahí y solo se repinta el
+ * contenido — sin eso, la pantalla entera se sustituía por el esqueleto
+ * genérico de `/admin` y se perdía de vista dónde se había pulsado. La `key`
+ * del `Suspense` es lo que hace que vuelva a suspenderse en cada cambio: sin
+ * ella React reutilizaría el subárbol y dejaría las cifras viejas en pantalla
+ * mientras llegan las nuevas, que en un panel de cifras se lee como un dato
+ * que no cuadra.
  *
  * La pestaña y el período viajan por query string (`?vista=` y `?dias=`) y no
  * en estado de cliente: la página ya se renderiza en el servidor y un enlace
@@ -373,6 +385,39 @@ function BloqueInstagram({ datos, dias }: { datos: AnaliticasInstagram; dias: nu
   );
 }
 
+/**
+ * Los tres bloques envueltos en su propia lectura.
+ *
+ * El `fetch` vive aquí dentro y no en la página para que `<Suspense>` tenga
+ * algo que esperar: si la página los resolviera antes de renderizar, el
+ * esqueleto no llegaría a verse nunca y volveríamos a la pantalla en blanco.
+ */
+async function DatosWeb({ dias, vista }: { dias: number; vista: Vista }) {
+  const datos = await leerAnaliticasWeb(dias).catch((error: Error) => error);
+
+  if (datos instanceof Error) {
+    return (
+      <Aviso>
+        No se pudieron leer las analíticas del sitio: {datos.message}. Las tasas y la publicación
+        no dependen de esto; vuelve a cargar la página en un momento.
+      </Aviso>
+    );
+  }
+
+  return vista === "enlaces" ? (
+    <BloqueEnlaces datos={datos} dias={dias} />
+  ) : (
+    <BloqueWeb datos={datos} dias={dias} />
+  );
+}
+
+async function DatosInstagram({ dias }: { dias: number }) {
+  // `leerAnaliticasInstagram` no lanza: degrada a la estructura vacía con sus
+  // avisos, que es lo que la pantalla sabe mostrar métrica a métrica.
+  const datos = await leerAnaliticasInstagram(Math.min(dias, MAX_DIAS_INSTAGRAM));
+  return <BloqueInstagram datos={datos} dias={dias} />;
+}
+
 export default async function AdminAnaliticasPage({
   searchParams,
 }: {
@@ -381,15 +426,6 @@ export default async function AdminAnaliticasPage({
   const params = await searchParams;
   const vista = leerVista(params.vista);
   const dias = leerDias(params.dias);
-
-  // Solo se pide lo que se va a mostrar. Es la razón práctica de las
-  // pestañas: la mitad de Instagram son cinco llamadas a la Graph API, y
-  // hacerlas para una pantalla que nadie va a mirar es gastar cuota y
-  // segundos de carga en nada.
-  const web =
-    vista === "instagram" ? null : await leerAnaliticasWeb(dias).catch((error: Error) => error);
-  const instagram =
-    vista === "instagram" ? await leerAnaliticasInstagram(Math.min(dias, MAX_DIAS_INSTAGRAM)) : null;
 
   return (
     <>
@@ -402,16 +438,17 @@ export default async function AdminAnaliticasPage({
 
       <SelectorPeriodo vista={vista} dias={dias} />
 
-      {web !== null &&
-        (web instanceof Error ? (
-          <Aviso>No se pudieron leer las analíticas del sitio: {web.message}</Aviso>
-        ) : vista === "enlaces" ? (
-          <BloqueEnlaces datos={web} dias={dias} />
+      {/* Solo se pide lo que se va a mostrar. Es la razón práctica de las
+          pestañas: la mitad de Instagram son cinco llamadas a la Graph API, y
+          hacerlas para una pantalla que nadie va a mirar es gastar cuota y
+          segundos de carga en nada. */}
+      <Suspense key={`${vista}-${dias}`} fallback={<EsqueletoAnaliticas />}>
+        {vista === "instagram" ? (
+          <DatosInstagram dias={dias} />
         ) : (
-          <BloqueWeb datos={web} dias={dias} />
-        ))}
-
-      {instagram !== null && <BloqueInstagram datos={instagram} dias={dias} />}
+          <DatosWeb dias={dias} vista={vista} />
+        )}
+      </Suspense>
     </>
   );
 }

@@ -10,11 +10,11 @@
  * contenido se cambia por este esqueleto genérico. No intenta imitar cada
  * página: un esqueleto por sección habría que mantenerlo sincronizado con
  * cada formulario, y esto ya cubre lo que de verdad importa — que algo se
- * mueva de inmediato.
+ * mueva de inmediato. La excepción es `/admin/analiticas`, que sí tiene el
+ * suyo (`EsqueletoAnaliticas`): esa pantalla tiene siempre la misma forma y
+ * se puede imitar sin mantener nada sincronizado.
  */
-function Bloque({ className }: { className?: string }) {
-  return <div className={`animate-pulse rounded-2xl bg-surface-strong ${className ?? ""}`} />;
-}
+import { Bloque } from "@/components/admin/Esqueleto";
 
 export default function CargandoSeccion() {
   return (
