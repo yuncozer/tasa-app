@@ -22,7 +22,12 @@ import { ListaConteo } from "@/components/admin/ListaConteo";
 import { TarjetaMetrica } from "@/components/admin/TarjetaMetrica";
 import { leerAnaliticasWeb, type AnaliticasWeb } from "@/lib/analiticas-web";
 import { formatEntero, formatFechaCorta, formatPercent } from "@/lib/format";
-import { leerAnaliticasInstagram, type AnaliticasInstagram } from "@/lib/instagram-insights";
+import {
+  compararFranjas,
+  leerAnaliticasInstagram,
+  type AnaliticasInstagram,
+  type ComparacionFranjas,
+} from "@/lib/instagram-insights";
 import { rateMeta } from "@/lib/rates";
 import type { RateKey } from "@/lib/types";
 
@@ -331,7 +336,49 @@ function BloqueEnlaces({ datos, dias }: { datos: AnaliticasWeb; dias: number }) 
   );
 }
 
-function BloqueInstagram({ datos, dias }: { datos: AnaliticasInstagram; dias: number }) {
+/**
+ * La recomendación de franja horaria.
+ *
+ * Es lo único del panel que sugiere algo en vez de limitarse a contar, así
+ * que lleva su propia letra pequeña: con cuántos posts se dijo y cómo se
+ * midió. Sin material suficiente no se calla —eso parecería un fallo— sino
+ * que dice que todavía no se puede responder, que es distinto.
+ */
+function Franjas({ comparacion }: { comparacion: ComparacionFranjas | null }) {
+  if (!comparacion) {
+    return (
+      <p className="rounded-2xl border border-border-soft bg-surface px-4 py-3 text-xs text-muted">
+        Todavía no hay publicaciones suficientes en las dos franjas para comparar mañana con tarde.
+      </p>
+    );
+  }
+
+  const { mejor, diferencia, postsManana, postsTarde } = comparacion;
+
+  return (
+    <div className="flex flex-col gap-1 rounded-2xl border border-border-soft bg-surface px-4 py-3">
+      <p className="text-sm font-medium">
+        {mejor === null
+          ? "Mañana y tarde rinden parecido"
+          : `Los posts de la ${mejor === "tarde" ? "tarde" : "mañana"} rinden ${formatPercent(diferencia)} más`}
+      </p>
+      <p className="text-xs text-muted">
+        Mediana de me gusta y comentarios · {postsManana} posts de mañana y {postsTarde} de tarde.
+        No usa el alcance porque exigiría una llamada por publicación.
+      </p>
+    </div>
+  );
+}
+
+function BloqueInstagram({
+  datos,
+  dias,
+  franjas,
+}: {
+  datos: AnaliticasInstagram;
+  dias: number;
+  franjas: ComparacionFranjas | null;
+}) {
   const periodo = Math.min(dias, MAX_DIAS_INSTAGRAM);
 
   return (
@@ -372,6 +419,8 @@ function BloqueInstagram({ datos, dias }: { datos: AnaliticasInstagram; dias: nu
           valor={datos.totales.profile_views}
         />
       </div>
+
+      <Franjas comparacion={franjas} />
 
       {datos.alcanceDiario.length > 0 && (
         <div className="rounded-2xl border border-border-soft bg-surface px-4 py-4">
@@ -443,8 +492,12 @@ async function DatosWeb({ dias, vista }: { dias: number; vista: Vista }) {
 async function DatosInstagram({ dias }: { dias: number }) {
   // `leerAnaliticasInstagram` no lanza: degrada a la estructura vacía con sus
   // avisos, que es lo que la pantalla sabe mostrar métrica a métrica.
-  const datos = await leerAnaliticasInstagram(Math.min(dias, MAX_DIAS_INSTAGRAM));
-  return <BloqueInstagram datos={datos} dias={dias} />;
+  // `compararFranjas` tampoco: devuelve `null` cuando no hay con qué opinar.
+  const [datos, franjas] = await Promise.all([
+    leerAnaliticasInstagram(Math.min(dias, MAX_DIAS_INSTAGRAM)),
+    compararFranjas(),
+  ]);
+  return <BloqueInstagram datos={datos} dias={dias} franjas={franjas} />;
 }
 
 export default async function AdminAnaliticasPage({

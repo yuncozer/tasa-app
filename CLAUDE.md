@@ -838,6 +838,17 @@ hace la gente en la calculadora y cómo le va a lo que se publica en Instagram.
   aviso y oculta varias en cuentas pequeñas, así que se piden **una por una**
   —pedirlas en lote hace que una sola métrica no disponible tumbe las demás— y
   lo que falla se muestra como `—`, nunca como `0`.
+- **La única sugerencia del panel es la franja horaria**, y por eso lleva su
+  propia letra pequeña. `compararFranjas()` (`lib/instagram-insights.ts`) mira
+  las últimas 50 publicaciones, las parte en mañana y tarde por su hora **de
+  Caracas** y compara la **mediana** de me gusta más comentarios — mediana y
+  no promedio porque un post viral desplazaría a su franja y haría recomendar
+  una hora por una casualidad. Se mide con interacciones públicas y no con el
+  alcance porque aquel exige una llamada de `insights` por publicación, o sea
+  cincuenta por cada visita a la pestaña. Con menos de cinco posts en alguna
+  franja, o con una diferencia por debajo del 15 %, **no recomienda**: dice que
+  todavía no se puede responder o que están parejas. Una recomendación sacada
+  de dos posts es una corazonada con cara de dato.
 - **Instagram no devuelve métricas de cuenta más allá de 30 días.** El selector
   ofrece igualmente 90, que estira solo la mitad web, y la pantalla lo dice en
   vez de recortar la opción: "cómo viene el trimestre en el sitio" es una

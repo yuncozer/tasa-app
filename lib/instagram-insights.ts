@@ -15,6 +15,7 @@
  * igual que hace el reporte semanal cuando falta una comparación.
  */
 
+import { horaCaracas } from "@/lib/format";
 import { credenciales, GRAPH_BASE } from "@/lib/instagram";
 
 const TIMEOUT_MS = 10_000;
@@ -61,6 +62,32 @@ export interface AnaliticasInstagram {
   publicaciones: MediaConMetricas[];
   /** Qué falló, en lenguaje llano, para que el panel lo diga en vez de callarlo. */
   avisos: string[];
+}
+
+/**
+ * Cuántos posts se miran para comparar franjas horarias, y cuántos hacen
+ * falta como mínimo en cada una para decir algo.
+ *
+ * Con cinco por franja una sola publicación excepcional deja de mandar sobre
+ * la conclusión, sobre todo usando la mediana. Por debajo de eso no se
+ * compara: una recomendación sacada de dos posts es una corazonada con cara
+ * de dato, que es peor que no decir nada.
+ */
+const POSTS_PARA_FRANJAS = 50;
+const MINIMO_POR_FRANJA = 5;
+
+/** Antes o después del mediodía en Caracas: son las dos franjas en que se publica. */
+export type Franja = "manana" | "tarde";
+
+export interface ComparacionFranjas {
+  /** Qué franja rinde más, o `null` si la diferencia no llega a ser una. */
+  mejor: Franja | null;
+  /** Cuánto más rinde, en porcentaje sobre la otra. */
+  diferencia: number;
+  medianaManana: number;
+  medianaTarde: number;
+  postsManana: number;
+  postsTarde: number;
 }
 
 async function graph<T>(ruta: string, params: Record<string, string>): Promise<T> {
@@ -196,6 +223,75 @@ async function publicaciones(cuantas: number): Promise<MediaConMetricas[]> {
       };
     }),
   );
+}
+
+function mediana(valores: number[]): number {
+  const orden = [...valores].sort((a, b) => a - b);
+  const medio = Math.floor(orden.length / 2);
+  return orden.length % 2 === 0 ? (orden[medio - 1] + orden[medio]) / 2 : orden[medio];
+}
+
+/**
+ * Si publicar por la mañana o por la tarde rinde más.
+ *
+ * **Se mide con las interacciones públicas** (me gusta + comentarios), que
+ * vienen en el propio listado de medias, y no con el alcance: aquel exige una
+ * llamada de `insights` por publicación, o sea cincuenta llamadas cada vez
+ * que alguien abre la pestaña, para una pregunta que se consulta de vez en
+ * cuando. La conclusión que interesa —qué franja funciona mejor— aguanta esa
+ * aproximación; el alcance exacto de cada post ya está en la lista de abajo.
+ *
+ * **Mediana y no promedio**: un post que se viralizó desplazaría el promedio
+ * de su franja y haría recomendar una hora por una casualidad.
+ *
+ * Devuelve `null` cuando no hay material suficiente. Ese caso no es un error
+ * ni un cero: es "todavía no se puede responder", y la interfaz lo dice con
+ * esas palabras en vez de enseñar una recomendación endeble.
+ */
+export async function compararFranjas(): Promise<ComparacionFranjas | null> {
+  try {
+    const { accountId } = await credenciales();
+    const listado = await graph<{ data?: FilaMedia[] }>(`/${accountId}/media`, {
+      fields: "id,timestamp,like_count,comments_count",
+      limit: String(POSTS_PARA_FRANJAS),
+    });
+
+    const manana: number[] = [];
+    const tarde: number[] = [];
+
+    for (const media of listado.data ?? []) {
+      const interacciones = (media.like_count ?? 0) + (media.comments_count ?? 0);
+      // La hora se lee en Caracas, no en UTC: publicar "a las 9" significa
+      // las 9 de allá, que es lo que decide quién está mirando el teléfono.
+      const hora = horaCaracas(new Date(media.timestamp).getTime());
+      (hora < 12 ? manana : tarde).push(interacciones);
+    }
+
+    if (manana.length < MINIMO_POR_FRANJA || tarde.length < MINIMO_POR_FRANJA) return null;
+
+    const medianaManana = mediana(manana);
+    const medianaTarde = mediana(tarde);
+    const mayor = Math.max(medianaManana, medianaTarde);
+    const menor = Math.min(medianaManana, medianaTarde);
+
+    // Sin base con la que dividir no hay porcentaje que dar.
+    if (menor === 0) return null;
+
+    const diferencia = (mayor / menor - 1) * 100;
+
+    return {
+      // Por debajo del 15 % la diferencia no sobrevive al ruido de una cuenta
+      // pequeña: se dice que están parejas en vez de recomendar una franja.
+      mejor: diferencia < 15 ? null : medianaTarde > medianaManana ? "tarde" : "manana",
+      diferencia,
+      medianaManana,
+      medianaTarde,
+      postsManana: manana.length,
+      postsTarde: tarde.length,
+    };
+  } catch {
+    return null;
+  }
 }
 
 /**
