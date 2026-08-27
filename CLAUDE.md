@@ -657,6 +657,16 @@ movió entre las dos. Se dispara a mano desde `/admin/brecha`.
   reporte semanal —reservas de 110 y 130 px arriba y abajo del vertical para
   que la interfaz de Instagram no tape nada— y mismo motivo para no publicarla
   por la API: una Story de la Graph API no admite sticker de enlace.
+- **La franja del titular va de borde a borde y con un rojo propio.** El
+  relleno lateral del lienzo lo ponen los bloques y no el contenedor raíz,
+  justo para que esa franja pueda llegar a los dos bordes: así se lee como un
+  rótulo de noticiero y no como otra píldora más de las que ya tiene la imagen.
+  El rojo (`ROJO`, local a la ruta) es más vivo que `COLOR.danger`, que está
+  calibrado para la columna de variaciones del semanal —texto pequeño sobre
+  fondo oscuro— y aquí, sosteniendo una franja entera con una foto detrás,
+  se leía apagado. No se toca el token global: el semanal sigue con el suyo,
+  donde el problema no existe. Lo usan también la flecha, la variación y el
+  borde de la tarjeta de hoy, para que haya un solo rojo y no dos parecidos.
 - **La foto de fondo va embebida y apagada bajo un velo.** Vive en
   `app/api/og/_assets/fondo-brecha.jpg` y se lee como data URI, igual que las
   fuentes y los SVG del pie: pedirla por red desde dentro de la misma función

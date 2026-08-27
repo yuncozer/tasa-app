@@ -99,13 +99,29 @@ const MEDIDAS: Record<Proporcion, Medidas> = {
 };
 
 /**
+ * El rojo de esta plantilla, más vivo que el `--danger` del sistema.
+ *
+ * `COLOR.danger` (#f87171) está calibrado para texto pequeño sobre fondo
+ * oscuro —la columna de variaciones del reporte semanal— y ahí funciona. Aquí
+ * tiene que sostener una franja de borde a borde y competir con una foto
+ * detrás: al mismo tono pálido, la franja se leía apagada, como un aviso más y
+ * no como la alerta que es. Se define **local a esta ruta** y no se toca el
+ * token global: el semanal sigue con el suyo, donde el problema no existe.
+ *
+ * Lo usan la franja y todos los detalles que acompañan a una brecha que sube
+ * —la flecha, la variación y el borde de la tarjeta de hoy— para que la imagen
+ * tenga un solo rojo y no dos parecidos.
+ */
+const ROJO = "#e11d2f";
+
+/**
  * El color va por impacto y no por signo, igual que en el reporte semanal: una
  * brecha que se abre es peor para quien lee, así que sube → rojo y baja →
  * verde. Sin movimiento no se pinta ninguno de los dos, que sería insinuar una
  * dirección que no hay.
  */
 function colorDe(direccion: DireccionVariacion): string {
-  if (direccion === "sube") return COLOR.danger;
+  if (direccion === "sube") return ROJO;
   if (direccion === "baja") return COLOR.accent;
   return COLOR.muted;
 }
@@ -147,10 +163,15 @@ function Banda({ alerta, medidas }: { alerta: AlertaBrecha; medidas: Medidas }) 
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        backgroundColor: urgente ? COLOR.danger : COLOR.surface,
-        border: `2px solid ${urgente ? COLOR.danger : color}`,
-        borderRadius: 18,
-        padding: "14px 28px",
+        width: "100%",
+        backgroundColor: urgente ? ROJO : COLOR.surface,
+        // Sin radio ni margen: la franja va de borde a borde del lienzo, que es
+        // lo que la hace leerse como un rótulo de noticiero y no como una
+        // píldora más de las que ya tiene la imagen. Por eso el relleno lateral
+        // del lienzo lo ponen los bloques y no el contenedor raíz.
+        borderTop: `2px solid ${urgente ? ROJO : color}`,
+        borderBottom: `2px solid ${urgente ? ROJO : color}`,
+        padding: `14px ${medidas.padding}px`,
         fontSize: medidas.banda,
         fontWeight: 700,
         color: urgente ? COLOR.foreground : color,
@@ -238,8 +259,6 @@ function BrechaImage({
         flexDirection: "column",
         justifyContent: "space-between",
         backgroundColor: COLOR.background,
-        paddingLeft: medidas.padding,
-        paddingRight: medidas.padding,
         paddingTop: medidas.padding + medidas.reservaArriba,
         paddingBottom: medidas.padding + medidas.reservaAbajo,
         fontFamily: "Geist",
@@ -280,9 +299,8 @@ function BrechaImage({
           position: "relative",
           display: "flex",
           flexDirection: "column",
+          alignItems: "center",
           gap: 22,
-          paddingLeft: AIRE_LATERAL,
-          paddingRight: AIRE_LATERAL,
         }}
       >
         <Cabecera medidas={medidas} />
@@ -299,8 +317,8 @@ function BrechaImage({
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
-          marginLeft: AIRE_LATERAL,
-          marginRight: AIRE_LATERAL,
+          marginLeft: medidas.padding + AIRE_LATERAL,
+          marginRight: medidas.padding + AIRE_LATERAL,
           padding: medidas.paddingPanel,
           borderRadius: 32,
           backgroundColor: "rgba(11,17,32,0.72)",
@@ -402,7 +420,15 @@ function BrechaImage({
 
       {/* `position: relative` para que quede por encima del velo, que es
           absoluto y va después en el flujo. */}
-      <div style={{ position: "relative", display: "flex", flexDirection: "column" }}>
+      <div
+        style={{
+          position: "relative",
+          display: "flex",
+          flexDirection: "column",
+          paddingLeft: medidas.padding,
+          paddingRight: medidas.padding,
+        }}
+      >
         <Pie icons={icons} aviso={AVISO_BRECHA} />
       </div>
     </div>
