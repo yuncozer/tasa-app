@@ -799,6 +799,14 @@ export function PublicarNoticiaForm({
   }
 
   async function publicar(datos: Preview) {
+    if (
+      !window.confirm(
+        "Esto publica en la cuenta real de Instagram. No se puede deshacer. ¿Publicar ahora?",
+      )
+    ) {
+      return;
+    }
+
     setEstado({ paso: "publicando", preview: datos });
     try {
       const endpoint = esCarrusel

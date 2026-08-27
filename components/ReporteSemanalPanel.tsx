@@ -67,6 +67,17 @@ export function ReporteSemanalPanel({
   const vertical = `${base}?proporcion=9:16${refresco}`;
 
   async function publicar() {
+    // Mismo resguardo que `/admin/hoy` y `/admin/parada`: esto sale a la
+    // cuenta real y no se deshace, y en el teléfono el botón queda a un dedo
+    // de distancia mientras se revisa la imagen.
+    if (
+      !window.confirm(
+        "Esto publica el reporte semanal en la cuenta real de Instagram. No se puede deshacer. ¿Publicar ahora?",
+      )
+    ) {
+      return;
+    }
+
     setEstado({ paso: "publicando" });
     try {
       const response = await fetch("/api/admin/publish-semanal", {

@@ -88,6 +88,16 @@ export function AlertaBrechaPanel({
   const vertical = `${base}?proporcion=9:16${variante}${refresco}`;
 
   async function publicar(destino: Destino) {
+    // Feed e Historia son dos publicaciones distintas y se confirman por
+    // separado, igual que se disparan por separado: el texto nombra cuál.
+    if (
+      !window.confirm(
+        `Esto publica la alerta de brecha ${destino === "historia" ? "como Historia" : "en el feed"} de la cuenta real de Instagram. No se puede deshacer. ¿Publicar ahora?`,
+      )
+    ) {
+      return;
+    }
+
     const setEstado = destino === "historia" ? setHistoria : setFeed;
 
     setEstado({ paso: "publicando" });

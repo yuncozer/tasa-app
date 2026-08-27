@@ -162,6 +162,14 @@ export function PublicarVideoForm({
   }
 
   async function publicar(videoPublicId: string) {
+    if (
+      !window.confirm(
+        "Esto publica el video en la cuenta real de Instagram. No se puede deshacer. ¿Publicar ahora?",
+      )
+    ) {
+      return;
+    }
+
     if (!("videoUrl" in estado)) return;
     setEstado({
       paso: "publicando",

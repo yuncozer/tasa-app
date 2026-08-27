@@ -1801,6 +1801,20 @@ a "Actualización del día" en vez de "de la mañana/tarde". Existe porque un
 BCV que falla a las 9:00 y responde a las 9:20 antes no tenía forma de
 corregirse sin esperar al disparo de la tarde.
 
+#### Publicar pide confirmación en todas partes
+
+Todo botón que manda algo a la cuenta real —tasas, La Parada, noticia, video,
+semanal y las dos variantes de la alerta de brecha— pasa por un
+`window.confirm` que nombra lo que va a salir y avisa de que no se deshace.
+Lo tenían `/admin/hoy` y `/admin/parada` desde el principio y faltaba en el
+resto, que es donde más falta hacía: en el teléfono ese botón queda a un dedo
+de distancia mientras se revisa la imagen, y publicar en Instagram es la única
+acción del proyecto sin vuelta atrás.
+
+Se usa `window.confirm` y no un diálogo propio a propósito: es lo que ya
+estaba, no lleva estado ni componente nuevo, y en la app instalada se ve como
+el diálogo del sistema — que es exactamente el peso que tiene que tener.
+
 #### El panel se instala aparte, como una segunda app
 
 Con la calculadora instalada en el teléfono no hay barra de direcciones donde
