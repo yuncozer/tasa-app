@@ -648,7 +648,15 @@ movió entre las dos. Se dispara a mano desde `/admin/brecha`.
   portada: aquella muestra un estado y esto produce un post que sale a la
   cuenta real y no se corrige después —mismo criterio que el video de tasas—.
   Lo que sí degrada es la comparación: sin dato de hace una semana la imagen
-  sale con la brecha de hoy y dice que no hay comparación, nunca un `0,0 pp`.
+  sale solo con la brecha de hoy —nunca un `0,0 pp`— y **no explica la
+  ausencia**. Al lector no le interesa el estado de nuestro histórico, y una
+  línea sobre lo que falta le quita sitio a la única cifra que sí hay; el
+  titular ya cambia a "ASÍ ESTÁ LA BRECHA" en vez de anunciar un movimiento
+  que no se puede afirmar. Es distinto del semanal, donde `Sin comparación`
+  ocupa el hueco de una columna que las otras tarjetas sí llenan. Por lo mismo
+  el aviso legal es una función (`avisoBrecha`) y no una constante: la frase
+  "comparada con el dato de hace una semana" solo se dice cuando la imagen de
+  verdad compara.
 - **El color va por impacto y la flecha por signo**, igual que el semanal:
   sube → rojo, baja → verde, y la magnitud viaja en valor absoluto porque el
   signo ya lo dice la flecha. La variación va en **puntos porcentuales**: la

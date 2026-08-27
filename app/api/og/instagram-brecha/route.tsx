@@ -4,7 +4,7 @@ import { construirAlertaBrecha, type AlertaBrecha } from "@/lib/alerta-brecha";
 import { diaCaracasISO, formatClock, formatFechaCorta, formatVariacion } from "@/lib/format";
 import {
   AIRE_LATERAL,
-  AVISO_BRECHA,
+  avisoBrecha,
   COLOR,
   LogoTaza,
   Pie,
@@ -351,14 +351,16 @@ function BrechaImage({
           <span>VS DÓLAR BCV</span>
         </div>
 
-        {sinComparacion ? (
-          // Sin dato de hace una semana no se pintan las dos tarjetas ni una
-          // variación: un "0,0 pp" ahí sería un número inventado. Se dice qué
-          // falta, con el mismo criterio que `Sin comparación` en el semanal.
-          <span style={{ fontSize: medidas.etiqueta + 4, color: COLOR.muted, marginTop: 26, textAlign: "center" }}>
-            Sin comparación: aún no hay dato de hace una semana en el histórico.
-          </span>
-        ) : (
+        {/* Sin dato de hace una semana no se pintan las tarjetas ni la
+            variación: un "0,0 pp" ahí sería un número inventado. Tampoco se
+            explica la ausencia — al lector no le interesa el estado de nuestro
+            histórico, y una línea sobre lo que falta le quita sitio a la única
+            cifra que sí hay. La imagen se queda con la brecha de hoy, que es
+            correcta por sí sola; el `titular` ya cambia a "ASÍ ESTÁ LA BRECHA"
+            en vez de anunciar un movimiento que no se puede afirmar. Es
+            distinto del semanal, donde `Sin comparación` ocupa el hueco de una
+            columna que las otras tarjetas sí llenan. */}
+        {sinComparacion ? null : (
           <div style={{ display: "flex", flexDirection: "column", width: "100%", marginTop: 26 }}>
             <div style={{ display: "flex", gap: 20 }}>
               <TarjetaComparativa
@@ -429,7 +431,7 @@ function BrechaImage({
           paddingRight: medidas.padding,
         }}
       >
-        <Pie icons={icons} aviso={AVISO_BRECHA} />
+        <Pie icons={icons} aviso={avisoBrecha(!sinComparacion)} />
       </div>
     </div>
   );
