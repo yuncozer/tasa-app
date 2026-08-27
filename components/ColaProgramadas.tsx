@@ -4,7 +4,50 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Spinner } from "@/components/admin/Spinner";
 import type { PublicacionPayload } from "@/lib/publish-news";
-import { formatClock, formatDate, horaCaracasDesdeIso, isoDesdeHoraCaracas } from "@/lib/format";
+import {
+  diaCaracasISO,
+  formatClock,
+  formatFecha,
+  horaCaracasDesdeIso,
+  isoDesdeHoraCaracas,
+} from "@/lib/format";
+
+/**
+ * La cola, partida por día calendario de Caracas y en orden.
+ *
+ * Con varias publicaciones seguidas, una lista plana de fechas repetidas
+ * obliga a leer la fecha de cada fila para saber si dos van el mismo día. Con
+ * el día en un encabezado, la fila solo tiene que decir la hora, que es lo que
+ * de verdad se compara — y de paso se ve de un vistazo cuántas hay cada día.
+ *
+ * El día se calcula en Caracas, como todo lo demás del proyecto: desde Cúcuta
+ * el teléfono va en UTC−5 y agrupar por su medianoche partiría en dos un día
+ * de allá.
+ */
+function porDia(programadas: ProgramadaVista[]): { dia: string; filas: ProgramadaVista[] }[] {
+  const grupos: { dia: string; filas: ProgramadaVista[] }[] = [];
+
+  for (const programada of programadas) {
+    const dia = diaCaracasISO(new Date(programada.publicarEn).getTime());
+    const ultimo = grupos[grupos.length - 1];
+    if (ultimo?.dia === dia) ultimo.filas.push(programada);
+    else grupos.push({ dia, filas: [programada] });
+  }
+
+  return grupos;
+}
+
+/**
+ * "Hoy" y "Mañana" en vez de la fecha: son los dos días en los que de verdad
+ * se programa, y leerlos es inmediato. Del tercero en adelante manda la fecha,
+ * que es lo único que no se presta a confusión.
+ */
+function tituloDia(dia: string): string {
+  const hoy = diaCaracasISO(Date.now());
+  if (dia === hoy) return "Hoy";
+  if (dia === diaCaracasISO(Date.now() + 24 * 60 * 60 * 1000)) return "Mañana";
+  return formatFecha(dia);
+}
 
 /** Espera entre cada sondeo de "Publicar ahora", para no encadenar peticiones sin pausa. */
 const PAUSA_ENTRE_SONDEOS_MS = 1_000;
@@ -185,9 +228,19 @@ export function ColaProgramadas({
         <p className="rounded-2xl border border-warning/40 bg-warning/5 px-4 py-3 text-sm text-warning">{error}</p>
       )}
 
-      {programadas.length > 0 && (
-        <ul className="divide-y divide-border-soft overflow-hidden rounded-2xl border border-border-soft bg-surface">
-          {programadas.map((programada) => (
+      {porDia(programadas).map(({ dia, filas }) => (
+        <div key={dia} className="flex flex-col gap-2">
+          <div className="flex items-baseline justify-between gap-2">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">
+              {tituloDia(dia)}
+            </h3>
+            <span className="tabular text-xs text-muted">
+              {filas.length} {filas.length === 1 ? "publicación" : "publicaciones"}
+            </span>
+          </div>
+
+          <ul className="divide-y divide-border-soft overflow-hidden rounded-2xl border border-border-soft bg-surface">
+            {filas.map((programada) => (
             <li key={programada.id} className="flex flex-col gap-2 px-4 py-3">
               {/* `flex-wrap` + la fecha sin partir: en un teléfono, tres
                   píldoras junto a la hora no caben en una línea, y antes lo que
@@ -198,8 +251,9 @@ export function ColaProgramadas({
                   partirla, esta se sale de su caja por debajo de los botones. */}
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex min-w-48 flex-1 flex-col gap-1">
+                  {/* Solo la hora: el día ya lo dice el encabezado del grupo. */}
                   <span className="tabular whitespace-nowrap text-sm font-medium">
-                    {formatDate(programada.publicarEn)} · {formatClock(programada.publicarEn)}
+                    {formatClock(programada.publicarEn)}
                   </span>
                   {/* Con qué post se corresponde la hora. Va en una sola línea y
                       recortado por CSS: a igual hora, dos filas se distinguen
@@ -313,9 +367,10 @@ export function ColaProgramadas({
                 </div>
               )}
             </li>
-          ))}
-        </ul>
-      )}
+            ))}
+          </ul>
+        </div>
+      ))}
     </section>
   );
 }

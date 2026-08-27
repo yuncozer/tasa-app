@@ -1004,6 +1004,13 @@ vive aquí.
   fila mientras se elegía la hora nueva, el `PATCH` no encuentra nada y contesta
   409 en vez de moverle la hora a algo que ya está saliendo. Una `fallida` no se
   reprograma: para esa está "Publicar ahora".
+- **La cola va agrupada por día**, con un encabezado ("Hoy", "Mañana" o la
+  fecha) y cuántas publicaciones lleva cada uno; la fila solo dice la hora.
+  Una lista plana de fechas repetidas obliga a leer la fecha de cada fila para
+  saber si dos van el mismo día, y la hora —que es lo que de verdad se
+  compara— quedaba detrás de ella. El día se calcula en Caracas, como todo lo
+  demás: desde Cúcuta el teléfono va en UTC−5 y agrupar por su medianoche
+  partiría en dos un día de allá.
 - **Cada fila de la cola muestra un fragmento de su título**
   (`resumenPublicacion`). Dos posts programados con pocos minutos de diferencia
   se veían idénticos —solo su hora—, y cancelar o mover el equivocado era
