@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { AppleSplashLinks } from "@/components/AppleSplashLinks";
+import { RegistroVisita } from "@/components/RegistroVisita";
 import { ServiceWorkerRegistration } from "@/components/ServiceWorkerRegistration";
 import { SplashOverlay } from "@/components/SplashOverlay";
 import { Analytics } from "@vercel/analytics/next"
@@ -51,6 +52,7 @@ export default function RootLayout({
         <SplashOverlay />
         {children}
         <ServiceWorkerRegistration />
+        <RegistroVisita />
       </body>
       <Analytics />
     </html>

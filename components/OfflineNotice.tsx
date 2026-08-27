@@ -1,6 +1,7 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { useEffect, useRef, useSyncExternalStore } from "react";
+import { registrarEvento } from "@/lib/analitica-cliente";
 import { formatRelative } from "@/lib/format";
 
 /**
@@ -29,6 +30,22 @@ const estadoEnServidor = () => false;
 
 export function OfflineNotice({ fetchedAt }: { fetchedAt: string }) {
   const sinConexion = useSyncExternalStore(suscribir, estadoActual, estadoEnServidor);
+
+  // El evento se anota **al volver la conexión**, no al perderla: sin red no
+  // hay forma de mandarlo y la analítica no guarda cola en el dispositivo (ver
+  // `lib/analitica-cliente.ts`). Lo que se mide es "esta sesión llegó a usar la
+  // app sin señal", que es la pregunta que justifica el service worker.
+  const estuvoSinConexion = useRef(false);
+  useEffect(() => {
+    if (sinConexion) {
+      estuvoSinConexion.current = true;
+      return;
+    }
+    if (estuvoSinConexion.current) {
+      estuvoSinConexion.current = false;
+      registrarEvento("sin_conexion");
+    }
+  }, [sinConexion]);
 
   if (!sinConexion) return null;
 

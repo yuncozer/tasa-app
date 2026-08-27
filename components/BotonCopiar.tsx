@@ -2,6 +2,7 @@
 
 import { Check, Copy } from "lucide-react";
 import { useState } from "react";
+import { registrarEvento } from "@/lib/analitica-cliente";
 
 /**
  * Copia una cifra al portapapeles.
@@ -27,6 +28,7 @@ export function BotonCopiar({ texto, etiqueta }: { texto: string; etiqueta: stri
     try {
       await navigator.clipboard.writeText(texto);
       setCopiado(true);
+      registrarEvento("copiar", etiqueta);
       // Vuelve solo a su estado normal: un "copiado" permanente deja de
       // significar que lo que hay guardado es esta cifra y no otra.
       setTimeout(() => setCopiado(false), 2000);

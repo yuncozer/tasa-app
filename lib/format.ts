@@ -462,3 +462,18 @@ export function normalizarMontoPegado(
     ? `${enterosNormalizados},${decimales.slice(0, maxDecimales)}`
     : enterosNormalizados;
 }
+
+/**
+ * Un conteo entero con separador de miles: "12.480".
+ *
+ * Los números sí usan `Intl.NumberFormat` —es lo único que no dio problemas de
+ * hidratación entre versiones de ICU— y aquí no hay decimales que decidir: una
+ * visita o una conversión no se cuenta a medias.
+ *
+ * Sin dato devuelve el mismo guion largo que el resto de formateadores, para
+ * que "no hay medición" no se lea como un cero.
+ */
+export function formatEntero(value: number | null | undefined): string {
+  if (value === null || value === undefined || !Number.isFinite(value)) return "—";
+  return new Intl.NumberFormat("es-VE", { maximumFractionDigits: 0 }).format(value);
+}

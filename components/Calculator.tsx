@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ConversionResults } from "@/components/ConversionResults";
+import { registrarEvento } from "@/lib/analitica-cliente";
 import { Keypad, type KeypadKey } from "@/components/Keypad";
 import { convert } from "@/lib/convert";
 import { normalizarMontoPegado, parseInput } from "@/lib/format";
@@ -115,7 +116,10 @@ export function Calculator({ snapshot }: { snapshot: RatesSnapshot }) {
       const monto = normalizarMontoPegado(texto, MAX_INTEGER_DIGITS, MAX_DECIMALS);
       // Sin monto reconocible no se toca lo que ya había: vaciar el display
       // por pegar una cadena cualquiera sería peor que no hacer nada.
-      if (monto !== null) setRaw(monto);
+      if (monto !== null) {
+        setRaw(monto);
+        registrarEvento("pegar");
+      }
     } catch {
       // El permiso de portapapeles se puede denegar en el momento; no hay nada
       // que reportar más allá de que no pasa nada.
@@ -153,6 +157,16 @@ export function Calculator({ snapshot }: { snapshot: RatesSnapshot }) {
     return () => window.removeEventListener("keydown", alPulsar);
   }, []);
 
+  // Una conversión se anota cuando el usuario **deja de teclear**, no en cada
+  // dígito: escribir "74878" son cinco cambios de estado y una sola cuenta que
+  // el usuario quería hacer. El detalle es la moneda de origen —de conjunto
+  // cerrado— y nunca el monto: lo que se teclea es asunto de quien lo teclea.
+  useEffect(() => {
+    if (parseInput(raw) <= 0) return;
+    const espera = setTimeout(() => registrarEvento("conversion", from), 1500);
+    return () => clearTimeout(espera);
+  }, [raw, from]);
+
   const conversion = useMemo(
     () => convert(parseInput(raw), from, snapshot),
     [raw, from, snapshot],
@@ -172,7 +186,10 @@ export function Calculator({ snapshot }: { snapshot: RatesSnapshot }) {
           </h2>
           <button
             type="button"
-            onClick={() => startRefresh(() => router.replace(`/?actualizar=${Date.now()}`))}
+            onClick={() => {
+              registrarEvento("actualizar");
+              startRefresh(() => router.replace(`/?actualizar=${Date.now()}`));
+            }}
             disabled={isRefreshing}
             className="rounded-full border border-[color:var(--border)] px-3 py-1 text-xs font-medium text-[color:var(--muted)] transition active:scale-95 disabled:opacity-50"
           >

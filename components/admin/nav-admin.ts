@@ -1,4 +1,5 @@
 import {
+  Activity,
   BarChart3,
   LayoutDashboard,
   MapPin,
@@ -63,6 +64,12 @@ export const NAV_ADMIN: GrupoAdmin[] = [
     id: "reportes",
     titulo: "Reportes y difusión",
     enlaces: [
+      {
+        href: "/admin/analiticas",
+        label: "Analíticas",
+        descripcion: "Uso de la calculadora y rendimiento de lo publicado en Instagram.",
+        icon: Activity,
+      },
       {
         href: "/admin/semanal",
         label: "Semanal",
