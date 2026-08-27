@@ -1801,6 +1801,21 @@ a "Actualización del día" en vez de "de la mañana/tarde". Existe porque un
 BCV que falla a las 9:00 y responde a las 9:20 antes no tenía forma de
 corregirse sin esperar al disparo de la tarde.
 
+#### Cada pantalla dice de cuándo es lo que muestra
+
+`components/admin/SelloDeHora.tsx`, bajo el título de la sección. La app
+pública lo tiene desde el principio —cada tarjeta de tasa lleva su fuente y su
+antigüedad— y en el panel faltaba, justo donde más decide: aquí se mira una
+cifra para decidir si se publica, y una lectura de hace dos horas y una de
+hace dos minutos no valen lo mismo.
+
+Lleva la hora **y** el "hace tanto": la hora es lo que se puede contrastar con
+el post ya publicado, y el relativo responde de un vistazo si el dato todavía
+sirve. Cada pantalla fecha lo suyo — `/admin/semanal` y `/admin/brecha`, las
+tasas del snapshot; `/admin/parada`, cuándo se **detectó** el borrador (su
+antigüedad es lo que dice si sigue siendo la columna de hoy); `/admin/analiticas`
+y la agenda, el momento de la lectura. `/admin/hoy` ya lo tenía.
+
 #### Publicar pide confirmación en todas partes
 
 Todo botón que manda algo a la cuenta real —tasas, La Parada, noticia, video,

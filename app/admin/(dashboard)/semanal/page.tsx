@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
+import { SelloDeHora } from "@/components/admin/SelloDeHora";
 import { ReporteSemanalPanel } from "@/components/ReporteSemanalPanel";
 import { buildCaptionSemanal } from "@/lib/caption";
 import { iaDisponible } from "@/lib/ia";
@@ -32,6 +33,7 @@ export default async function AdminSemanalPage() {
       <AdminPageHeader
         titulo="Reporte semanal"
         descripcion="Cómo se movieron las tasas en los últimos 7 días."
+        aviso={<SelloDeHora iso={snapshot.fetchedAt} que="Tasas" />}
       />
 
       <ReporteSemanalPanel

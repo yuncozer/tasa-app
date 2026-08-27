@@ -1,7 +1,7 @@
 import { AlertTriangle, Check, Clock, HelpCircle } from "lucide-react";
 import Link from "next/link";
 import type { AgendaHoy, EstadoTarea } from "@/lib/agenda-hoy";
-import { formatFecha } from "@/lib/format";
+import { formatClock, formatFecha } from "@/lib/format";
 
 /**
  * La agenda del día en `/admin`: qué salió, qué está en camino y qué necesita
@@ -36,6 +36,10 @@ const TONO: Record<EstadoTarea, string> = {
 };
 
 export function AgendaDelDia({ agenda }: { agenda: AgendaHoy }) {
+  // La hora de la lectura, no la del reloj del navegador: esto se pinta en el
+  // servidor y lo que dice es de cuándo son las filas de abajo.
+  const leidoA = formatClock(new Date().toISOString());
+
   return (
     <section aria-labelledby="agenda-hoy" className="flex flex-col gap-3">
       <div className="flex items-baseline justify-between gap-2">
@@ -43,7 +47,7 @@ export function AgendaDelDia({ agenda }: { agenda: AgendaHoy }) {
           Hoy
         </h2>
         <p className="text-xs text-muted">
-          {formatFecha(agenda.fecha)}
+          {formatFecha(agenda.fecha)} · <span className="tabular">{leidoA}</span>
           {agenda.porAtender > 0
             ? ` · ${agenda.porAtender} por atender`
             : " · todo en orden"}

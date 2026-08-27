@@ -18,6 +18,7 @@ import { Suspense } from "react";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { BarrasDias } from "@/components/admin/BarrasDias";
 import { EsqueletoAnaliticas } from "@/components/admin/Esqueleto";
+import { SelloDeHora } from "@/components/admin/SelloDeHora";
 import { ListaConteo } from "@/components/admin/ListaConteo";
 import { TarjetaMetrica } from "@/components/admin/TarjetaMetrica";
 import { leerAnaliticasWeb, type AnaliticasWeb } from "@/lib/analiticas-web";
@@ -514,6 +515,7 @@ export default async function AdminAnaliticasPage({
       <AdminPageHeader
         titulo="Analíticas"
         descripcion="Qué hace la gente en la calculadora y cómo le va a lo que se publica."
+        aviso={<SelloDeHora iso={new Date().toISOString()} que="Lectura" />}
       />
 
       <Pestanas vista={vista} dias={dias} />

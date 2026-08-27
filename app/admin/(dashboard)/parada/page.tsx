@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
+import { SelloDeHora } from "@/components/admin/SelloDeHora";
 import { ParadaPanel } from "@/components/ParadaPanel";
 import { leerParadaPendiente } from "@/lib/parada";
 
@@ -22,11 +23,17 @@ export default async function AdminParadaPage() {
   const pendiente = await leerParadaPendiente().catch(() => null);
   const borrador = pendiente && !pendiente.publicado ? pendiente : null;
 
+  // Se fecha por cuándo se **detectó** el artículo, no por cuándo se abrió la
+  // pantalla: la antigüedad del borrador es lo que dice si sigue siendo la
+  // columna de hoy o si quedó una de ayer sin publicar.
+  const sello = borrador ? <SelloDeHora iso={borrador.detectadoEn} que="Borrador" /> : undefined;
+
   return (
     <>
       <AdminPageHeader
         titulo="Dólar en La Parada"
         descripcion="Revisa y publica el borrador que detecta el cron de lanacionweb.com."
+        aviso={sello}
       />
 
       <ParadaPanel borrador={borrador} />

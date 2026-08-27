@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
+import { SelloDeHora } from "@/components/admin/SelloDeHora";
 import { AlertaBrechaPanel } from "@/components/AlertaBrechaPanel";
 import { construirAlertaBrecha } from "@/lib/alerta-brecha";
 import { buildCaptionBrecha } from "@/lib/caption";
@@ -41,6 +42,7 @@ export default async function AdminBrechaPage() {
       <AdminPageHeader
         titulo="Alerta de brecha"
         descripcion="Cuánto se paga de más fuera del BCV y cuánto se movió en una semana."
+        aviso={<SelloDeHora iso={snapshot.fetchedAt} que="Tasas" />}
       />
 
       <AlertaBrechaPanel
