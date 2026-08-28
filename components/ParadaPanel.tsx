@@ -38,7 +38,19 @@ async function leerError(response: Response): Promise<string> {
   return body?.error ? `${body.error}${body.detail ? `: ${body.detail}` : ""}` : `Error ${response.status}`;
 }
 
-export function ParadaPanel({ borrador }: { borrador: Borrador | null }) {
+export function ParadaPanel({
+  borrador,
+  esDeHoy,
+}: {
+  borrador: Borrador | null;
+  /**
+   * Si la columna guardada es la de hoy (`null` = no se pudo saber). Solo se
+   * usa para el diálogo de confirmación: la franja de aviso ya la pinta la
+   * página, pero el diálogo es la última línea antes de que salga a la cuenta
+   * real, y ahí conviene repetirlo.
+   */
+  esDeHoy?: boolean | null;
+}) {
   const [lugar, setLugar] = useState(borrador?.lugar ?? "");
   const [compra, setCompra] = useState(borrador?.compra ?? "");
   const [venta, setVenta] = useState(borrador?.venta ?? "");
@@ -82,8 +94,15 @@ export function ParadaPanel({ borrador }: { borrador: Borrador | null }) {
   }
 
   async function publicar() {
+    const aviso =
+      esDeHoy === false
+        ? "OJO: este borrador no es la columna de hoy, sino la de otro día. "
+        : "";
+
     if (
-      !window.confirm("Esto publica el post en la cuenta real de Instagram. No se puede deshacer. ¿Publicar ahora?")
+      !window.confirm(
+        `${aviso}Esto publica el post en la cuenta real de Instagram. No se puede deshacer. ¿Publicar ahora?`,
+      )
     ) {
       return;
     }

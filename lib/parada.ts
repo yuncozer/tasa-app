@@ -12,6 +12,7 @@
  */
 
 import { withCache } from "@/lib/cache";
+import { diaColombiaISO } from "@/lib/format";
 
 const TIMEOUT_MS = 10_000;
 const TABLA = "parada_pendiente";
@@ -31,6 +32,13 @@ export interface ParadaBorrador {
   venta: string | null;
   publicado: boolean;
   detectadoEn: string;
+  /**
+   * `article:published_time` del artículo, o `null` si el portal no lo
+   * declaró. Es lo que permite saber si el borrador es la columna **de hoy**:
+   * `detectadoEn` solo dice cuándo lo vio el cron, que puede ser días después
+   * si la vigilancia estuvo caída.
+   */
+  fechaArticulo: string | null;
 }
 
 interface FilaParada {
@@ -43,6 +51,7 @@ interface FilaParada {
   venta: string | null;
   publicado: boolean;
   detectado_en: string;
+  fecha_articulo: string | null;
 }
 
 function credenciales(): { base: string; key: string } {
@@ -90,7 +99,69 @@ function desdeFila(fila: FilaParada): ParadaBorrador {
     venta: fila.venta,
     publicado: fila.publicado,
     detectadoEn: fila.detectado_en,
+    fechaArticulo: fila.fecha_articulo ?? null,
   };
+}
+
+/**
+ * El día del mes que declara el propio titular: "Dólar en La Parada este 27A"
+ * → 27.
+ *
+ * Hace falta porque **lanacionweb no fecha sus artículos**: verificado en
+ * vivo el 2026-08-28, ni el HTML del artículo ni el listado traen
+ * `article:published_time`, `datePublished` ni un `<time>`. Lo único que dice
+ * de qué día es la columna es su propio título, que el portal escribe
+ * siempre con esta forma (verificado también con "Dólar en La Parada este
+ * 26A").
+ *
+ * Solo se lee el **número**, no la letra del mes: "A" lo mismo vale para
+ * abril que para agosto, y adivinarlo sería inventar. El número basta para lo
+ * que hace falta —distinguir la columna de hoy de la de ayer— porque es una
+ * columna diaria y lo que se compara siempre está a un día de distancia.
+ */
+export function diaDelTitulo(titulo: string): number | null {
+  const match = /\beste\s+(\d{1,2})\s*[a-zA-Z]?\b/i.exec(titulo);
+  if (!match) return null;
+
+  const dia = Number(match[1]);
+  return dia >= 1 && dia <= 31 ? dia : null;
+}
+
+/**
+ * Si la columna guardada es la de hoy.
+ *
+ * Se juzga con dos señales, en este orden:
+ *
+ * 1. `article:published_time`, si el portal alguna vez lo declara. Es la
+ *    buena, y se compara en **hora de Colombia**: el portal es colombiano y
+ *    su titular se fecha con el día de allá, así que una columna publicada a
+ *    las 11 de la noche en Cúcuta no puede contar como la del día siguiente.
+ * 2. El día del mes que dice el propio titular, que hoy es lo único que hay.
+ *
+ * `esDeHoy: null` significa "no se puede saber" y no se confunde con `false`:
+ * uno invita a revisar antes de publicar, el otro dice que las cifras ya no
+ * son las del día.
+ *
+ * Vive aquí y no en la página que lo muestra para no llamar a `Date.now()`
+ * dentro del render, que es impuro y el linter de React rechaza.
+ */
+export function diaDeLaColumna(
+  fechaArticulo: string | null,
+  titulo?: string,
+): { dia: string | null; esDeHoy: boolean | null } {
+  const hoy = diaColombiaISO(Date.now());
+
+  if (fechaArticulo) {
+    const dia = diaColombiaISO(new Date(fechaArticulo).getTime());
+    return { dia, esDeHoy: dia === hoy };
+  }
+
+  const delTitulo = titulo ? diaDelTitulo(titulo) : null;
+  if (delTitulo !== null) {
+    return { dia: null, esDeHoy: delTitulo === Number(hoy.slice(8, 10)) };
+  }
+
+  return { dia: null, esDeHoy: null };
 }
 
 /** El borrador guardado ahora mismo, o `null` si el cron todavía no ha detectado ninguno. */
@@ -113,6 +184,8 @@ export async function guardarParadaPendiente(borrador: {
   titulo: string;
   imagenUrl: string;
   caption: string;
+  /** Cuándo lo publicó el portal; `null` si no lo declara. */
+  fechaArticulo: string | null;
 }): Promise<void> {
   await rest<undefined>("", {
     method: "POST",
@@ -128,6 +201,7 @@ export async function guardarParadaPendiente(borrador: {
       venta: null,
       publicado: false,
       detectado_en: new Date().toISOString(),
+      fecha_articulo: borrador.fechaArticulo,
     }),
   });
 }

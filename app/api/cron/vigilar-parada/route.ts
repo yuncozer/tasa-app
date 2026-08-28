@@ -1,7 +1,8 @@
 import { apiError, apiJson } from "@/lib/api";
 import { buildParadaCaption } from "@/lib/caption";
+
 import { notificarParadaPendiente } from "@/lib/notificar";
-import { guardarParadaPendiente, leerParadaPendiente } from "@/lib/parada";
+import { diaDeLaColumna, guardarParadaPendiente, leerParadaPendiente } from "@/lib/parada";
 import { fetchArticle } from "@/lib/providers/news";
 import { buscarArticuloParada } from "@/lib/providers/parada";
 
@@ -53,6 +54,30 @@ export async function GET(request: Request) {
     }
 
     const article = await fetchArticle(encontrado.url);
+
+    // **Solo la columna de hoy.** El listado devuelve el artículo más
+    // reciente que case con el título, y algunos días no hay columna nueva:
+    // entonces el más reciente es el de ayer y guardarlo dejaba
+    // `/admin/parada` ofreciendo publicar como "el dólar de hoy" unas cifras
+    // que ya no lo eran. Pasó en producción el 28 de agosto con el artículo
+    // del 27, y comparar la URL con la guardada no lo evita: el portal
+    // republicó esa misma columna bajo un slug nuevo (`…-27a-2`), que para el
+    // cron era un artículo distinto.
+    //
+    // De qué día es lo decide `diaDeLaColumna()`, que se apoya en el titular
+    // porque lanacionweb no fecha sus artículos (ver ahí).
+    const { esDeHoy } = diaDeLaColumna(article.publishedAt, article.title || encontrado.titulo);
+
+    // `null` es "no se pudo saber": ahí se deja pasar, porque un borrador que
+    // el admin revisa es mejor que ningún borrador, y la pantalla avisa de
+    // que no se pudo fechar. `false` sí bloquea: es la columna de otro día.
+    if (esDeHoy === false) {
+      return apiJson(
+        { ok: true, detectado: false, motivo: "no_es_de_hoy", titulo: article.title },
+        { cachear: false },
+      );
+    }
+
     const caption = buildParadaCaption(article);
 
     await guardarParadaPendiente({
@@ -60,6 +85,7 @@ export async function GET(request: Request) {
       titulo: article.title,
       imagenUrl: article.imageUrl,
       caption,
+      fechaArticulo: article.publishedAt,
     });
 
     // El borrador ya quedó guardado y `/admin/parada` lo muestra igual sin

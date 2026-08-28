@@ -1103,6 +1103,31 @@ fuente. Es la única serie del proyecto que combina un cron que vigila un sitio
 de terceros con una cola de un solo elemento que un humano tiene que aprobar
 antes de que salga nada.
 
+- **Solo la columna del día.** El listado devuelve el artículo más reciente
+  que case con el título, y algunos días no hay columna nueva: entonces el más
+  reciente es el de ayer. Guardarlo dejaba `/admin/parada` ofreciendo publicar
+  como "el dólar de hoy" unas cifras que ya no lo eran — pasó en producción el
+  28 de agosto con el artículo del 27. Comparar la URL con la guardada no lo
+  evita: el portal republicó esa misma columna bajo un slug nuevo
+  (`…-27a-2`), que para el cron era un artículo distinto.
+
+  Quién decide de qué día es: `diaDeLaColumna()` (`lib/parada.ts`), que se
+  apoya en **el titular** —"Dólar en La Parada este 27A"— porque **lanacionweb
+  no fecha sus artículos**: verificado en vivo, ni el HTML del artículo ni el
+  listado traen `article:published_time`, `datePublished` ni un `<time>`. Solo
+  se lee el número del día y nunca la letra del mes, que lo mismo vale para
+  abril que para agosto; el número basta porque es una columna diaria y lo que
+  se compara está siempre a un día de distancia. Si algún día el portal
+  empieza a declarar `published_time`, esa señal manda sobre el titular.
+
+  El día se juzga en **hora de Colombia** (`diaColombiaISO`, la única
+  concesión a un segundo huso en el proyecto): el portal es colombiano y su
+  titular se fecha con el día de allá, así que una columna publicada a las 11
+  de la noche en Cúcuta no puede contar como la del día siguiente.
+
+  "No se pudo saber" (`null`) **no bloquea**: un borrador que el admin revisa
+  es mejor que ningún borrador, y `/admin/parada` avisa de que no se pudo
+  fechar. Lo que bloquea es saber que es de otro día.
 - **El cron detecta, nunca publica.** `app/api/cron/vigilar-parada/route.ts`
   revisa la categoría "Frontera" de lanacionweb.com (`lib/providers/parada.ts`,
   regex sobre el HTML del listado — el sitio no tiene API) cada pocos minutos,

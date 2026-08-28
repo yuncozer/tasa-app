@@ -164,6 +164,23 @@ export function diaCaracasISO(ms: number): string {
 }
 
 /**
+ * El día calendario en **Colombia** (UTC−5), "YYYY-MM-DD".
+ *
+ * Es la única concesión a un segundo huso en todo el proyecto, y tiene un
+ * motivo concreto: la columna "Dólar en La Parada" la publica un portal
+ * colombiano y su propio titular se fecha con el día de allá ("este 27A").
+ * Juzgar si el artículo es el de hoy con el día de Caracas haría que una
+ * columna publicada a las 11 de la noche en Cúcuta contara como del día
+ * siguiente, que es exactamente el error que se quiere evitar.
+ *
+ * Colombia no aplica horario de verano, así que el desfase es fijo, igual que
+ * el de Caracas.
+ */
+export function diaColombiaISO(ms: number): string {
+  return new Date(ms - 5 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+
+/**
  * La hora del día en Caracas (0–23), para decidir si algo "ya debería haber
  * pasado". La usa la agenda de `/admin`: a las 8 de la mañana que el post de
  * las 9:00 no esté publicado es lo normal, y a las 11 es un problema.
