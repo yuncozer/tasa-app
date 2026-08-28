@@ -30,13 +30,33 @@ async function fetchListado(): Promise<string> {
 }
 
 /**
- * Cada título de artículo en el listado va como `<h3 class="... brxe-heading
- * ...">\s*<a href="URL" ... title="TÍTULO">`, con `brxe-heading` del
- * constructor Bricks que usa el sitio — verificado en vivo el 2026-08-24.
- * Igual que `CONTENEDOR_POR_HOST` en `lib/providers/news.ts`, esto es
- * específico del theme de este portal y no algo genérico.
+ * Cualquier enlace del listado a un artículo del portal, en orden de
+ * aparición.
+ *
+ * Antes esto buscaba solo `<h3 class="... brxe-heading ...">\s*<a href title>`,
+ * que es como el theme Bricks maqueta la **lista** de artículos. El 28 de
+ * agosto de 2026 eso falló en producción: el artículo más reciente no estaba
+ * en esa lista sino en el bloque de destacados de arriba, que usa otro
+ * marcado —un `<a class="brxe-text-basic …">` con el título como texto y sin
+ * atributo `title`—. El cron seguía "detectando" la columna de ayer, que sí
+ * estaba en un `<h3>`, mientras la de hoy llevaba horas publicada.
+ *
+ * Por eso ahora se miran **todos** los enlaces y se decide por la URL, que es
+ * lo único estable entre los dos bloques: el slug de la columna siempre
+ * empieza por `dolar-en-la-parada`. Un cambio de theme puede mover los
+ * títulos de sitio otra vez, pero no cambia a dónde apunta el enlace.
  */
-const TITULO_ARTICULO = /<h3[^>]*brxe-heading[^>]*>\s*<a href="([^"]+)"[^>]*title="([^"]*)"/gi;
+const ENLACE = /<a\b[^>]*href="(https?:\/\/lanacionweb\.com\/[^"?#]+)"([^>]*)>([\s\S]{0,300}?)<\/a>/gi;
+
+/** El slug de la columna diaria, que es la señal que no depende del marcado. */
+const SLUG_PARADA = /\/dolar-en-la-parada[^/]*\/?$/i;
+
+/** El texto del enlace, sin las etiquetas que el theme mete dentro. */
+function textoDelEnlace(atributos: string, interior: string): string {
+  const conTitulo = /title="([^"]*)"/i.exec(atributos);
+  if (conTitulo) return conTitulo[1];
+  return interior.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+}
 
 /**
  * URL del artículo "Dólar en La Parada" más reciente, o `null` si no hay
@@ -44,18 +64,27 @@ const TITULO_ARTICULO = /<h3[^>]*brxe-heading[^>]*>\s*<a href="([^"]+)"[^>]*titl
  * arriba en cuanto se consulta, y algunos días no se publica.
  *
  * El listado va de más reciente a más antiguo, así que basta el primer
- * `<h3>` que case con el título: no hace falta comparar fechas.
+ * enlace que case: no hace falta comparar fechas aquí. De qué día es la
+ * columna lo decide después `diaDeLaColumna()` (`lib/parada.ts`), que es
+ * quien evita publicar la de ayer.
  *
- * Si el sitio cambia de theme y esta expresión regular deja de encontrar
- * nada, devuelve `null` en vez de romper — degradación intencional, igual
- * que el resto de proveedores del proyecto.
+ * Si el sitio cambia de theme y esto deja de encontrar nada, devuelve `null`
+ * en vez de romper — degradación intencional, igual que el resto de
+ * proveedores del proyecto.
  */
 export async function buscarArticuloParada(): Promise<{ url: string; titulo: string } | null> {
   const html = await fetchListado();
 
-  for (const match of html.matchAll(TITULO_ARTICULO)) {
-    const [, url, titulo] = match;
-    if (PATRON_TITULO.test(titulo)) return { url, titulo };
+  for (const match of html.matchAll(ENLACE)) {
+    const [, url, atributos, interior] = match;
+    const titulo = textoDelEnlace(atributos, interior);
+
+    // La URL manda y el título es el respaldo: el slug sobrevive a un cambio
+    // de maquetación, y el título del enlace puede venir vacío o con el
+    // nombre del sitio pegado según el bloque en que esté.
+    if (SLUG_PARADA.test(url) || PATRON_TITULO.test(titulo)) {
+      return { url, titulo };
+    }
   }
 
   return null;

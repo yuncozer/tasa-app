@@ -1128,6 +1128,17 @@ antes de que salga nada.
   "No se pudo saber" (`null`) **no bloquea**: un borrador que el admin revisa
   es mejor que ningún borrador, y `/admin/parada` avisa de que no se pudo
   fechar. Lo que bloquea es saber que es de otro día.
+- **El listado se lee por el enlace, no por el marcado del título.** La
+  detección buscaba solo los `<h3 class="… brxe-heading …">` con los que el
+  theme Bricks maqueta la **lista** de artículos, y el 28 de agosto de 2026
+  eso falló en producción: el artículo más reciente no estaba en esa lista
+  sino en el bloque de **destacados** de arriba, que usa otro marcado —un
+  `<a class="brxe-text-basic …">` con el título como texto y sin atributo
+  `title`—. El cron siguió "detectando" la columna de ayer, que sí estaba en
+  un `<h3>`, mientras la de hoy llevaba horas publicada. Ahora se recorren
+  **todos** los enlaces del listado en orden y se decide por la URL, cuyo slug
+  siempre empieza por `dolar-en-la-parada`: un cambio de theme puede mover los
+  títulos de sitio otra vez, pero no cambia a dónde apunta el enlace.
 - **El cron detecta, nunca publica.** `app/api/cron/vigilar-parada/route.ts`
   revisa la categoría "Frontera" de lanacionweb.com (`lib/providers/parada.ts`,
   regex sobre el HTML del listado — el sitio no tiene API) cada pocos minutos,
