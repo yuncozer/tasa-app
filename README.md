@@ -181,7 +181,7 @@ cola de publicaciones programadas. Todos los disparos viven ahí, con el header
 | `/api/cron/publicar-tasas-pendientes` | cada 2 min | Reintenta el post del día cuando faltaba una tasa base |
 | `/api/cron/vigilar-parada` | cada 10 min | Detecta la columna diaria de "Dólar en La Parada" |
 | `/api/cron/refrescar-token-ig` | `0 10 * * *` | Renueva el token de Instagram antes de que caduque |
-| `/api/cron/resumen-dia` | `0 0 * * *` | Manda por correo el resumen del día (8:00 pm de Caracas) |
+| `/api/cron/resumen-dia` | `0 1 * * *` | Manda por correo el resumen del día (9:00 pm de Caracas) |
 
 Al configurarlas, **desactivar los reintentos automáticos**. El post diario no es
 idempotente: si una ejecución se pasa del tope de tiempo pero Meta ya publicó, un
