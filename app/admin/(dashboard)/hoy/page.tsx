@@ -1,8 +1,11 @@
 import type { Metadata } from "next";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
+import { AjustesDelDia } from "@/components/admin/AjustesDelDia";
 import { PublicarHoyPanel } from "@/components/PublicarHoyPanel";
 import { formatClock, formatRate } from "@/lib/format";
+import { leerAjustesDiaSeguro } from "@/lib/ajustes-publicacion";
 import { getRates, RATE_ORDER } from "@/lib/rates";
+import { fechaDeHoy } from "@/lib/tasas-pendientes";
 
 export const metadata: Metadata = {
   title: "Publicar tasas — La Tasa",
@@ -20,7 +23,7 @@ export const metadata: Metadata = {
  * actualiza al publicar.
  */
 export default async function AdminHoyPage() {
-  const snapshot = await getRates();
+  const [snapshot, ajustes] = await Promise.all([getRates(), leerAjustesDiaSeguro(fechaDeHoy())]);
   const filas = RATE_ORDER.filter((key) => key !== "VES").map((key) => {
     const rate = snapshot.rates[key];
     return { key, label: rate.shortLabel, texto: formatRate(rate.bsPerUnit) };
@@ -39,6 +42,12 @@ export default async function AdminHoyPage() {
         horaTasas={formatClock(snapshot.fetchedAt)}
         conDegradacion={conDegradacion}
       />
+
+      {/* Debajo del botón de publicar a mano: las dos cosas responden la misma
+          pregunta —"qué sale hoy"— desde los dos lados, una añadiendo una
+          publicación fuera de hora y la otra quitando o recortando las que ya
+          están programadas. */}
+      <AjustesDelDia ajustes={ajustes} />
     </>
   );
 }

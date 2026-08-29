@@ -1,3 +1,4 @@
+import { leerAjustesDiaSeguro } from "@/lib/ajustes-publicacion";
 import { apiError, apiJson } from "@/lib/api";
 import { revisarCordura } from "@/lib/cordura-tasas";
 import { notificarEsperaLarga } from "@/lib/notificar";
@@ -54,6 +55,15 @@ export async function GET(request: Request) {
     await notificarEsperaLarga(pendiente.momento, MINUTOS_DE_ESPERA);
   }
 
+  // El admin pudo apagar este disparo después de que se encolara: publicarlo
+  // igual sería desobedecer lo último que pidió. Se marca como publicada para
+  // sacarla de la cola — no está pendiente de nada, se decidió que no salga.
+  const modo = (await leerAjustesDiaSeguro(pendiente.fecha))[pendiente.momento];
+  if (modo === "apagado") {
+    await marcarPublicada(pendiente.id).catch(() => {});
+    return apiJson({ ok: true, estado: "apagado" }, { cachear: false });
+  }
+
   try {
     const snapshot = await getRates();
     if (!tasasBaseCompletas(snapshot)) {
@@ -69,7 +79,7 @@ export async function GET(request: Request) {
       return apiJson({ ok: true, estado: "salto_anomalo" }, { cachear: false });
     }
 
-    const { mediaId, enlace } = await publicarTasasDelDia(siteUrl, pendiente.momento);
+    const { mediaId, enlace } = await publicarTasasDelDia(siteUrl, pendiente.momento, modo);
     await marcarPublicada(pendiente.id);
     return apiJson({ ok: true, estado: "publicada", mediaId, enlace }, { cachear: false });
   } catch (error) {

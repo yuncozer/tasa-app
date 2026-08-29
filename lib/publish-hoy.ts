@@ -6,7 +6,8 @@ import { getRates } from "@/lib/rates";
 import { guardarSnapshotHoy } from "@/lib/snapshot-hoy";
 
 export interface ResultadoPublicacionHoy {
-  mediaId: string;
+  /** `null` en modo `solo_historias`: ahí no hay post de feed que enlazar. */
+  mediaId: string | null;
   enlace: string | null;
 }
 
@@ -30,7 +31,9 @@ export interface ResultadoPublicacionHoy {
  * el botón manual de `/admin/hoy` (sin `momento`). El de la tarde
  * (`momento === "tarde"`) se queda solo con el carrusel: dos Historias
  * idénticas en formato el mismo día saturan quien mira el timeline, y la de
- * la mañana ya cumplió el propósito de avisar que hay tasas nuevas.
+ * la mañana ya cumplió el propósito de avisar que hay tasas nuevas. La
+ * excepción es el modo `solo_historias`, donde son lo único que se publica y
+ * por tanto salen a cualquier hora.
  *
  * Sin `momento` no se archiva en `historico_tasas` (`registrarSnapshot` solo
  * corre si se pasa) y el caption sale con "Actualización del día" en vez de
@@ -42,6 +45,17 @@ export interface ResultadoPublicacionHoy {
 export async function publicarTasasDelDia(
   siteUrl: string,
   momento?: "manana" | "tarde",
+  /**
+   * Qué se publica en este disparo (ver `lib/ajustes-publicacion.ts`). Solo
+   * lo pasa el cron, leyendo lo que el admin dejó configurado para hoy; el
+   * botón manual de `/admin/hoy` publica siempre completo, porque ahí hay una
+   * persona decidiendo en ese momento.
+   *
+   * `apagado` no llega hasta aquí: eso lo resuelve la ruta del cron sin
+   * llamar a esta función, que es lo que evita congelar un snapshot y
+   * archivar un histórico de algo que no se publicó.
+   */
+  modo: "completo" | "solo_historias" = "completo",
 ): Promise<ResultadoPublicacionHoy> {
   const snapshot = await getRates();
 
@@ -64,18 +78,30 @@ export async function publicarTasasDelDia(
 
   const caption = buildCaption(snapshot, momento);
 
-  // El orden es el orden en que se deslizan: bolívares primero.
-  const { mediaId } = await publishCarouselPost(
-    [`${siteUrl}/api/og/instagram-post`, `${siteUrl}/api/og/instagram-post-pesos`],
-    caption,
-  );
+  // En `solo_historias` no hay carrusel, y por tanto tampoco `mediaId` ni
+  // permalink que anotar: `/hoy` sigue apuntando al último post de feed que
+  // sí salió, que es lo correcto — ese atajo promete llevar a un post, y una
+  // Historia dura 24 horas y no tiene enlace estable.
+  const mediaId =
+    modo === "completo"
+      ? // El orden es el orden en que se deslizan: bolívares primero.
+        (
+          await publishCarouselPost(
+            [`${siteUrl}/api/og/instagram-post`, `${siteUrl}/api/og/instagram-post-pesos`],
+            caption,
+          )
+        ).mediaId
+      : null;
 
   // Una Historia por diapositiva del carrusel, con el mismo orden. Son un
   // extra sobre el post ya publicado — que es lo irreversible — así que cada
   // una va en su propio `try/catch`: si una falla no debe tocar `mediaId` ni
   // `enlace`, y que falle una no debe impedir la otra. Se saltan en el
   // disparo de la tarde: ver el comentario de la función.
-  if (momento !== "tarde") {
+  // Con el carrusel completo salen solo en la mañana (ver arriba). En
+  // `solo_historias` salen siempre: son lo único que se publica, así que
+  // saltárselas por la hora dejaría el disparo sin nada.
+  if (modo === "solo_historias" || momento !== "tarde") {
     try {
       await publishStory(`${siteUrl}/api/og/instagram-post?proporcion=9:16`);
     } catch {
@@ -92,11 +118,13 @@ export async function publicarTasasDelDia(
   // el enlace no puede convertir una publicación exitosa en un error que
   // invite a reintentar y duplique el post.
   let enlace: string | null = null;
-  try {
-    enlace = await permalinkDeMedia(mediaId);
-    await guardarEnlace("hoy", enlace);
-  } catch {
-    enlace = null;
+  if (mediaId) {
+    try {
+      enlace = await permalinkDeMedia(mediaId);
+      await guardarEnlace("hoy", enlace);
+    } catch {
+      enlace = null;
+    }
   }
 
   return { mediaId, enlace };

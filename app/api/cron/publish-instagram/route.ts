@@ -1,4 +1,5 @@
 import type { NextRequest } from "next/server";
+import { leerAjustesDiaSeguro } from "@/lib/ajustes-publicacion";
 import { apiError, apiJson } from "@/lib/api";
 import { revisarCordura } from "@/lib/cordura-tasas";
 import { formatPercent, formatRate } from "@/lib/format";
@@ -78,6 +79,14 @@ export async function GET(request: NextRequest) {
   const momento = momentoDesdeQuery(request);
 
   try {
+    // Qué pidió el admin para el disparo de hoy. Sin ajuste guardado esto es
+    // `completo`, o sea el comportamiento de siempre; y como el ajuste va por
+    // fecha, apagar hoy no dice nada de mañana.
+    const modo = momento ? (await leerAjustesDiaSeguro(fechaDeHoy()))[momento] : "completo";
+
+    if (modo === "apagado") {
+      return apiJson({ ok: true, estado: "apagado", momento }, { cachear: false });
+    }
 
     if (momento) {
       const snapshot = await getRates();
@@ -107,8 +116,8 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const { mediaId, enlace } = await publicarTasasDelDia(siteUrl, momento);
-    return apiJson({ ok: true, mediaId, enlace }, { cachear: false });
+    const { mediaId, enlace } = await publicarTasasDelDia(siteUrl, momento, modo);
+    return apiJson({ ok: true, modo, mediaId, enlace }, { cachear: false });
   } catch (error) {
     // El aviso va aquí y no dentro de `publicarTasasDelDia()`: lo que hay que
     // reportar es "el disparo de las 9:00 no publicó", y solo esta ruta sabe

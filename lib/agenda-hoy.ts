@@ -21,6 +21,7 @@
  *   mismo criterio que las insignias de las tarjetas.
  */
 
+import { leerAjustesDiaSeguro, type AjustesDia } from "@/lib/ajustes-publicacion";
 import { diaCaracasISO, horaCaracas } from "@/lib/format";
 import { momentosArchivados } from "@/lib/historico";
 import { leerParadaPendiente } from "@/lib/parada";
@@ -59,8 +60,21 @@ function estadoDelPost(
   momento: "manana" | "tarde",
   hora: number,
   hoy: string,
+  ajustes: AjustesDia,
 ): { detalle: string; estado: EstadoTarea } {
-  if (archivados.includes(momento)) return { detalle: "Publicado", estado: "hecho" };
+  if (archivados.includes(momento)) {
+    return {
+      detalle: ajustes[momento] === "solo_historias" ? "Historias publicadas" : "Publicado",
+      estado: "hecho",
+    };
+  }
+
+  // Apagado a mano para hoy: no es un fallo ni algo que esperar, es lo que se
+  // pidió. Sin esto la agenda lo pintaría en ámbar como "no salió" y el ámbar
+  // dejaría de significar que hay algo que hacer.
+  if (ajustes[momento] === "apagado") {
+    return { detalle: "Apagado para hoy", estado: "esperando" };
+  }
 
   // La fila tiene que ser de hoy **y** de este momento: una que quedara viva
   // de ayer no dice nada del disparo de esta mañana.
@@ -91,6 +105,8 @@ type Momentos = ("manana" | "tarde")[];
 async function tareasDeTasas(hoy: string, hora: number): Promise<TareaHoy[]> {
   let archivados: Momentos = [];
   let pendiente: { fecha: string; momento: string } | null = null;
+  // Nunca lanza: sin ajustes se asume lo normal, que es lo que hace el cron.
+  const ajustes = await leerAjustesDiaSeguro(hoy);
 
   try {
     [archivados, pendiente] = await Promise.all([momentosArchivados(hoy), pendienteActual()]);
@@ -109,7 +125,7 @@ async function tareasDeTasas(hoy: string, hora: number): Promise<TareaHoy[]> {
   return (["manana", "tarde"] as const).map((momento) => ({
     id: `tasas-${momento}`,
     titulo: momento === "manana" ? "Post de la mañana" : "Post de la tarde",
-    ...estadoDelPost(archivados, pendiente, momento, hora, hoy),
+    ...estadoDelPost(archivados, pendiente, momento, hora, hoy, ajustes),
     href: "/admin/hoy",
   }));
 }

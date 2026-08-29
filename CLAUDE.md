@@ -381,6 +381,49 @@ mismo orden en que se deslizan: bolívares primero, pesos después.
   a mano desde `/admin/video`; esta Historia no lo sustituye ni depende de
   él.
 
+### El post automático de hoy se puede apagar o recortar, solo por hoy
+
+`/admin/hoy` no solo dispara el carrusel fuera de hora: también decide qué van
+a publicar los dos disparos automáticos **de hoy**. Tres modos por momento
+(`lib/ajustes-publicacion.ts`, tabla `ajustes_publicacion`, migración `0014`):
+
+| Modo | Qué sale |
+| --- | --- |
+| `completo` | El carrusel y, en la mañana, sus dos Historias |
+| `solo_historias` | Las dos Historias, sin el carrusel de feed |
+| `apagado` | Nada en ese disparo |
+
+- **El ajuste caduca solo, y esa es la decisión central.** La clave es
+  `(fecha, momento)`, así que apagar el post de hoy no dice nada de mañana.
+  Un interruptor permanente es justo el que alguien deja apagado sin querer y
+  deja la cuenta muda una semana; por eso tampoco se acepta una fecha desde el
+  navegador —la pone el servidor con `fechaDeHoy()`—, que si no se podría
+  apagar un día cualquiera del futuro sin que nada lo recuerde.
+- **La ausencia de fila es `completo`.** Lo normal no se guarda: no hay estado
+  que inicializar, y una tabla vacía se comporta exactamente como antes de que
+  esto existiera.
+- **`leerAjustesDiaSeguro()` nunca lanza**: ante un Supabase caído devuelve
+  `completo`. Entre "no publicar porque no pude leer un ajuste" y "publicar
+  como siempre", lo segundo es lo que no deja a la cuenta en silencio.
+- **`apagado` se resuelve en la ruta del cron, sin llamar a
+  `publicarTasasDelDia()`**: así no se congela un `snapshot_hoy` ni se archiva
+  en `historico_tasas` un disparo que no publicó nada — y la agenda, que
+  deduce de ahí si el post salió, no se confunde.
+- **En `solo_historias` las Historias salen también por la tarde**, al
+  contrario que en `completo`, donde solo acompañan a la mañana: si son lo
+  único que se publica, saltárselas por la hora dejaría el disparo vacío.
+  Tampoco se toca `/hoy`, que sigue apuntando al último post de feed: ese
+  atajo promete llevar a un post, y una Historia dura 24 horas y no tiene
+  enlace estable.
+- **El botón manual publica siempre completo.** Ahí hay una persona mirando y
+  decidiendo en ese momento, que es el mismo criterio por el que ese botón se
+  salta la puerta de las tasas incompletas.
+- **La cola de pendientes también lo respeta**: si el disparo se apagó después
+  de encolarse, la fila se cierra sin publicar — publicarla sería desobedecer
+  lo último que se pidió.
+- **La agenda lo dice en gris, no en ámbar**: "Apagado para hoy" es lo que se
+  pidió, no un fallo, y pintarlo de ámbar vaciaría de significado al ámbar.
+
 ### El cron de tasas no publica con un hueco en las tasas base
 
 `app/api/cron/publish-instagram` puede dispararse a las 9:00 o las 18:00 con
