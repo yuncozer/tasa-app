@@ -3,7 +3,7 @@ import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { AjustesDelDia } from "@/components/admin/AjustesDelDia";
 import { PublicarHoyPanel } from "@/components/PublicarHoyPanel";
 import { formatClock, formatRate } from "@/lib/format";
-import { leerAjustesDiaSeguro } from "@/lib/ajustes-publicacion";
+import { leerAjustesDiaSeguro, modoPorDefecto } from "@/lib/ajustes-publicacion";
 import { getRates, RATE_ORDER } from "@/lib/rates";
 import { fechaDeHoy } from "@/lib/tasas-pendientes";
 
@@ -23,7 +23,12 @@ export const metadata: Metadata = {
  * actualiza al publicar.
  */
 export default async function AdminHoyPage() {
-  const [snapshot, ajustes] = await Promise.all([getRates(), leerAjustesDiaSeguro(fechaDeHoy())]);
+  const hoy = fechaDeHoy();
+  const [snapshot, ajustes] = await Promise.all([getRates(), leerAjustesDiaSeguro(hoy)]);
+  const porDefecto = {
+    manana: modoPorDefecto(hoy, "manana"),
+    tarde: modoPorDefecto(hoy, "tarde"),
+  };
   const filas = RATE_ORDER.filter((key) => key !== "VES").map((key) => {
     const rate = snapshot.rates[key];
     return { key, label: rate.shortLabel, texto: formatRate(rate.bsPerUnit) };
@@ -47,7 +52,7 @@ export default async function AdminHoyPage() {
           pregunta —"qué sale hoy"— desde los dos lados, una añadiendo una
           publicación fuera de hora y la otra quitando o recortando las que ya
           están programadas. */}
-      <AjustesDelDia ajustes={ajustes} />
+      <AjustesDelDia ajustes={ajustes} porDefecto={porDefecto} />
     </>
   );
 }

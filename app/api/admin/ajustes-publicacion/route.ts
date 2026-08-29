@@ -18,7 +18,7 @@ import { fechaDeHoy } from "@/lib/tasas-pendientes";
 export const runtime = "nodejs";
 
 const MOMENTOS = ["manana", "tarde"] as const;
-const MODOS = ["completo", "solo_historias", "apagado"] as const;
+const MODOS = ["completo", "solo_carrusel", "solo_historias", "apagado"] as const;
 
 export async function POST(request: NextRequest) {
   if (!esSesionValida(request.cookies.get(COOKIE_SESION)?.value)) {

@@ -384,14 +384,27 @@ mismo orden en que se deslizan: bolívares primero, pesos después.
 ### El post automático de hoy se puede apagar o recortar, solo por hoy
 
 `/admin/hoy` no solo dispara el carrusel fuera de hora: también decide qué van
-a publicar los dos disparos automáticos **de hoy**. Tres modos por momento
-(`lib/ajustes-publicacion.ts`, tabla `ajustes_publicacion`, migración `0014`):
+a publicar los dos disparos automáticos **de hoy**. Cuatro modos por momento
+(`lib/ajustes-publicacion.ts`, tabla `ajustes_publicacion`, migraciones `0014`
+y `0015`), que son las cuatro combinaciones de las dos piezas que existen:
 
-| Modo | Qué sale |
-| --- | --- |
-| `completo` | El carrusel y, en la mañana, sus dos Historias |
-| `solo_historias` | Las dos Historias, sin el carrusel de feed |
-| `apagado` | Nada en ese disparo |
+| Modo | Carrusel | Historias |
+| --- | --- | --- |
+| `completo` | sí | sí |
+| `solo_carrusel` | sí | no |
+| `solo_historias` | no | sí |
+| `apagado` | no | no |
+
+**La rutina de la semana es el valor por defecto, y vive en el código**
+(`modoPorDefecto()`): de lunes a viernes, carrusel con Historias por la mañana
+y solo carrusel por la tarde; sábado y domingo, nada por la mañana y carrusel
+con Historias por la tarde. Antes esa rutina estaba repartida entre
+cron-job.org —la tarea de las 9:00 no se activaba los fines de semana— y un
+`momento !== "tarde"` escondido dentro de `publicarTasasDelDia()`. Ninguno de
+los dos sitios era visible desde el panel: la agenda daba por fallido el post
+de la mañana todos los sábados, y no había forma de cambiar por un día algo
+que ni siquiera se veía. Ahora el cron puede dispararse todos los días y es
+esta función la que dice si toca publicar.
 
 - **El ajuste caduca solo, y esa es la decisión central.** La clave es
   `(fecha, momento)`, así que apagar el post de hoy no dice nada de mañana.
@@ -409,12 +422,16 @@ a publicar los dos disparos automáticos **de hoy**. Tres modos por momento
   `publicarTasasDelDia()`**: así no se congela un `snapshot_hoy` ni se archiva
   en `historico_tasas` un disparo que no publicó nada — y la agenda, que
   deduce de ahí si el post salió, no se confunde.
-- **En `solo_historias` las Historias salen también por la tarde**, al
-  contrario que en `completo`, donde solo acompañan a la mañana: si son lo
-  único que se publica, saltárselas por la hora dejaría el disparo vacío.
-  Tampoco se toca `/hoy`, que sigue apuntando al último post de feed: ese
-  atajo promete llevar a un post, y una Historia dura 24 horas y no tiene
-  enlace estable.
+- **Las Historias las decide el modo, no la hora.** `publicarTasasDelDia()`
+  ya no pregunta si es de tarde: obedece las piezas del modo (`piezasDe()`).
+  Sin carrusel tampoco se toca `/hoy`, que sigue apuntando al último post de
+  feed: ese atajo promete llevar a un post, y una Historia dura 24 horas y no
+  tiene enlace estable.
+- **El panel distingue "lo normal" de "lo de hoy".** La insignia ámbar
+  "Cambiado hoy" y la nota «Lo normal en este día es …» solo aparecen cuando
+  el modo elegido se aparta del que toca por el día de la semana: que un
+  sábado por la mañana diga "Apagado" es la rutina, no una excepción que haya
+  que mirar.
 - **El botón manual publica siempre completo.** Ahí hay una persona mirando y
   decidiendo en ese momento, que es el mismo criterio por el que ese botón se
   salta la puerta de las tasas incompletas.

@@ -175,13 +175,20 @@ cola de publicaciones programadas. Todos los disparos viven ahí, con el header
 
 | Tarea | Cuándo (UTC) | Para qué |
 | --- | --- | --- |
-| `/api/cron/publish-instagram?momento=manana` | `0 13 * * *` | El carrusel de las 9:00 am de Caracas |
-| `/api/cron/publish-instagram?momento=tarde` | `0 22 * * *` | El carrusel de las 6:00 pm de Caracas |
+| `/api/cron/publish-instagram?momento=manana` | `0 13 * * *` | El disparo de las 9:00 am de Caracas |
+| `/api/cron/publish-instagram?momento=tarde` | `0 22 * * *` | El disparo de las 6:00 pm de Caracas |
 | `/api/cron/publicar-programadas` | cada 2 min | Avanza la cola de publicaciones programadas, una fase por disparo |
 | `/api/cron/publicar-tasas-pendientes` | cada 2 min | Reintenta el post del día cuando faltaba una tasa base |
 | `/api/cron/vigilar-parada` | cada 10 min | Detecta la columna diaria de "Dólar en La Parada" |
 | `/api/cron/refrescar-token-ig` | `0 10 * * *` | Renueva el token de Instagram antes de que caduque |
 | `/api/cron/resumen-dia` | `0 1 * * *` | Manda por correo el resumen del día (9:00 pm de Caracas) |
+
+Los dos disparos de tasas pueden quedar activados **todos los días**: qué
+publica cada uno lo decide el propio código (`modoPorDefecto()` en
+`lib/ajustes-publicacion.ts`), que de lunes a viernes saca el carrusel con
+Historias por la mañana y solo el carrusel por la tarde, y los fines de semana
+nada por la mañana y carrusel con Historias por la tarde. Desde `/admin/hoy`
+se puede cambiar cualquiera de los dos **solo por hoy**.
 
 Al configurarlas, **desactivar los reintentos automáticos**. El post diario no es
 idempotente: si una ejecución se pasa del tope de tiempo pero Meta ya publicó, un

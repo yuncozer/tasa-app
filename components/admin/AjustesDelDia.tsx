@@ -23,9 +23,17 @@ import type { AjustesDia, ModoPublicacion } from "@/lib/ajustes-publicacion";
  */
 const OPCIONES: { modo: ModoPublicacion; etiqueta: string }[] = [
   { modo: "completo", etiqueta: "Completo" },
+  { modo: "solo_carrusel", etiqueta: "Solo carrusel" },
   { modo: "solo_historias", etiqueta: "Solo historias" },
   { modo: "apagado", etiqueta: "Apagado" },
 ];
+
+const NOMBRE: Record<ModoPublicacion, string> = {
+  completo: "Completo",
+  solo_carrusel: "Solo carrusel",
+  solo_historias: "Solo historias",
+  apagado: "Apagado",
+};
 
 /**
  * La descripción depende también del momento: en `completo`, las Historias
@@ -33,15 +41,32 @@ const OPCIONES: { modo: ModoPublicacion; etiqueta: string }[] = [
  * saturan a quien mira— así que decir lo mismo en los dos sitios sería
  * describir algo que no pasa.
  */
-function descripcion(modo: ModoPublicacion, momento: "manana" | "tarde"): string {
-  if (modo === "apagado") return "Ese disparo no publica nada hoy.";
-  if (modo === "solo_historias") return "Las dos Historias, sin el carrusel del feed.";
-  return momento === "manana"
-    ? "El carrusel en el feed y sus dos Historias."
-    : "Solo el carrusel en el feed; a esta hora no salen Historias.";
+function descripcion(modo: ModoPublicacion): string {
+  switch (modo) {
+    case "apagado":
+      return "Ese disparo no publica nada hoy.";
+    case "solo_historias":
+      return "Las dos Historias, sin el carrusel del feed.";
+    case "solo_carrusel":
+      return "El carrusel en el feed, sin Historias.";
+    default:
+      return "El carrusel en el feed y sus dos Historias.";
+  }
 }
 
-export function AjustesDelDia({ ajustes }: { ajustes: AjustesDia }) {
+export function AjustesDelDia({
+  ajustes,
+  porDefecto,
+}: {
+  ajustes: AjustesDia;
+  /**
+   * Lo que tocaría hoy sin haber tocado nada, según el día de la semana. Se
+   * muestra para que se vea qué es lo normal y qué es una excepción de hoy:
+   * sin eso, "Apagado" en un sábado por la mañana parece algo que alguien
+   * apagó y no la rutina de siempre.
+   */
+  porDefecto: AjustesDia;
+}) {
   const router = useRouter();
   const [guardando, setGuardando] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -80,7 +105,7 @@ export function AjustesDelDia({ ajustes }: { ajustes: AjustesDia }) {
           Automático de hoy
         </h2>
         <p className="text-xs text-muted">
-          Vale solo para hoy. Mañana los dos disparos vuelven a publicar completo.
+          Vale solo para hoy. Mañana cada disparo vuelve a lo que le toca por el día de la semana.
         </p>
       </div>
 
@@ -102,14 +127,17 @@ export function AjustesDelDia({ ajustes }: { ajustes: AjustesDia }) {
                 <span className="text-sm font-medium">
                   {momento === "manana" ? "Mañana · 9:00" : "Tarde · 18:00"}
                 </span>
-                {actual !== "completo" && (
+                {/* Ámbar solo cuando hoy se aparta de lo normal: que un sábado
+                    por la mañana diga "Apagado" es la rutina, no una excepción
+                    que haya que mirar. */}
+                {actual !== porDefecto[momento] && (
                   <span className="rounded-full border border-warning/40 bg-warning/10 px-2 py-0.5 text-[11px] font-semibold text-warning">
-                    {actual === "apagado" ? "Apagado" : "Solo historias"}
+                    Cambiado hoy
                   </span>
                 )}
               </div>
 
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                 {OPCIONES.map(({ modo, etiqueta }) => {
                   const seleccionado = actual === modo;
                   return (
@@ -132,7 +160,12 @@ export function AjustesDelDia({ ajustes }: { ajustes: AjustesDia }) {
                 })}
               </div>
 
-              <p className="text-xs text-muted">{descripcion(actual, momento)}</p>
+              <p className="text-xs text-muted">
+                {descripcion(actual)}
+                {actual !== porDefecto[momento] && (
+                  <> Lo normal en este día es «{NOMBRE[porDefecto[momento]]}».</>
+                )}
+              </p>
             </div>
           );
         })}

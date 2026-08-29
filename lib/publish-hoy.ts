@@ -1,3 +1,4 @@
+import { piezasDe, type ModoPublicacion } from "@/lib/ajustes-publicacion";
 import { buildCaption } from "@/lib/caption";
 import { guardarEnlace } from "@/lib/enlaces";
 import { registrarSnapshot } from "@/lib/historico";
@@ -55,7 +56,7 @@ export async function publicarTasasDelDia(
    * llamar a esta función, que es lo que evita congelar un snapshot y
    * archivar un histórico de algo que no se publicó.
    */
-  modo: "completo" | "solo_historias" = "completo",
+  modo: Exclude<ModoPublicacion, "apagado"> = "completo",
 ): Promise<ResultadoPublicacionHoy> {
   const snapshot = await getRates();
 
@@ -82,26 +83,29 @@ export async function publicarTasasDelDia(
   // permalink que anotar: `/hoy` sigue apuntando al último post de feed que
   // sí salió, que es lo correcto — ese atajo promete llevar a un post, y una
   // Historia dura 24 horas y no tiene enlace estable.
-  const mediaId =
-    modo === "completo"
-      ? // El orden es el orden en que se deslizan: bolívares primero.
-        (
-          await publishCarouselPost(
-            [`${siteUrl}/api/og/instagram-post`, `${siteUrl}/api/og/instagram-post-pesos`],
-            caption,
-          )
-        ).mediaId
-      : null;
+  const { carrusel, historias } = piezasDe(modo);
+
+  // El orden es el orden en que se deslizan: bolívares primero.
+  const mediaId = carrusel
+    ? (
+        await publishCarouselPost(
+          [`${siteUrl}/api/og/instagram-post`, `${siteUrl}/api/og/instagram-post-pesos`],
+          caption,
+        )
+      ).mediaId
+    : null;
 
   // Una Historia por diapositiva del carrusel, con el mismo orden. Son un
   // extra sobre el post ya publicado — que es lo irreversible — así que cada
   // una va en su propio `try/catch`: si una falla no debe tocar `mediaId` ni
   // `enlace`, y que falle una no debe impedir la otra. Se saltan en el
   // disparo de la tarde: ver el comentario de la función.
-  // Con el carrusel completo salen solo en la mañana (ver arriba). En
-  // `solo_historias` salen siempre: son lo único que se publica, así que
-  // saltárselas por la hora dejaría el disparo sin nada.
-  if (modo === "solo_historias" || momento !== "tarde") {
+  // Que salgan o no lo decide **el modo**, no la hora. Antes esto era
+  // `momento !== "tarde"`, con la regla "las Historias solo acompañan al post
+  // de la mañana" escrita aquí dentro; ahora esa regla vive en
+  // `modoPorDefecto()` como lo que es —una rutina de la cuenta, no una ley
+  // del código— y aquí solo se obedece lo que se pidió para este disparo.
+  if (historias) {
     try {
       await publishStory(`${siteUrl}/api/og/instagram-post?proporcion=9:16`);
     } catch {
