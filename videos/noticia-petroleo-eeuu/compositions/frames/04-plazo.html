@@ -1,0 +1,126 @@
+<template>
+  <div data-hf-id="hf-x08p" id="root" data-composition-id="04-plazo" data-start="0" data-duration="3.8" data-width="1080" data-height="1920">
+
+    <div data-hf-id="hf-4i0t" id="f03p-suelo" class="clip f03p-suelo" data-start="0" data-duration="3.8" data-track-index="0"></div>
+
+    <div data-hf-id="hf-wxso" id="f03p-contenido" class="clip f03p-contenido" data-start="0" data-duration="3.8" data-track-index="1">
+      <div data-hf-id="hf-k2gm" class="f03p-marco">
+        <img data-hf-id="hf-8o7z" id="f03p-foto" class="f03p-foto" src="public/fotos/petroleo.jpg" alt="" data-layout-allow-overflow="">
+      </div>
+      <div data-hf-id="hf-imus" class="f03p-velo"></div>
+
+      <div data-hf-id="hf-0fj3" id="f03p-kicker" class="f03p-kicker">POR CUÁNTO TIEMPO</div>
+
+      <div data-hf-id="hf-hbvo" class="f03p-cifra-bloque" data-layout-allow-overlap="">
+        <div data-hf-id="hf-guod" id="f03p-cifra" class="f03p-cifra tabular" data-layout-allow-overlap="">0</div>
+        <div data-hf-id="hf-dxc9" id="f03p-unidad" class="f03p-unidad" data-layout-allow-overlap="">AÑOS DE ACCESO A LOS CAMPOS</div>
+      </div>
+
+      <div data-hf-id="hf-hllu" id="f03p-hairline" class="f03p-hairline"></div>
+
+      <div data-hf-id="hf-fv74" class="f03p-nota">
+        <div data-hf-id="hf-ts2a" id="f03p-n1" class="f03p-nota-linea" data-layout-allow-overlap="">Un siglo. Quien firma hoy no verá</div>
+        <div data-hf-id="hf-fczm" id="f03p-n2" class="f03p-nota-linea" data-layout-allow-overlap="">el final del contrato.</div>
+      </div>
+      <div data-hf-id="hf-coii" class="m04-marca">
+        <img data-hf-id="hf-g1ny" class="m04-marca-logo" src="assets/logo-latasa.png" alt="">
+        <span data-hf-id="hf-b2sl" class="m04-marca-nombre">La Tasa</span>
+      </div>
+    </div>
+  </div>
+
+  <style>
+    @font-face { font-family: "Geist Sans"; src: url("assets/fonts/geist-latin.woff2") format("woff2");
+      font-weight: 100 900; font-style: normal; font-display: block; }
+
+    #root { width: 1080px; height: 1920px; position: relative; overflow: hidden;
+      container-type: size; font-family: "Geist Sans", sans-serif; color: #f1f5f9;
+      -webkit-font-smoothing: antialiased; }
+
+    .f03p-suelo { position: absolute; inset: 0; background: #0b1120; }
+    .f03p-contenido { position: absolute; inset: 0; }
+    .tabular { font-variant-numeric: tabular-nums; }
+
+    .f03p-marco { position: absolute; inset: 0; overflow: hidden; }
+    .f03p-foto { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
+      object-position: 50% 42%; filter: grayscale(1) contrast(1.16) brightness(0.4); }
+    .f03p-velo { position: absolute; inset: 0; pointer-events: none;
+      background: linear-gradient(180deg, rgba(11,17,32,.66) 0%, rgba(11,17,32,.52) 30%,
+        rgba(11,17,32,.9) 68%, rgba(11,17,32,.98) 100%); }
+
+    .f03p-kicker { position: absolute; top: 116px; left: 60px;
+      font-weight: 500; font-size: 26px;
+      letter-spacing: 0.14em; text-transform: uppercase; color: #34d399; }
+
+    /* La cifra más grande del video: 100 años es el dato que contesta la
+       pregunta del gancho, así que se lleva el mayor cuerpo de la pieza. */
+    .f03p-cifra-bloque { position: absolute; left: 60px; right: 60px; top: 800px; }
+    .f03p-cifra { font-weight: 900; font-size: 400px; line-height: 0.82;
+      letter-spacing: -0.055em; color: #34d399; transform-origin: left center; }
+    .f03p-unidad { margin-top: 30px; font-weight: 500; font-size: 32px;
+      letter-spacing: 0.14em; text-transform: uppercase; color: #94a3b8; }
+
+    .f03p-hairline { position: absolute; left: 60px; top: 1310px; width: 960px; height: 1px;
+      background: #26324c; transform-origin: left center; }
+    .f03p-nota { position: absolute; left: 60px; right: 60px; top: 1356px; }
+    .f03p-nota-linea { font-weight: 400; font-size: 46px; line-height: 1.34; color: #f1f5f9; }
+
+    .m04-marca { position: absolute; top: 104px; right: 60px;
+      display: flex; align-items: center; gap: 16px; }
+    .m04-marca-logo { width: 60px; height: 60px; border-radius: 14px; display: block; }
+    .m04-marca-nombre { font-weight: 600; font-size: 38px; letter-spacing: -0.02em;
+      line-height: 1; color: #f1f5f9; }
+  </style>
+
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+  <script>
+    (function () {
+      var raiz = document.currentScript.parentNode.querySelector('[data-composition-id="04-plazo"]')
+        || document.querySelector('[data-composition-id="04-plazo"]');
+      var q = function (sel) { return raiz.querySelector(sel); };
+
+      window.__timelines = window.__timelines || {};
+      var tl = gsap.timeline({ paused: true });
+      window.__timelines["04-plazo"] = tl;
+
+      // La marca entra con el frame y se queda: es identidad, no un elemento
+      // narrativo, así que no compite con ningún golpe.
+      tl.fromTo(q(".m04-marca"), { opacity: 0, y: -10 },
+        { opacity: 1, y: 0, duration: 0.3, ease: "power3.out" }, 0.02);
+
+      tl.fromTo(q("#f03p-foto"), { scale: 1.13 },
+        { scale: 1.02, duration: 1.9, ease: "power3.out" }, 0);
+      tl.to(q("#f03p-foto"), { scale: 1.05, duration: 1.5, ease: "none" }, 1.9);
+
+      tl.fromTo(q("#f03p-kicker"), { opacity: 0, y: -12 },
+        { opacity: 1, y: 0, duration: 0.32, ease: "power3.out" }, 0.06);
+
+      // counting-dynamic-scale. El conteo es corto a propósito: 0→100 se lee
+      // entero, y lo que impresiona es el tamaño final, no el recorrido.
+      var el = q("#f03p-cifra");
+      var estado = { valor: 0 };
+      var DUR = 0.92, INICIO = 0.26, EASE = "power2.out";
+
+      tl.to(estado, {
+        valor: 100, duration: DUR, ease: EASE,
+        onUpdate: function () { el.textContent = String(Math.round(estado.valor)); }
+      }, INICIO);
+      tl.fromTo(el, { scale: 0.82, opacity: 0 },
+        { scale: 1, opacity: 1, duration: DUR, ease: EASE }, INICIO);
+
+      tl.fromTo(q("#f03p-unidad"), { opacity: 0, y: 18 },
+        { opacity: 1, y: 0, duration: 0.34, ease: "power3.out" }, INICIO + DUR);
+
+      // La lectura en llano llega después: primero el número, después lo que
+      // significa para alguien que no piensa en plazos de concesión.
+      tl.fromTo(q("#f03p-hairline"), { scaleX: 0 },
+        { scaleX: 1, duration: 0.44, ease: "power3.inOut" }, 1.74);
+      tl.fromTo(q("#f03p-n1"), { opacity: 0, y: 24 },
+        { opacity: 1, y: 0, duration: 0.34, ease: "power3.out" }, 1.98);
+      tl.fromTo(q("#f03p-n2"), { opacity: 0, y: 24 },
+        { opacity: 1, y: 0, duration: 0.34, ease: "power3.out" }, 2.14);
+
+      // 2.5–3.4s: quietud antes del corte.
+    })();
+  </script>
+</template>

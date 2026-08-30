@@ -1,0 +1,110 @@
+<template>
+  <div id="root" data-composition-id="03-trump-cita" data-start="0" data-duration="5.0"
+       data-width="1080" data-height="1920">
+
+    <div id="suelo-03-trump-cita" class="clip suelo" data-start="0" data-duration="5.0" data-track-index="0"></div>
+
+    <div id="contenido-03-trump-cita" class="clip contenido" data-start="0" data-duration="5.0" data-track-index="1">
+      <div class="marco">
+        <img id="foto" class="foto" src="public/fotos/trump.jpg" alt="" data-layout-allow-overflow />
+      </div>
+      <div class="velo"></div>
+
+      <div class="kicker">LO QUE DIJO TRUMP</div>
+
+      <div class="cita">
+        <div id="c1" class="cita-linea acento" data-layout-allow-overlap>&laquo;Un regalo</div>
+        <div id="c2" class="cita-linea acento" data-layout-allow-overlap>de Venezuela</div>
+        <div id="c3" class="cita-linea acento" data-layout-allow-overlap>al pueblo</div>
+        <div id="c4" class="cita-linea acento" data-layout-allow-overlap>de EE.UU.&raquo;</div>
+      </div>
+
+      <div id="hl" class="hairline" style="top: 1322px"></div>
+      <div id="fuente" class="fuente">Truth Social, 30 de agosto.</div>
+      <div class="marca">
+        <img class="marca-logo" src="assets/logo-latasa.png" alt="" />
+        <span class="marca-nombre">La Tasa</span>
+      </div>
+    </div>
+  </div>
+
+  <style>
+    @font-face { font-family: "Geist Sans"; src: url("assets/fonts/geist-latin.woff2") format("woff2");
+      font-weight: 100 900; font-style: normal; font-display: block; }
+
+    #root { width: 1080px; height: 1920px; position: relative; overflow: hidden;
+      container-type: size; font-family: "Geist Sans", sans-serif; color: #f1f5f9;
+      -webkit-font-smoothing: antialiased; }
+
+    .suelo { position: absolute; inset: 0; background: #0b1120; }
+    .contenido { position: absolute; inset: 0; }
+    .tabular { font-variant-numeric: tabular-nums; }
+
+    .marco { position: absolute; inset: 0; overflow: hidden; }
+    .foto { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+    .velo { position: absolute; inset: 0; pointer-events: none; }
+
+    .kicker { position: absolute; top: 116px; left: 60px; font-weight: 500; font-size: 26px;
+      letter-spacing: 0.14em; text-transform: uppercase; color: #34d399; }
+    .hairline { position: absolute; left: 60px; width: 960px; height: 1px;
+      background: #26324c; transform-origin: left center; }
+
+    /* La marca va en las once pantallas, arriba a la derecha: si alguien descarga
+       el Reel y lo reparte suelto, la cuenta viaja con el. */
+    .marca { position: absolute; top: 104px; right: 60px;
+      display: flex; align-items: center; gap: 16px; }
+    .marca-logo { width: 60px; height: 60px; border-radius: 14px; display: block; }
+    .marca-nombre { font-weight: 600; font-size: 38px; letter-spacing: -0.02em;
+      line-height: 1; color: #f1f5f9; }
+    .foto { object-position: 50% 30%; filter: grayscale(1) contrast(1.15) brightness(0.62) blur(20px); }
+    .velo { background: linear-gradient(180deg, rgba(11,17,32,.58) 0%, rgba(11,17,32,.40) 24%, rgba(11,17,32,.86) 52%, rgba(11,17,32,.97) 100%); }
+    .cita { position: absolute; left: 60px; right: 60px; top: 872px; }
+    .cita-linea { font-weight: 900; font-size: 96px; line-height: 1.04; letter-spacing: -0.04em; }
+    .acento { color: #34d399; }
+    .fuente { position: absolute; left: 60px; right: 60px; top: 1368px;
+      font-weight: 400; font-size: 42px; line-height: 1.36; color: #94a3b8; }
+  </style>
+
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+  <script>
+    (function () {
+      var raiz = document.currentScript.parentNode.querySelector('[data-composition-id="03-trump-cita"]')
+        || document.querySelector('[data-composition-id="03-trump-cita"]');
+      var q = function (sel) { return raiz.querySelector(sel); };
+      var qa = function (sel) { return Array.prototype.slice.call(raiz.querySelectorAll(sel)); };
+
+      window.__timelines = window.__timelines || {};
+      var tl = gsap.timeline({ paused: true });
+      window.__timelines["03-trump-cita"] = tl;
+
+      // Identidad, no elemento narrativo: entra con el frame y no compite.
+      tl.fromTo(q(".marca"), { opacity: 0, y: -10 },
+        { opacity: 1, y: 0, duration: 0.3, ease: "power3.out" }, 0.02);
+
+      // La escala extra tapa el borde que deja el blur al desenfocar hasta el
+      // limite del lienzo.
+      tl.fromTo(q("#foto"), { scale: 1.26 },
+        { scale: 1.16, duration: 3.0, ease: "power3.out" }, 0);
+      tl.to(q("#foto"), { scale: 1.20, duration: 2.0, ease: "none" }, 3.0);
+      tl.fromTo(q(".kicker"), { opacity: 0, y: -12 },
+        { opacity: 1, y: 0, duration: 0.32, ease: "power3.out" }, 0.06);
+
+      // La cita se arma delante del lector, linea a linea. Es la frase entera
+      // la que choca, no una palabra: por eso ninguna se destaca sobre otra.
+      tl.fromTo(q("#c1"), { scale: 1.20, filter: "blur(12px)", opacity: 0 },
+        { scale: 1, filter: "blur(0px)", opacity: 1, duration: 0.46, ease: "power4.out" }, 0.30);
+      tl.fromTo(q("#c2"), { x: -220, opacity: 0 },
+        { x: 0, opacity: 1, duration: 0.42, ease: "expo.out" }, 0.88);
+      tl.fromTo(q("#c3"), { y: 66, rotation: 2, opacity: 0 },
+        { y: 0, rotation: 0, opacity: 1, duration: 0.46, ease: "circ.out" }, 1.46);
+      tl.fromTo(q("#c4"), { y: 66, rotation: 2, opacity: 0 },
+        { y: 0, rotation: 0, opacity: 1, duration: 0.46, ease: "circ.out" }, 1.74);
+
+      // La fuente llega ultima: primero se lee la cita, despues quien la dijo.
+      tl.fromTo(q("#hl"), { scaleX: 0 },
+        { scaleX: 1, duration: 0.46, ease: "power3.inOut" }, 2.20);
+      tl.fromTo(q("#fuente"), { opacity: 0, y: 20 },
+        { opacity: 1, y: 0, duration: 0.34, ease: "power3.out" }, 2.46);
+    })();
+  </script>
+</template>

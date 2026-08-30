@@ -41,3 +41,11 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# proyectos de video (HyperFrames): se versiona la fuente, no la salida.
+# Los MP4 y los PNG de contacto se regeneran con `npx hyperframes render`
+# y `snapshot`; versionarlos engordaria el repo ~14 MB por pieza para siempre.
+videos/*/renders/
+videos/*/snapshots/
+videos/*/.hyperframes/
+videos/*/node_modules/

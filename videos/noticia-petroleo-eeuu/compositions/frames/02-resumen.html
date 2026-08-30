@@ -1,0 +1,104 @@
+<template>
+  <div id="root" data-composition-id="02-resumen" data-start="0" data-duration="2.0" data-width="1080" data-height="1920">
+
+    <div id="f02r-suelo" class="clip f02r-suelo" data-start="0" data-duration="2.0" data-track-index="0"></div>
+
+    <div id="f02r-contenido" class="clip f02r-contenido" data-start="0" data-duration="2.0" data-track-index="1">
+      <div class="f02r-marco">
+        <img id="f02r-foto" class="f02r-foto" src="public/fotos/portada.jpg" alt="">
+      </div>
+      <div class="f02r-velo"></div>
+
+      <div class="f02r-bloque">
+        <div id="f02r-l1" class="f02r-linea" data-layout-allow-overlap="">Te lo resumimos</div>
+        <div id="f02r-l2" class="f02r-linea f02r-acento" data-layout-allow-overlap="">en cifras</div>
+      </div>
+
+      <!-- Tres marcas: una por cada cifra que viene. Adelantan la estructura
+           del bloque sin adelantar los números. -->
+      <div class="f02r-marcas">
+        <div class="f02r-marca" data-i="0"></div>
+        <div class="f02r-marca" data-i="1"></div>
+        <div class="f02r-marca" data-i="2"></div>
+      </div>
+      <div class="m02-marca">
+        <img class="m02-marca-logo" src="assets/logo-latasa.png" alt="">
+        <span class="m02-marca-nombre">La Tasa</span>
+      </div>
+    </div>
+  </div>
+
+  <style>
+    @font-face { font-family: "Geist Sans"; src: url("assets/fonts/geist-latin.woff2") format("woff2");
+      font-weight: 100 900; font-style: normal; font-display: block; }
+
+    #root { width: 1080px; height: 1920px; position: relative; overflow: hidden;
+      container-type: size; font-family: "Geist Sans", sans-serif; color: #f1f5f9;
+      -webkit-font-smoothing: antialiased; }
+
+    .f02r-suelo { position: absolute; inset: 0; background: #0b1120; }
+    .f02r-contenido { position: absolute; inset: 0; }
+
+    /* Sigue la portada del gancho, un punto mas cerrada y bastante mas apagada:
+       aqui la imagen ya cumplio y lo que manda es la frase. */
+    .f02r-marco { position: absolute; inset: 0; overflow: hidden; }
+    .f02r-foto { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
+      object-position: 50% 42%; filter: saturate(0.3) contrast(1.06) brightness(0.44); }
+    .f02r-velo { position: absolute; inset: 0; pointer-events: none;
+      background: linear-gradient(180deg,
+        rgba(11,17,32,.72) 0%, rgba(11,17,32,.62) 30%, rgba(11,17,32,.92) 62%,
+        rgba(11,17,32,.99) 100%); }
+
+    .f02r-bloque { position: absolute; left: 60px; right: 60px; top: 852px; }
+    .f02r-linea { font-weight: 900; font-size: 110px; line-height: 1.0;
+      letter-spacing: -0.045em; }
+    .f02r-acento { color: #34d399; }
+
+    .f02r-marcas { position: absolute; left: 60px; top: 1148px; display: flex; gap: 18px; }
+    .f02r-marca { width: 76px; height: 6px; background: #34d399; transform-origin: left center; }
+
+    .m02-marca { position: absolute; top: 104px; right: 60px;
+      display: flex; align-items: center; gap: 16px; }
+    .m02-marca-logo { width: 60px; height: 60px; border-radius: 14px; display: block; }
+    .m02-marca-nombre { font-weight: 600; font-size: 38px; letter-spacing: -0.02em;
+      line-height: 1; color: #f1f5f9; }
+  </style>
+
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+  <script>
+    (function () {
+      var raiz = document.currentScript.parentNode.querySelector('[data-composition-id="02-resumen"]')
+        || document.querySelector('[data-composition-id="02-resumen"]');
+      var q = function (sel) { return raiz.querySelector(sel); };
+      var qa = function (sel) { return Array.prototype.slice.call(raiz.querySelectorAll(sel)); };
+
+      window.__timelines = window.__timelines || {};
+      var tl = gsap.timeline({ paused: true });
+      window.__timelines["02-resumen"] = tl;
+
+      // El push no se reinicia: continua donde lo dejo el gancho (1.06 -> 1.10).
+      tl.fromTo(q("#f02r-foto"), { scale: 1.06 },
+        { scale: 1.10, duration: 2.0, ease: "none" }, 0);
+
+      // La marca entra con el frame y se queda: es identidad, no un elemento
+      // narrativo, así que no compite con ningún golpe.
+      tl.fromTo(q(".m02-marca"), { opacity: 0, y: -10 },
+        { opacity: 1, y: 0, duration: 0.3, ease: "power3.out" }, 0.02);
+
+      // Frame puente: el más corto del video a propósito. Es una respiración
+      // entre el gancho y el bloque de cifras, no un frame de información —
+      // por eso no lleva foto, ni kicker, ni letra chica que leer.
+      tl.fromTo(q("#f02r-l1"),
+        { scale: 1.22, filter: "blur(12px)", opacity: 0 },
+        { scale: 1, filter: "blur(0px)", opacity: 1, duration: 0.4, ease: "power4.out" }, 0.06);
+      tl.fromTo(q("#f02r-l2"), { y: 70, opacity: 0 },
+        { y: 0, opacity: 1, duration: 0.38, ease: "circ.out" }, 0.34);
+
+      // Las tres marcas entran en cascada corta: se leen como "vienen tres".
+      tl.fromTo(qa(".f02r-marca"), { scaleX: 0 },
+        { scaleX: 1, duration: 0.26, stagger: 0.1, ease: "power3.out" }, 0.72);
+
+      // 1.3–2.0s: quietud. Corta, porque aquí no hay nada que leer despacio.
+    })();
+  </script>
+</template>

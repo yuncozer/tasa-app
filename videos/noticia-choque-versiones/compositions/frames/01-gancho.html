@@ -1,0 +1,106 @@
+<template>
+  <div id="root" data-composition-id="01-gancho" data-start="0" data-duration="4.0"
+       data-width="1080" data-height="1920">
+
+    <div id="suelo-01-gancho" class="clip suelo" data-start="0" data-duration="4.0" data-track-index="0"></div>
+
+    <div id="contenido-01-gancho" class="clip contenido" data-start="0" data-duration="4.0" data-track-index="1">
+      <div class="marco">
+        <img id="foto" class="foto" src="public/fotos/portada-cara-a-cara.png" alt="" data-layout-allow-overflow />
+      </div>
+      <div class="velo"></div>
+
+      <div class="kicker">ACUERDO EE.UU. &ndash; VENEZUELA</div>
+
+      <div class="titular">
+        <div id="l1" class="linea" data-layout-allow-overlap>&iquest;Negocio millonario</div>
+        <div id="l2" class="linea acento" data-layout-allow-overlap>o &laquo;un regalo&raquo;?</div>
+      </div>
+
+      <div class="sub">
+        <div id="s1" class="sub-linea">El choque de versiones entre Trump y</div>
+        <div id="s2" class="sub-linea">Venezuela por el &laquo;acuerdo del siglo&raquo;.</div>
+      </div>
+      <div class="marca">
+        <img class="marca-logo" src="assets/logo-latasa.png" alt="" />
+        <span class="marca-nombre">La Tasa</span>
+      </div>
+    </div>
+  </div>
+
+  <style>
+    @font-face { font-family: "Geist Sans"; src: url("assets/fonts/geist-latin.woff2") format("woff2");
+      font-weight: 100 900; font-style: normal; font-display: block; }
+
+    #root { width: 1080px; height: 1920px; position: relative; overflow: hidden;
+      container-type: size; font-family: "Geist Sans", sans-serif; color: #f1f5f9;
+      -webkit-font-smoothing: antialiased; }
+
+    .suelo { position: absolute; inset: 0; background: #0b1120; }
+    .contenido { position: absolute; inset: 0; }
+    .tabular { font-variant-numeric: tabular-nums; }
+
+    .marco { position: absolute; inset: 0; overflow: hidden; }
+    .foto { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+    .velo { position: absolute; inset: 0; pointer-events: none; }
+
+    .kicker { position: absolute; top: 116px; left: 60px; font-weight: 500; font-size: 26px;
+      letter-spacing: 0.14em; text-transform: uppercase; color: #34d399; }
+    .hairline { position: absolute; left: 60px; width: 960px; height: 1px;
+      background: #26324c; transform-origin: left center; }
+
+    /* La marca va en las once pantallas, arriba a la derecha: si alguien descarga
+       el Reel y lo reparte suelto, la cuenta viaja con el. */
+    .marca { position: absolute; top: 104px; right: 60px;
+      display: flex; align-items: center; gap: 16px; }
+    .marca-logo { width: 60px; height: 60px; border-radius: 14px; display: block; }
+    .marca-nombre { font-weight: 600; font-size: 38px; letter-spacing: -0.02em;
+      line-height: 1; color: #f1f5f9; }
+    .foto { object-position: 50% 42%; filter: saturate(0.50) contrast(1.05) brightness(0.72); }
+    .velo { background: linear-gradient(180deg, rgba(11,17,32,.46) 0%, rgba(11,17,32,.20) 20%, rgba(11,17,32,.34) 44%, rgba(11,17,32,.78) 58%, rgba(11,17,32,.93) 74%, rgba(11,17,32,.97) 100%); }
+    .titular { position: absolute; left: 60px; right: 60px; top: 1088px; }
+    .linea { font-weight: 900; font-size: 94px; line-height: 1.0; letter-spacing: -0.04em; }
+    .acento { color: #34d399; }
+    .sub { position: absolute; left: 60px; right: 60px; top: 1318px; }
+    .sub-linea { font-weight: 400; font-size: 50px; line-height: 1.32; color: #f1f5f9; }
+  </style>
+
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+  <script>
+    (function () {
+      var raiz = document.currentScript.parentNode.querySelector('[data-composition-id="01-gancho"]')
+        || document.querySelector('[data-composition-id="01-gancho"]');
+      var q = function (sel) { return raiz.querySelector(sel); };
+      var qa = function (sel) { return Array.prototype.slice.call(raiz.querySelectorAll(sel)); };
+
+      window.__timelines = window.__timelines || {};
+      var tl = gsap.timeline({ paused: true });
+      window.__timelines["01-gancho"] = tl;
+
+      // Identidad, no elemento narrativo: entra con el frame y no compite.
+      tl.fromTo(q(".marca"), { opacity: 0, y: -10 },
+        { opacity: 1, y: 0, duration: 0.3, ease: "power3.out" }, 0.02);
+
+      // El push abre lento sobre los tres retratos y cierra sobre el pozo.
+      tl.fromTo(q(".marco"), { scale: 1.10 }, { scale: 1.03, duration: 2.4, ease: "power3.out" }, 0);
+      tl.to(q(".marco"), { scale: 1.06, duration: 1.6, ease: "none" }, 2.4);
+      tl.fromTo(q(".kicker"), { opacity: 0, y: -14 },
+        { opacity: 1, y: 0, duration: 0.38, ease: "power3.out" }, 0.16);
+
+      // kinetic-beat-slam: dos golpes sobre una rejilla. La pregunta completa
+      // aterriza antes del segundo 1,5 — el gancho no puede depender de que el
+      // lector aguante hasta el final del frame.
+      var P = 0.32;
+      tl.fromTo(q("#l1"), { scale: 1.30, filter: "blur(14px)", opacity: 0 },
+        { scale: 1, filter: "blur(0px)", opacity: 1, duration: 0.5, ease: "power4.out" }, P * 1.1);
+      tl.fromTo(q("#l2"), { y: 84, rotation: 3, opacity: 0 },
+        { y: 0, rotation: 0, opacity: 1, duration: 0.46, ease: "circ.out" }, P * 3.0);
+
+      // El subtitulo cae linea a linea: primero engancha, despues explica.
+      tl.fromTo(q("#s1"), { opacity: 0, y: 26 },
+        { opacity: 1, y: 0, duration: 0.36, ease: "power3.out" }, 1.70);
+      tl.fromTo(q("#s2"), { opacity: 0, y: 26 },
+        { opacity: 1, y: 0, duration: 0.36, ease: "power3.out" }, 1.86);
+    })();
+  </script>
+</template>

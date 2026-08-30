@@ -1,0 +1,110 @@
+<template>
+  <div id="root" data-composition-id="12-cierre" data-start="0" data-duration="3.6"
+       data-width="1080" data-height="1920">
+
+    <div id="suelo-12-cierre" class="clip suelo" data-start="0" data-duration="3.6" data-track-index="0"></div>
+
+    <div id="contenido-12-cierre" class="clip contenido" data-start="0" data-duration="3.6" data-track-index="1">
+
+      <div id="acento-campo" class="acento-campo"></div>
+      <div class="num">12</div>
+
+      <div class="bloque">
+        <div id="l1" class="linea" data-layout-allow-overlap>&iquest;Y esto mueve</div>
+        <div id="l2" class="linea" data-layout-allow-overlap>la tasa?</div>
+        <div id="sub" class="sub">Seguimos atentos a los acontecimientos.</div>
+      </div>
+
+      <div class="firma">
+        <div id="rule" class="rule"></div>
+        <div id="marca-pie" class="marca-pie">LA TASA &middot; @LATASA.ONLINE</div>
+      </div>
+      <div class="marca">
+        <img class="marca-logo" src="assets/logo-latasa.png" alt="" />
+        <span class="marca-nombre">La Tasa</span>
+      </div>
+    </div>
+  </div>
+
+  <style>
+    @font-face { font-family: "Geist Sans"; src: url("assets/fonts/geist-latin.woff2") format("woff2");
+      font-weight: 100 900; font-style: normal; font-display: block; }
+
+    #root { width: 1080px; height: 1920px; position: relative; overflow: hidden;
+      container-type: size; font-family: "Geist Sans", sans-serif; color: #f1f5f9;
+      -webkit-font-smoothing: antialiased; }
+
+    .suelo { position: absolute; inset: 0; background: #0b1120; }
+    .contenido { position: absolute; inset: 0; }
+    .tabular { font-variant-numeric: tabular-nums; }
+
+    .marco { position: absolute; inset: 0; overflow: hidden; }
+    .foto { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+    .velo { position: absolute; inset: 0; pointer-events: none; }
+
+    .kicker { position: absolute; top: 116px; left: 60px; font-weight: 500; font-size: 26px;
+      letter-spacing: 0.14em; text-transform: uppercase; color: #34d399; }
+    .hairline { position: absolute; left: 60px; width: 960px; height: 1px;
+      background: #26324c; transform-origin: left center; }
+
+    /* La marca va en las once pantallas, arriba a la derecha: si alguien descarga
+       el Reel y lo reparte suelto, la cuenta viaja con el. */
+    .marca { position: absolute; top: 104px; right: 60px;
+      display: flex; align-items: center; gap: 16px; }
+    .marca-logo { width: 60px; height: 60px; border-radius: 14px; display: block; }
+    .marca-nombre { font-weight: 600; font-size: 38px; letter-spacing: -0.02em;
+      line-height: 1; color: #f1f5f9; }
+    #root { color: #0b1120; }
+    .acento-campo { position: absolute; inset: 0; background: #34d399; transform-origin: center bottom; }
+    .num { position: absolute; top: 116px; left: 60px; font-weight: 500; font-size: 26px;
+      letter-spacing: 0.14em; color: rgba(11,17,32,0.62); }
+    .marca-nombre { color: #0b1120; }
+    .bloque { position: absolute; left: 60px; right: 60px; top: 800px; }
+    .linea { font-weight: 900; font-size: 138px; line-height: 0.96; letter-spacing: -0.045em;
+      color: #0b1120; }
+    .sub { margin-top: 48px; font-weight: 400; font-size: 48px; line-height: 1.34;
+      color: rgba(11,17,32,0.62); }
+    .firma { position: absolute; left: 60px; top: 1420px; }
+    .rule { width: 36px; height: 2px; background: #0b1120; transform-origin: left center; }
+    .marca-pie { margin-top: 26px; font-weight: 500; font-size: 28px; letter-spacing: 0.14em;
+      color: rgba(11,17,32,0.75); }
+  </style>
+
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+  <script>
+    (function () {
+      var raiz = document.currentScript.parentNode.querySelector('[data-composition-id="12-cierre"]')
+        || document.querySelector('[data-composition-id="12-cierre"]');
+      var q = function (sel) { return raiz.querySelector(sel); };
+      var qa = function (sel) { return Array.prototype.slice.call(raiz.querySelectorAll(sel)); };
+
+      window.__timelines = window.__timelines || {};
+      var tl = gsap.timeline({ paused: true });
+      window.__timelines["12-cierre"] = tl;
+
+      // Identidad, no elemento narrativo: entra con el frame y no compite.
+      tl.fromTo(q(".marca"), { opacity: 0, y: -10 },
+        { opacity: 1, y: 0, duration: 0.3, ease: "power3.out" }, 0.02);
+
+      // El cambio de registro es el remate, igual que en el primer video: el
+      // acento sube desde abajo. Transform, no clip-path.
+      tl.fromTo(q("#acento-campo"), { scaleY: 0 },
+        { scaleY: 1, duration: 0.26, ease: "power4.out" }, 0);
+      tl.fromTo(q(".num"), { opacity: 0 },
+        { opacity: 1, duration: 0.3, ease: "power2.out" }, 0.26);
+
+      var P = 0.3;
+      tl.fromTo(q("#l1"), { scale: 1.18, filter: "blur(11px)", opacity: 0 },
+        { scale: 1, filter: "blur(0px)", opacity: 1, duration: 0.44, ease: "power4.out" }, P * 0.9);
+      tl.fromTo(q("#l2"), { y: 60, opacity: 0 },
+        { y: 0, opacity: 1, duration: 0.42, ease: "circ.out" }, P * 2.0);
+      tl.fromTo(q("#sub"), { opacity: 0, y: 20 },
+        { opacity: 1, y: 0, duration: 0.36, ease: "power3.out" }, 1.14);
+
+      tl.fromTo(q("#rule"), { scaleX: 0 },
+        { scaleX: 1, duration: 0.30, ease: "power3.inOut" }, 1.66);
+      tl.fromTo(q("#marca-pie"), { opacity: 0, y: 14 },
+        { opacity: 1, y: 0, duration: 0.34, ease: "power3.out" }, 1.84);
+    })();
+  </script>
+</template>

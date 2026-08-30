@@ -1,0 +1,122 @@
+LA TASA — ACUERDO PETROLERO EE.UU. / VENEZUELA
+Guion de voz en off · video de 44,2s · 1080x1920
+
+Locutor de noticiero, no de publicidad. Grave, seco, sin sonrisa.
+Rapido pero sin atropellar. Cero exclamaciones: la urgencia la carga el dato.
+Cada frame termina en silencio: ese hueco es para respirar, no para llenarlo.
+Si una frase se pasa dos decimas, dejala correr sobre el corte siguiente.
+Lo unico que no puede pasar es empezar una frase antes de que entre su frame.
+
+
+[00.0 - 03.4]  GANCHO
+¿El negocio del siglo? El megaacuerdo de Trump con Venezuela por el petroleo.
+
+   > Pregunta primero, pausa, y despues el encuadre.
+   > El peso va en "del siglo": ahi golpea tambien la imagen (1,3s).
+   > Es la linea mas apretada. Si se pasa, que se pase sobre el frame 2.
+
+
+[03.4 - 05.4]  PUENTE
+Te lo resumimos en cifras.
+
+   > Rapido y hacia arriba, como quien abre una lista.
+   > Unica linea del video con energia de presentador. Todo lo demas es informe.
+
+
+[05.4 - 10.0]  LA CIFRA
+Sesenta y cinco mil millones de barriles.
+El veinte por ciento de todo lo que tiene Venezuela.
+Solo Saudi Aramco tiene mas.
+
+   > "Sesenta y cinco mil millones" DESPACIO, casi digito a digito:
+     en pantalla el numero esta contando.
+   > Las dos comparaciones entran a los ~2,5s del frame.
+   > "Solo Saudi Aramco tiene mas" mas bajo, como quien remata.
+
+
+[10.0 - 13.8]  EL PLAZO
+Cien anos de acceso. Quien firma hoy no vera el final del contrato.
+
+   > "Cien anos" se dice y SE DEJA CAER.
+   > La segunda frase entra despues del silencio, no pegada.
+
+
+[13.8 - 18.4]  EL CONTROL
+Estados Unidos se queda con el cincuenta y cinco por ciento de la produccion.
+
+   > El numero y nada mas.
+   > NO narrar la letra chica (de donde sale el 55 %, el grupo Betancourt):
+     ya esta escrita y la voz la satura.
+
+
+[18.4 - 23.2]  QUIENES ENTRAN
+Seis petroleras habilitadas. Diecisiete campos.
+
+   > NO leer los seis nombres. Estan en pantalla y leerlos se come el frame.
+   > Despues de "diecisiete campos", CALLAR mientras el ojo lee la lista.
+   > Es el silencio mas largo del video y es deliberado.
+
+
+[23.2 - 26.8]  LA PROMESA
+Prometen cien mil millones en inversion y miles de empleos. Sin fecha.
+
+   > "Sin fecha" va aparte, mas bajo, casi un aparte.
+   > Es el matiz que impide que el frame suene a publicidad del acuerdo.
+
+
+[26.8 - 30.2]  QUIENES FIRMAN
+Lo negociaron Marco Rubio y Delcy Rodriguez. Ella lo llamo un hito historico.
+
+   > Los dos nombres sin adorno.
+   > "Hito historico" es cita ajena: micro-pausa antes.
+     Nada de tono ironico ni de comillas dichas en voz alta.
+
+
+[30.2 - 36.6]  QUIEN FIRMO POR VENEZUELA          <-- el frame delicado
+Del lado venezolano firmo Delcy Rodriguez, que asumio en enero tras la salida
+de Maduro. Su cargo es encargado, no electo: un puente hacia elecciones que
+ya vencio.
+
+   > TONO PLANO, DE ACTA. No de denuncia.
+   > La voz describe un cargo, no juzga a una persona. Eso no es solo criterio
+     editorial: es lo que protege a quien maneja la cuenta.
+   > Tres respiraciones, una por hecho.
+   > "que ya vencio" se deja caer sin subrayarlo.
+
+
+[36.6 - 40.6]  LA PREGUNTA
+¿Es sostenible un acuerdo a cien anos sin elecciones a la vista?
+
+   > Se pregunta DE VERDAD, no retoricamente. Sube al final y se corta.
+
+
+[40.6 - 44.2]  CIERRE
+¿Y esto mueve la tasa? Nadie lo ha dicho todavia. Aqui lo vas a ver primero.
+
+   > La pregunta sube, la respuesta baja.
+   > Ultima frase: la unica de todo el video donde La Tasa habla en primera
+     persona. Ahi si, cercania.
+
+
+===============================================================================
+LO QUE LA VOZ NO DEBE HACER
+===============================================================================
+
+- NO anadir cifras que no esten en pantalla.
+- NO decir que va a pasar con el bolivar ni con la tasa. No hay dato oficial y
+  esta app no publica numeros que no calcula.
+- NO calificar el acuerdo: ni "historico", ni "entrega", ni "regalo". Lo unico
+  adjetivado en todo el video es la cita de Delcy Rodriguez, y va atribuida.
+- NO leer los seis nombres de petroleras ni la letra chica de ningun frame.
+- NO decir "captura", "detencion" ni "operacion militar". Se dice "la salida de
+  Maduro del poder", que es el termino que usaron los propios medios.
+- NO decir "nadie la eligio". Se dice "encargado, no electo": es la definicion
+  de la figura, no un juicio sobre quien la ocupa.
+- NO improvisar en el frame de los 30,2s. Si una toma sale con una palabra de
+  mas, SE REPITE LA TOMA.
+
+
+===============================================================================
+155 palabras en 44,2s = 3,5 palabras por segundo. Ritmo de noticiero.
+Los frames de 13,8s y 18,4s van holgados a proposito: ahi manda la pantalla.
+===============================================================================

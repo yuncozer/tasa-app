@@ -1,0 +1,157 @@
+LA TASA — CHOQUE DE VERSIONES POR EL ACUERDO PETROLERO
+Guion de voz en off · video de 48,8s · 1080x1920 · segunda pieza de la serie
+
+Locutor de noticiero, no de publicidad. Grave, seco, sin sonrisa.
+Cero exclamaciones: la urgencia la carga el dato.
+
+ESTO ES UN RELATO, NO UNA LISTA. Cada frase engancha con la anterior mediante
+su conector -"y", "del otro lado", "ahi esta", "y del dinero", "y sobre el
+fondo"-. Esos conectores NO se pueden quitar: son lo unico que impide que el
+video suene a fichas leidas una detras de otra.
+La entonacion no baja del todo al final de cada frase salvo donde se indica.
+El corte de imagen es duro; la voz es la que cose.
+
+REGLA DE ORO: el narrador NO arbitra. Las dos versiones se dicen con el mismo
+tono. En el momento en que una suene con mas conviccion que la otra, la pieza
+deja de informar y empieza a opinar.
+
+
+[00.0 - 04.0]  GANCHO
+¿Negocio millonario, o un regalo? Trump y Venezuela cuentan distinto
+el acuerdo del siglo.
+
+   > "Un regalo" es cita de Trump: micro-pausa antes, sin retintin.
+   > Aqui SI se cierra la entonacion: es la unica frase que se sostiene sola.
+
+
+[04.0 - 06.2]  PUENTE
+Y las dos versiones aparecieron el mismo dia.
+
+   > La "y" abre el relato. Se dice rapido y hacia arriba, sin cerrar: esta
+     presentando lo que viene.
+
+
+[06.2 - 11.2]  LA CITA DE TRUMP
+Trump lo dijo asi: el petroleo venezolano es un regalo de Venezuela
+al pueblo de Estados Unidos.
+
+   > "Trump lo dijo asi" es lo que la marca como cita y no como afirmacion
+     nuestra. No se puede omitir.
+   > La cita se lee ENTERA y sin enfasis. No hace falta ayudarla.
+
+
+[11.2 - 16.2]  SU PUBLICACION
+Y explico para que: llenar las reservas estrategicas, que segun el
+quedaron casi vacias.
+
+   > La "y" encadena con la cita anterior: es la misma publicacion.
+   > En pantalla esta la captura de su post. La frase entra a los ~1,3s del
+     frame, DESPUES de que la tarjeta aterrice.
+   > "Segun el" no se puede quitar: lo de las reservas vacias es afirmacion
+     suya, no dato verificado. NO decir "vacias por Biden" como un hecho.
+
+
+[16.2 - 19.4]  PIVOTE
+Del otro lado, Caracas lo cuenta distinto.
+
+   > "Del otro lado" es la bisagra del relato entero. Se dice sin ironia:
+     es un giro, no un juicio.
+   > Siete palabras en 3,2s: el silencio es para que se vea el plano de la
+     alocucion, que es el par simetrico del post de Trump.
+
+
+[19.4 - 23.6]  EL PLAZO OFICIAL
+Anoche puso numeros: veinticinco anos, diecisiete campos y millon y medio
+de barriles diarios.
+
+   > "Anoche puso numeros" enlaza con "lo cuenta distinto": esta es la
+     version de ella empezando.
+   > Los tres datos con la misma cadencia, como quien lee un acta.
+
+
+[23.6 - 27.8]  100 O 25
+Ahi esta el choque: desde el viernes se hablo de cien anos; ella dice
+veinticinco.
+
+   > "Ahi esta el choque" nombra lo que el video viene construyendo. Es la
+     frase mas importante y la mas facil de estropear.
+   > "DESDE EL VIERNES", no "toda la semana": el acuerdo se anuncio el viernes
+     y son dos dias. Exagerar cuanto circulo la cifra es exagerar el error de
+     quien la publico.
+   > Se dice PLANO, sin subrayar el contraste: ya esta en pantalla.
+   > "Ella dice" no es escepticismo, es atribucion. Mismo tono que el resto.
+
+
+[27.8 - 32.4]  LO QUE CALCULA CARACAS
+Y del dinero: ella calcula doscientos nueve mil millones, con el barril
+a sesenta y cinco.
+
+   > "Y del dinero" cambia de tema sin cortar el hilo.
+   > "Ella calcula" es la atribucion, y no se puede quitar: es una proyeccion,
+     no una cantidad en firme.
+   > La cifra DESPACIO: en pantalla esta contando.
+   > "Con el barril a sesenta y cinco" tampoco se salta. Sin eso, la cifra
+     suena a dinero ya contado.
+
+
+[32.4 - 36.8]  CON QUE CONDICIONES
+Con regalias del dieciseis por ciento e impuesto sobre la renta del treinta
+y cuatro.
+
+   > La frase arranca en "con": es continuacion directa de la anterior, no
+     una frase nueva. NO respirar entre las dos.
+   > Los porcentajes y nada mas. La comparacion con el 1 % de hace 30 anos
+     esta en pantalla y es de ella: NO se narra.
+
+
+[36.8 - 40.8]  SU MENSAJE POLITICO
+Y sobre el fondo, insiste en que Venezuela conserva la propiedad
+y la soberania.
+
+   > "Y sobre el fondo" cierra la version de ella: pasa de las cifras al
+     argumento.
+   > "Insiste en que" es la atribucion. La cita va sin enfasis.
+   > Lo de que agradecio a Trump y a Rubio esta en pantalla. NO se narra.
+
+
+[40.8 - 45.2]  LA MISMA FIRMA, DOS RELATOS
+La misma firma, dos relatos: un regalo, dice uno; doscientos nueve mil
+millones, dice la otra.
+
+   > Aqui el relato se cierra sobre si mismo: recoge las dos frases que ya
+     se dijeron. Por eso funciona sin conector.
+   > Las dos mitades con EXACTAMENTE el mismo peso y la misma duracion.
+     Es donde mas se nota si el narrador tomo partido.
+   > Pausa larga en el punto y coma del medio.
+
+
+[45.2 - 48.8]  CIERRE
+¿Y esto mueve la tasa? Seguimos atentos a los acontecimientos.
+
+   > La pregunta sube; la segunda frase baja y se dice sin prisa.
+   > La pregunta es el guino a la marca y se repite en todos los videos de la
+     serie: se dice SIEMPRE igual, es la firma sonora de La Tasa.
+   > La segunda frase no es una conclusion, es un compromiso: no cierra,
+     abre al siguiente video.
+
+
+===============================================================================
+LO QUE LA VOZ NO DEBE HACER
+===============================================================================
+
+- NO quitar los conectores. Sin ellos el video vuelve a sonar a lista.
+- NO arbitrar. Ninguna de las dos versiones se dice con mas conviccion.
+- NO anadir cifras que no esten en pantalla.
+- NO decir que va a pasar con el bolivar ni con la tasa. No hay dato.
+- NO quitar las atribuciones: "segun el", "ella dice", "ella calcula",
+  "insiste en que". Son la diferencia entre informar y repetir.
+- NO narrar lo que ya esta escrito en letra chica (la comparacion con el 1 %,
+  el agradecimiento a Trump y Rubio). Duplicar la pantalla satura el frame.
+- NO ironizar en el pivote ni en el frame de los 23,6s.
+
+
+===============================================================================
+159 palabras en 48,8s = 3,3 palabras por segundo. Ritmo de noticiero.
+Subio respecto de la version anterior (143) porque los conectores anaden
+palabras: es exactamente lo que compra la fluidez.
+===============================================================================

@@ -1028,6 +1028,181 @@ botón que arma el Reel con esas mismas cifras, su vista previa y su descarga.
   desarrollo y no gasta créditos. Se prefiere la nube cuando está configurada
   para que lo que se prueba sea lo que va a pasar en producción.
 
+### El Reel de noticia es un formato fijo, no un diseño por pieza
+
+Cuando una noticia relevante toca a la frontera se publica un **Reel vertical de
+noticia**: 1080×1920, mudo, entre 40 y 50 segundos, hecho con HyperFrames. No es
+un diseño nuevo cada vez — es una plantilla editorial con reglas duras, y esa
+repetición es justamente lo que la vuelve reconocible en el feed.
+
+Los dos primeros viven en `videos/noticia-petroleo-eeuu/` (el acuerdo petrolero
+EE.UU.–Venezuela) y `videos/noticia-choque-versiones/` (el choque de versiones
+entre Trump y Caracas). **Para hacer uno nuevo se copia el más reciente**, no se
+empieza de cero: fuentes, logo, `frame.md` y el generador ya están dentro.
+
+No confundir con el **video de tasas** de `videos/tasas-del-dia/` (sección de
+arriba): aquel publica cifras propias que la app calcula, este republica hechos
+de terceros. Las reglas de abajo son de este.
+
+#### La estructura
+
+Diez a doce frames, siempre en este orden:
+
+| Rol | Cuántos | Qué hace |
+| --- | --- | --- |
+| Gancho | 1 | Una **pregunta**, no una afirmación, sobre foto de portada |
+| Puente | 1 | Una frase corta, sin datos. Respiración |
+| Cuerpo | 6–9 | Un dato por frame |
+| Cierre | 1 | Registro `--accent` pleno + firma |
+
+- **El gancho es una pregunta y se completa antes del segundo 1,5.** No puede
+  depender de que el lector aguante hasta el final del frame: si la pregunta
+  aterriza en el segundo 3, ya se fue. El encuadre —de qué va la noticia— entra
+  *después*, en cuerpo de lectura, para no pelearle el sitio.
+- **El puente no informa de nada.** "Te lo resumimos en cifras", "Dos versiones
+  del mismo acuerdo". Es el frame más corto (~2s) y su brevedad es lo que lo hace
+  funcionar como respiración y no como un frame más. Sin él, se pasa de una
+  pregunta a un número enorme sin transición y el primer dato se pierde.
+- **Una cifra por frame.** En cuanto dos comparten pantalla, ninguna se recuerda.
+  La excepción se documenta en el storyboard y solo vale si son el mismo tipo de
+  dato (dos porcentajes del mismo contrato) y entran una tras otra.
+- **El cierre siempre es `¿Y esto mueve la tasa?`** en registro `--accent` pleno.
+  Es el guiño al nombre de la marca y la firma de la serie: se repite igual en
+  todos los Reels y eso es lo que los encadena. Lo que cambia es la línea de
+  abajo, que **abre en vez de cerrar** ("Seguimos atentos a los acontecimientos").
+  Una línea del tipo "nadie lo dice" es cierta pero deja al lector en un callejón.
+
+#### Las reglas visuales
+
+- **La paleta es la de la app** (`ESTILOS.md` §2), sin un color crudo:
+  `--background` de fondo, `--foreground` en el texto, `--muted` en etiquetas y
+  letra chica, `--border` en los hairlines, `--accent` en **toda** cifra y todo
+  kicker. Tipografía **Geist Sans**, la única familia del proyecto.
+- **`--warning` #fbbf24 no se usa nunca.** En este sistema es semántico —"este
+  número no es de fiar ahora mismo"— y en un Reel sería decorativo, que es justo
+  lo que la norma prohíbe. Si un preset lo mapea ahí automáticamente, se corrige
+  a mano (ya pasó una vez).
+- **La marca va en las once o doce pantallas**, arriba a la derecha: taza +
+  "La Tasa". Entra con el frame y se queda quieta — es identidad, no elemento
+  narrativo, así que nunca compite con un golpe. Mismo criterio que el sello de
+  los videos marcados en Cloudinary: si alguien descarga el Reel y lo reparte
+  suelto, la cuenta viaja con él.
+- **Ortografía normal, no minúsculas forzadas.** El preset de origen
+  (`broadside`) las trae y **se retiran**: la app escribe con mayúscula en todas
+  partes, y era lo último que quedaba de una identidad ajena. Las continuaciones
+  de frase sí van en minúscula ("¿El negocio / del siglo?") y las citas
+  fragmentarias también («un hito histórico»).
+- **Las fotos van desaturadas y con velo `--background` entre 40 % y 68 %**, para
+  que ninguna compita con la tipografía y para que se lean como un mismo sistema
+  pese a venir de fuentes distintas. La excepción es la **portada**: no es una
+  foto de fuente sino una composición armada para abrir, y va a media saturación.
+  Que sea la única con color separa la apertura del bloque de datos.
+- **Cortes duros, nunca crossfade.** Es una noticia, no un ensayo. La única
+  transición blanda es el wipe vertical que trae el registro de acento del cierre.
+- **Todo empuja hacia adelante.** Cada frame hereda un push de cámara del anterior
+  —escala creciente, nunca pull-back—, incluso cuando cambia la foto.
+- **Cada frame termina con 0,5–1,4s de quietud total.** Ese hueco es el tiempo de
+  lectura y el sitio donde respira la voz. Sin él, doce frames se leen como un
+  listado y no queda ni una cifra.
+
+#### Las reglas editoriales, que son las que no se negocian
+
+- **Cada afirmación dice de quién es**: "Dice que", "según él", "ella calcula",
+  "insiste en que", comillas en toda cita. Es la diferencia entre informar y
+  repetir, y en una pieza sobre declaraciones cruzadas es toda la defensa.
+- **Los supuestos van pegados a su cifra.** "209.335 millones" sin "calculado con
+  el barril a 65 dólares" al lado se lee como dinero contado, y es una
+  proyección. Misma regla que rige las tarjetas de tasas en la app.
+- **Lo que no se ha revelado se dice que no se ha revelado**, y lo que aporta un
+  periodista se le atribuye por su nombre.
+- **Nunca se proyecta el efecto sobre la tasa.** No hay dato oficial y esta app no
+  publica números que no calcula. Por eso el cierre es una pregunta abierta.
+- **Se describen cargos, no se juzgan personas.** "Un cargo encargado, no electo"
+  es la definición de una figura institucional; "nadie la eligió" es una
+  afirmación sobre alguien. Dicen lo mismo y **no exponen igual a quien publica**,
+  que es una consideración real: la cuenta la manejan personas. Por lo mismo se
+  usa el término que usaron los medios ("la salida de Maduro del poder") y no la
+  narración de la operación.
+- **Las ventanas de tiempo se nombran con precisión.** "Desde el viernes", no
+  "toda la semana": exagerar cuánto circuló una cifra es exagerar el error de
+  quien la publicó.
+- **Cuando dos fuentes se contradicen, van las dos a la misma altura**, cada una
+  con su procedencia, y el frame no concluye. Eso no es tibieza: es lo único
+  honesto cuando el documento no es público. La cifra que ya circuló entra en
+  `--muted` (es lo que el lector trae en la cabeza) y la nueva en `--accent`.
+- **Un dato desmentido después no es una corrección**, es otra versión — y suele
+  ser mejor material que el original. Ver `videos/noticia-choque-versiones/`, cuyo
+  frame de "100 o 25" nació exactamente de eso.
+
+#### El guion se escribe como relato, no como fichas
+
+El video se entrega **mudo y autosuficiente** —se entiende sin sonido, que es como
+se ve un Reel— y el guion de voz queda en `GUION-CAPCUT.txt` para grabarlo aparte.
+**El proyecto no genera TTS**, por el mismo motivo que `videos/tasas-del-dia`.
+
+- **Cada línea engancha con la anterior por su conector**: "y", "del otro lado",
+  "ahí está", "y del dinero", "y sobre el fondo". Los cortes de imagen son duros
+  y **la voz es la que cose**; sin conectores el Reel suena a titulares leídos uno
+  detrás de otro. Cuestan ~15 palabras sobre el total y eso es lo que se paga.
+- **Ritmo: 3,0–3,3 palabras por segundo.** Más rápido no se entiende de pie y con
+  ruido, que es donde se ve esto.
+- **La voz no lee lo que ya está en pantalla.** Ni las listas de nombres, ni la
+  letra chica. Duplicar la pantalla satura el frame en vez de reforzarlo, y el
+  silencio es lo que da tiempo a leer.
+- **Las cifras se escriben en letras** ("veinticinco años", "doscientos nueve mil
+  millones"): los motores de texto a voz leen "209.335" como un número suelto y
+  "25" sin la unidad.
+- El guion lleva **tiempos sacados del render**, no del storyboard. Si un frame
+  cambia de duración hay que recalcularlos — ya se publicó una vez con los viejos.
+
+#### Cómo se construye
+
+- **Los frames los escribe `scripts/generar-frames.py`, no la mano.** La mitad de
+  cada archivo es idéntica en los doce (la `@font-face`, el `#root`, el suelo y el
+  lockup de marca) y mantenerla en doce copias es como se cuelan las divergencias.
+  Al tocar un frame **se edita el generador y se vuelve a correr**, nunca el HTML
+  suelto: la próxima corrida lo pisaría. El generador borra los frames que ya no
+  produce, porque renombrar uno dejaba el archivo viejo en la carpeta.
+- **Antes de renderizar se abre el Studio** (`npx hyperframes preview
+  --background`) y se revisa ahí. Renderizar para mirar cuesta tres minutos por
+  vuelta; el Studio recarga solo. El puerto cambia en cada arranque —lo dice
+  `preview --status`—, y conviene matar los servidores viejos porque dejan puertos
+  ocupados sirviendo contenido viejo.
+- **Al reemplazar una imagen hay que cambiarle el nombre.** El navegador cachea
+  por URL: mismo nombre y contenido distinto es una imagen que no se actualiza
+  nunca en el Studio, aunque el render sí la tome. Es el mismo motivo del
+  `?actualizar=` de la portada y de `/admin/parada`.
+- **`npx hyperframes check` tiene que pasar limpio** antes de renderizar: lint,
+  runtime, layout, motion y contraste WCAG AA.
+- El display va con interlínea por debajo de 1, así que el checker reporta
+  `content_overlap` entre líneas seguidas aunque la tinta no se toque. Se marca
+  con `data-layout-allow-overlap` **solo en las líneas display y los bloques de
+  cifra**, en ningún otro sitio.
+- **El texto largo hay que partirlo a mano.** Una línea que envuelve sola empuja
+  el bloque y se come lo de abajo; ha pasado en cuatro frames distintos. A 1080 px
+  con márgenes de 60, en peso 900 caben ~19 caracteres a 122 px y ~24 a 96 px.
+
+#### Las imágenes
+
+- **Las de stock salen de Pexels** con `PEXELS_API_KEY` (ya está en `.env.local`).
+  La licencia no exige atribución; se acredita igual en `CREDITOS.md`, por el
+  mismo motivo por el que cada tasa dice de dónde viene.
+- **Se descartan las fotos que insinúan algo que no se afirma.** Las de "bandera
+  de Venezuela" en Pexels son manifestaciones y celebraciones: usarlas de
+  decoración para un dato de reservas sugiere que esa gente reacciona a esa
+  noticia. Se usó un mapa en su lugar.
+- **Una imagen pequeña no va a sangre.** Por debajo de ~1000 px de alto se
+  pixela a 1080×1920. Hay dos salidas y las dos son legítimas: **desenfocarla**
+  (18–20 px) cuando solo hace de atmósfera detrás de una cita, o **meterla en una
+  caja** de 960 px, que baja la ampliación a algo razonable y además conserva el
+  encuadre completo. Lo que no vale es estirarla nítida.
+- **Cuando se enseña una publicación como prueba, se recorta a la fuente.** Si la
+  captura viene de una cuenta que reproduce a otra, se deja fuera el chrome de la
+  intermediaria: lo que se enseña tiene que ser el original, no quien lo reenvía.
+- **Los documentos de las dos partes van con el mismo trato.** Misma caja, mismo
+  borde, mismo radio y un pie en `--muted` que dice de dónde sale. Esa simetría no
+  es decorativa: es lo que impide que una versión pese más que la otra.
+
 ### El aviso legal se queda
 
 El pie declara que los datos son de terceros, que La Tasa no fija ni certifica

@@ -1,0 +1,107 @@
+<template>
+  <div id="root" data-composition-id="09-legitimidad" data-start="0" data-duration="6.4" data-width="1080" data-height="1920">
+
+    <div id="f08-suelo" class="clip f08-suelo" data-start="0" data-duration="6.4" data-track-index="0"></div>
+
+    <div id="f08-contenido" class="clip f08-contenido" data-start="0" data-duration="6.4" data-track-index="1">
+      <div id="f08-kicker" class="f08-kicker">QUIÉN FIRMÓ POR VENEZUELA</div>
+
+      <div class="f08-titular">
+        <div id="f08-t1" class="f08-linea" data-layout-allow-overlap="">Un cargo</div>
+        <div id="f08-t2" class="f08-linea f08-acento" data-layout-allow-overlap="">encargado, no electo</div>
+      </div>
+
+      <div id="f08-hairline" class="f08-hairline"></div>
+
+      <div class="f08-datos">
+        <div id="f08-d1" class="f08-dato">Delcy Rodríguez asumió en enero, tras la salida de Nicolás Maduro del poder.</div>
+        <div id="f08-d2" class="f08-dato">La figura de presidenta encargada es un puente de 180 días hacia elecciones.</div>
+        <div id="f08-d3" class="f08-dato f08-dato-fuerte">Ese plazo ya venció.</div>
+      </div>
+      <div class="m09-marca">
+        <img class="m09-marca-logo" src="assets/logo-latasa.png" alt="">
+        <span class="m09-marca-nombre">La Tasa</span>
+      </div>
+    </div>
+  </div>
+
+  <style>
+    @font-face { font-family: "Geist Sans"; src: url("assets/fonts/geist-latin.woff2") format("woff2");
+      font-weight: 100 900; font-style: normal; font-display: block; }
+
+    #root { width: 1080px; height: 1920px; position: relative; overflow: hidden;
+      container-type: size; font-family: "Geist Sans", sans-serif; color: #f1f5f9;
+      -webkit-font-smoothing: antialiased; }
+
+    .f08-suelo { position: absolute; inset: 0; background: #0b1120; }
+    .f08-contenido { position: absolute; inset: 0; }
+
+    .f08-kicker { position: absolute; top: 116px; left: 60px;
+      font-weight: 500; font-size: 26px;
+      letter-spacing: 0.14em; text-transform: uppercase; color: #34d399; }
+
+    .f08-titular { position: absolute; left: 60px; right: 60px; top: 700px; }
+    .f08-linea { font-weight: 900; font-size: 96px; line-height: 1.0;
+      letter-spacing: -0.045em; }
+    .f08-acento { color: #34d399; }
+
+    .f08-hairline { position: absolute; left: 60px; top: 950px; width: 960px; height: 1px;
+      background: #26324c; transform-origin: left center; }
+
+    /* Marcador `/` en acento: el bullet del sistema. Tope de tres, como manda
+       el preset — y aqui tres son exactamente los hechos que sostienen la frase. */
+    .f08-datos { position: absolute; left: 60px; right: 60px; top: 1006px; }
+    .f08-dato { position: relative; padding-left: 50px; margin-bottom: 34px;
+      font-weight: 400; font-size: 44px; line-height: 1.42; color: #94a3b8; }
+    .f08-dato::before { content: "/"; position: absolute; left: 0; top: 0;
+      font-weight: 500; color: #34d399; }
+    .f08-dato-fuerte { color: #f1f5f9; font-weight: 500; }
+
+    .m09-marca { position: absolute; top: 104px; right: 60px;
+      display: flex; align-items: center; gap: 16px; }
+    .m09-marca-logo { width: 60px; height: 60px; border-radius: 14px; display: block; }
+    .m09-marca-nombre { font-weight: 600; font-size: 38px; letter-spacing: -0.02em;
+      line-height: 1; color: #f1f5f9; }
+  </style>
+
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+  <script>
+    (function () {
+      var raiz = document.currentScript.parentNode.querySelector('[data-composition-id="09-legitimidad"]')
+        || document.querySelector('[data-composition-id="09-legitimidad"]');
+      var q = function (sel) { return raiz.querySelector(sel); };
+
+      window.__timelines = window.__timelines || {};
+      var tl = gsap.timeline({ paused: true });
+      window.__timelines["09-legitimidad"] = tl;
+
+      // La marca entra con el frame y se queda: es identidad, no un elemento
+      // narrativo, así que no compite con ningún golpe.
+      tl.fromTo(q(".m09-marca"), { opacity: 0, y: -10 },
+        { opacity: 1, y: 0, duration: 0.3, ease: "power3.out" }, 0.02);
+
+      tl.fromTo(q("#f08-kicker"), { opacity: 0, y: -12 },
+        { opacity: 1, y: 0, duration: 0.32, ease: "power3.out" }, 0.06);
+
+      tl.fromTo(q("#f08-t1"),
+        { scale: 1.24, filter: "blur(13px)", opacity: 0 },
+        { scale: 1, filter: "blur(0px)", opacity: 1, duration: 0.48, ease: "power4.out" }, 0.26);
+      tl.fromTo(q("#f08-t2"), { y: 74, opacity: 0 },
+        { y: 0, opacity: 1, duration: 0.44, ease: "circ.out" }, 0.72);
+
+      // La afirmación va primero y los hechos que la sostienen después, uno a
+      // uno: es una acusación seria y el video tiene que mostrarla comprobada.
+      tl.fromTo(q("#f08-hairline"), { scaleX: 0 },
+        { scaleX: 1, duration: 0.46, ease: "power3.inOut" }, 1.32);
+      tl.fromTo(q("#f08-d1"), { opacity: 0, y: 24 },
+        { opacity: 1, y: 0, duration: 0.36, ease: "power3.out" }, 1.58);
+      tl.fromTo(q("#f08-d2"), { opacity: 0, y: 24 },
+        { opacity: 1, y: 0, duration: 0.36, ease: "power3.out" }, 2.22);
+      tl.fromTo(q("#f08-d3"), { opacity: 0, y: 24 },
+        { opacity: 1, y: 0, duration: 0.36, ease: "power3.out" }, 2.86);
+
+      // 3.3–4.4s: la quietud más larga del video. El dato necesita asentarse
+      // antes de que llegue la pregunta.
+    })();
+  </script>
+</template>

@@ -1,0 +1,114 @@
+<template>
+  <div id="root" data-composition-id="08-ingresos" data-start="0" data-duration="4.6"
+       data-width="1080" data-height="1920">
+
+    <div id="suelo-08-ingresos" class="clip suelo" data-start="0" data-duration="4.6" data-track-index="0"></div>
+
+    <div id="contenido-08-ingresos" class="clip contenido" data-start="0" data-duration="4.6" data-track-index="1">
+      <div class="marco">
+        <img id="foto" class="foto" src="public/fotos/dinero.jpg" alt="" data-layout-allow-overflow />
+      </div>
+      <div class="velo"></div>
+
+      <div class="kicker">LO QUE CALCULA CARACAS</div>
+
+      <div class="cifra-bloque">
+        <div id="cifra" class="cifra tabular" data-layout-allow-overlap>US$ 0</div>
+        <div id="unidad" class="unidad" data-layout-allow-overlap>MILLONES PARA EL ESTADO VENEZOLANO</div>
+      </div>
+
+      <div id="hl" class="hairline" style="top: 1240px"></div>
+      <div class="datos">
+        <div id="d1" class="dato">Calculado con el barril a 65 d&oacute;lares.</div>
+        <div id="d2" class="dato acento">Unos 19 d&oacute;lares por cada barril vendido.</div>
+      </div>
+      <div class="marca">
+        <img class="marca-logo" src="assets/logo-latasa.png" alt="" />
+        <span class="marca-nombre">La Tasa</span>
+      </div>
+    </div>
+  </div>
+
+  <style>
+    @font-face { font-family: "Geist Sans"; src: url("assets/fonts/geist-latin.woff2") format("woff2");
+      font-weight: 100 900; font-style: normal; font-display: block; }
+
+    #root { width: 1080px; height: 1920px; position: relative; overflow: hidden;
+      container-type: size; font-family: "Geist Sans", sans-serif; color: #f1f5f9;
+      -webkit-font-smoothing: antialiased; }
+
+    .suelo { position: absolute; inset: 0; background: #0b1120; }
+    .contenido { position: absolute; inset: 0; }
+    .tabular { font-variant-numeric: tabular-nums; }
+
+    .marco { position: absolute; inset: 0; overflow: hidden; }
+    .foto { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+    .velo { position: absolute; inset: 0; pointer-events: none; }
+
+    .kicker { position: absolute; top: 116px; left: 60px; font-weight: 500; font-size: 26px;
+      letter-spacing: 0.14em; text-transform: uppercase; color: #34d399; }
+    .hairline { position: absolute; left: 60px; width: 960px; height: 1px;
+      background: #26324c; transform-origin: left center; }
+
+    /* La marca va en las once pantallas, arriba a la derecha: si alguien descarga
+       el Reel y lo reparte suelto, la cuenta viaja con el. */
+    .marca { position: absolute; top: 104px; right: 60px;
+      display: flex; align-items: center; gap: 16px; }
+    .marca-logo { width: 60px; height: 60px; border-radius: 14px; display: block; }
+    .marca-nombre { font-weight: 600; font-size: 38px; letter-spacing: -0.02em;
+      line-height: 1; color: #f1f5f9; }
+    .foto { object-position: 50% 50%; filter: grayscale(1) contrast(1.2) brightness(0.32); }
+    .velo { background: linear-gradient(180deg, rgba(11,17,32,.62) 0%, rgba(11,17,32,.72) 42%, rgba(11,17,32,.94) 100%); }
+    .cifra-bloque { position: absolute; left: 60px; right: 60px; top: 880px; }
+    .cifra { font-weight: 900; font-size: 152px; line-height: 1.0; letter-spacing: -0.045em;
+      color: #34d399; transform-origin: left center; }
+    .unidad { margin-top: 26px; font-weight: 500; font-size: 30px; letter-spacing: 0.13em;
+      text-transform: uppercase; color: #94a3b8; }
+    .datos { position: absolute; left: 60px; right: 60px; top: 1286px; }
+    .dato { font-weight: 400; font-size: 44px; line-height: 1.36; color: #f1f5f9; margin-bottom: 16px; }
+    .acento { color: #34d399; font-weight: 600; }
+  </style>
+
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+  <script>
+    (function () {
+      var raiz = document.currentScript.parentNode.querySelector('[data-composition-id="08-ingresos"]')
+        || document.querySelector('[data-composition-id="08-ingresos"]');
+      var q = function (sel) { return raiz.querySelector(sel); };
+      var qa = function (sel) { return Array.prototype.slice.call(raiz.querySelectorAll(sel)); };
+
+      window.__timelines = window.__timelines || {};
+      var tl = gsap.timeline({ paused: true });
+      window.__timelines["08-ingresos"] = tl;
+
+      // Identidad, no elemento narrativo: entra con el frame y no compite.
+      tl.fromTo(q(".marca"), { opacity: 0, y: -10 },
+        { opacity: 1, y: 0, duration: 0.3, ease: "power3.out" }, 0.02);
+
+      tl.fromTo(q("#foto"), { scale: 1.12 }, { scale: 1.02, duration: 2.8, ease: "power3.out" }, 0);
+      tl.fromTo(q(".kicker"), { opacity: 0, y: -12 },
+        { opacity: 1, y: 0, duration: 0.32, ease: "power3.out" }, 0.06);
+
+      // La cifra se cuenta entera: es la respuesta de Caracas a "un regalo",
+      // y el ojo tiene que perseguirla hasta el final.
+      var el = q("#cifra"), st = { v: 0 }, DUR = 1.5, INI = 0.26, EASE = "power2.out";
+      tl.to(st, { v: 209335, duration: DUR, ease: EASE,
+        onUpdate: function () {
+          el.textContent = "US$ " + Math.round(st.v).toLocaleString("es-VE");
+        } }, INI);
+      tl.fromTo(el, { scale: 0.88, opacity: 0 },
+        { scale: 1, opacity: 1, duration: DUR, ease: EASE }, INI);
+      tl.fromTo(q("#unidad"), { opacity: 0, y: 18 },
+        { opacity: 1, y: 0, duration: 0.34, ease: "power3.out" }, INI + DUR);
+
+      // El supuesto del precio va pegado a la cifra: sin el, 209.335 millones
+      // se lee como una cantidad firme y es una estimacion.
+      tl.fromTo(q("#hl"), { scaleX: 0 },
+        { scaleX: 1, duration: 0.44, ease: "power3.inOut" }, 2.16);
+      tl.fromTo(q("#d1"), { opacity: 0, y: 22 },
+        { opacity: 1, y: 0, duration: 0.34, ease: "power3.out" }, 2.40);
+      tl.fromTo(q("#d2"), { opacity: 0, y: 22 },
+        { opacity: 1, y: 0, duration: 0.34, ease: "power3.out" }, 2.76);
+    })();
+  </script>
+</template>

@@ -1,0 +1,110 @@
+<template>
+  <div id="root" data-composition-id="10-sostenible" data-start="0" data-duration="4.0" data-width="1080" data-height="1920">
+
+    <div id="f09-suelo" class="clip f09-suelo" data-start="0" data-duration="4.0" data-track-index="0"></div>
+
+    <div id="f09-contenido" class="clip f09-contenido" data-start="0" data-duration="4.0" data-track-index="1">
+      <div id="f09-superficie" class="f09-superficie"></div>
+
+      <div id="f09-kicker" class="f09-kicker">LA PREGUNTA DE FONDO</div>
+
+      <div class="f09-bloque">
+        <div id="f09-l1" class="f09-linea" data-layout-allow-overlap="">¿Es sostenible</div>
+        <div id="f09-l2" class="f09-linea" data-layout-allow-overlap="">un acuerdo a 100 años</div>
+        <div id="f09-l3" class="f09-acento" data-layout-allow-overlap="">
+          <div class="f09-linea" data-layout-allow-overlap="">sin elecciones</div>
+          <div class="f09-linea" data-layout-allow-overlap="">a la vista?</div>
+        </div>
+      </div>
+
+      <div id="f09-hairline" class="f09-hairline"></div>
+      <div id="f09-nota" class="f09-nota">Todavía no hay fecha electoral anunciada.</div>
+      <div class="m10-marca">
+        <img class="m10-marca-logo" src="assets/logo-latasa.png" alt="">
+        <span class="m10-marca-nombre">La Tasa</span>
+      </div>
+    </div>
+  </div>
+
+  <style>
+    @font-face { font-family: "Geist Sans"; src: url("assets/fonts/geist-latin.woff2") format("woff2");
+      font-weight: 100 900; font-style: normal; font-display: block; }
+
+    #root { width: 1080px; height: 1920px; position: relative; overflow: hidden;
+      container-type: size; font-family: "Geist Sans", sans-serif; color: #f1f5f9;
+      -webkit-font-smoothing: antialiased; }
+
+    .f09-suelo { position: absolute; inset: 0; background: #0b1120; }
+    .f09-contenido { position: absolute; inset: 0; }
+
+    /* Registro intermedio: --surface. Es el escalón entre los frames oscuros y
+       el acento del cierre, y avisa de que ya no estamos enumerando datos. */
+    .f09-superficie { position: absolute; inset: 0; background: #131c2f;
+      transform-origin: center bottom; }
+
+    .f09-kicker { position: absolute; top: 116px; left: 60px;
+      font-weight: 500; font-size: 26px;
+      letter-spacing: 0.14em; text-transform: uppercase; color: #34d399; }
+
+    .f09-bloque { position: absolute; left: 60px; right: 60px; top: 748px; }
+    .f09-linea { font-weight: 900; font-size: 84px; line-height: 1.06;
+      letter-spacing: -0.04em; }
+    .f09-acento { color: #34d399; }
+
+    .f09-hairline { position: absolute; left: 60px; top: 1166px; width: 960px; height: 1px;
+      background: #26324c; transform-origin: left center; }
+    .f09-nota { position: absolute; left: 60px; right: 60px; top: 1212px;
+      font-weight: 400; font-size: 42px; line-height: 1.36; color: #94a3b8; }
+
+    .m10-marca { position: absolute; top: 104px; right: 60px;
+      display: flex; align-items: center; gap: 16px; }
+    .m10-marca-logo { width: 60px; height: 60px; border-radius: 14px; display: block; }
+    .m10-marca-nombre { font-weight: 600; font-size: 38px; letter-spacing: -0.02em;
+      line-height: 1; color: #f1f5f9; }
+  </style>
+
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+  <script>
+    (function () {
+      var raiz = document.currentScript.parentNode.querySelector('[data-composition-id="10-sostenible"]')
+        || document.querySelector('[data-composition-id="10-sostenible"]');
+      var q = function (sel) { return raiz.querySelector(sel); };
+
+      window.__timelines = window.__timelines || {};
+      var tl = gsap.timeline({ paused: true });
+      window.__timelines["10-sostenible"] = tl;
+
+      // La marca entra con el frame y se queda: es identidad, no un elemento
+      // narrativo, así que no compite con ningún golpe.
+      tl.fromTo(q(".m10-marca"), { opacity: 0, y: -10 },
+        { opacity: 1, y: 0, duration: 0.3, ease: "power3.out" }, 0.02);
+
+      // La superficie sube desde abajo, misma dirección que el acento del
+      // cierre: los dos últimos frames comparten el gesto y se leen como uno.
+      tl.fromTo(q("#f09-superficie"), { scaleY: 0 },
+        { scaleY: 1, duration: 0.28, ease: "power4.out" }, 0);
+
+      tl.fromTo(q("#f09-kicker"), { opacity: 0, y: -12 },
+        { opacity: 1, y: 0, duration: 0.3, ease: "power3.out" }, 0.28);
+
+      // kinetic-beat-slam: un golpe por línea sobre una sola rejilla, con
+      // entradas distintas. La pregunta se arma delante del lector.
+      var PULSE = 0.3;
+      tl.fromTo(q("#f09-l1"),
+        { scale: 1.16, filter: "blur(10px)", opacity: 0 },
+        { scale: 1, filter: "blur(0px)", opacity: 1, duration: 0.42, ease: "power4.out" },
+        PULSE * 1.2);
+      tl.fromTo(q("#f09-l2"), { x: -200, opacity: 0 },
+        { x: 0, opacity: 1, duration: 0.4, ease: "expo.out" }, PULSE * 2.6);
+      tl.fromTo(q("#f09-l3"), { y: 60, rotation: 2.5, opacity: 0 },
+        { y: 0, rotation: 0, opacity: 1, duration: 0.44, ease: "circ.out" }, PULSE * 4.0);
+
+      tl.fromTo(q("#f09-hairline"), { scaleX: 0 },
+        { scaleX: 1, duration: 0.4, ease: "power3.inOut" }, 1.82);
+      tl.fromTo(q("#f09-nota"), { opacity: 0, y: 18 },
+        { opacity: 1, y: 0, duration: 0.34, ease: "power3.out" }, 2.02);
+
+      // 2.4–3.0s: quietud. La pregunta se queda sola en pantalla.
+    })();
+  </script>
+</template>

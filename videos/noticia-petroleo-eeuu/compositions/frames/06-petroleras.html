@@ -1,0 +1,131 @@
+<template>
+  <div id="root" data-composition-id="06-petroleras" data-start="0" data-duration="4.8" data-width="1080" data-height="1920">
+
+    <div id="f05p-suelo" class="clip f05p-suelo" data-start="0" data-duration="4.8" data-track-index="0"></div>
+
+    <div id="f05p-contenido" class="clip f05p-contenido" data-start="0" data-duration="4.8" data-track-index="1">
+
+      <div id="f05p-kicker" class="f05p-kicker">QUIÉNES ENTRAN</div>
+
+      <div class="f05p-titular">
+        <div id="f05p-t1" class="f05p-linea" data-layout-allow-overlap=""><span class="f05p-acento" data-layout-allow-overlap="">6 petroleras</span></div>
+        <div id="f05p-t2" class="f05p-linea" data-layout-allow-overlap="">habilitadas</div>
+      </div>
+
+      <div class="f05p-lista">
+        <div class="f05p-nombre" data-i="0">BP</div>
+        <div class="f05p-nombre" data-i="1">Chevron</div>
+        <div class="f05p-nombre" data-i="2">Eni</div>
+        <div class="f05p-nombre" data-i="3">Maurel &amp; Prom</div>
+        <div class="f05p-nombre" data-i="4">Repsol</div>
+        <div class="f05p-nombre" data-i="5">Shell</div>
+      </div>
+
+      <div id="f05p-hairline" class="f05p-hairline"></div>
+
+      <div class="f05p-pie">
+        <div id="f05p-p1" class="f05p-pie-fila">
+          <span class="f05p-pie-cifra tabular" data-layout-allow-overlap="">17</span>
+          <span class="f05p-pie-texto">campos estratégicos</span>
+        </div>
+        <div id="f05p-p2" class="f05p-pie-nota">Licencias ampliadas por la OFAC el 27 de agosto.</div>
+      </div>
+      <div class="m06-marca">
+        <img class="m06-marca-logo" src="assets/logo-latasa.png" alt="">
+        <span class="m06-marca-nombre">La Tasa</span>
+      </div>
+    </div>
+  </div>
+
+  <style>
+    @font-face { font-family: "Geist Sans"; src: url("assets/fonts/geist-latin.woff2") format("woff2");
+      font-weight: 100 900; font-style: normal; font-display: block; }
+
+    #root { width: 1080px; height: 1920px; position: relative; overflow: hidden;
+      container-type: size; font-family: "Geist Sans", sans-serif; color: #f1f5f9;
+      -webkit-font-smoothing: antialiased; }
+
+    .f05p-suelo { position: absolute; inset: 0; background: #0b1120; }
+    .f05p-contenido { position: absolute; inset: 0; }
+    .tabular { font-variant-numeric: tabular-nums; }
+
+    .f05p-kicker { position: absolute; top: 116px; left: 60px;
+      font-weight: 500; font-size: 26px;
+      letter-spacing: 0.14em; text-transform: uppercase; color: #34d399; }
+
+    .f05p-titular { position: absolute; left: 60px; right: 60px; top: 236px; }
+    .f05p-linea { font-weight: 900; font-size: 116px; line-height: 0.96;
+      letter-spacing: -0.04em; }
+    .f05p-acento { color: #34d399; }
+
+    /* Las seis en dos columnas: en vertical, una lista de seis en fila
+       obligaria a cuerpos que ya no se leen de pasada. */
+    .f05p-lista { position: absolute; left: 60px; right: 60px; top: 540px;
+      display: grid; grid-template-columns: 1fr 1fr; column-gap: 40px; row-gap: 0; }
+    .f05p-nombre { font-weight: 600; font-size: 62px; line-height: 1.0;
+      letter-spacing: -0.02em; color: #f1f5f9; padding: 30px 0;
+      border-bottom: 1px solid #26324c; }
+
+    .f05p-hairline { position: absolute; left: 60px; top: 1108px; width: 960px; height: 1px;
+      background: #26324c; transform-origin: left center; }
+
+    .f05p-pie { position: absolute; left: 60px; right: 60px; top: 1180px; }
+    .f05p-pie-fila { display: flex; align-items: baseline; gap: 24px; }
+    .f05p-pie-cifra { font-weight: 900; font-size: 128px; line-height: 1.0;
+      letter-spacing: -0.04em; color: #34d399; }
+    .f05p-pie-texto { font-weight: 400; font-size: 50px; color: #f1f5f9; }
+    .f05p-pie-nota { margin-top: 34px; font-weight: 400; font-size: 38px;
+      line-height: 1.35; color: #94a3b8; }
+
+    .m06-marca { position: absolute; top: 104px; right: 60px;
+      display: flex; align-items: center; gap: 16px; }
+    .m06-marca-logo { width: 60px; height: 60px; border-radius: 14px; display: block; }
+    .m06-marca-nombre { font-weight: 600; font-size: 38px; letter-spacing: -0.02em;
+      line-height: 1; color: #f1f5f9; }
+  </style>
+
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+  <script>
+    (function () {
+      var raiz = document.currentScript.parentNode.querySelector('[data-composition-id="06-petroleras"]')
+        || document.querySelector('[data-composition-id="06-petroleras"]');
+      var q = function (sel) { return raiz.querySelector(sel); };
+      var qa = function (sel) { return Array.prototype.slice.call(raiz.querySelectorAll(sel)); };
+
+      window.__timelines = window.__timelines || {};
+      var tl = gsap.timeline({ paused: true });
+      window.__timelines["06-petroleras"] = tl;
+
+      // La marca entra con el frame y se queda: es identidad, no un elemento
+      // narrativo, así que no compite con ningún golpe.
+      tl.fromTo(q(".m06-marca"), { opacity: 0, y: -10 },
+        { opacity: 1, y: 0, duration: 0.3, ease: "power3.out" }, 0.02);
+
+      tl.fromTo(q("#f05p-kicker"), { opacity: 0, y: -12 },
+        { opacity: 1, y: 0, duration: 0.3, ease: "power3.out" }, 0.04);
+
+      tl.fromTo(q("#f05p-t1"),
+        { scale: 1.2, filter: "blur(12px)", opacity: 0 },
+        { scale: 1, filter: "blur(0px)", opacity: 1, duration: 0.44, ease: "power4.out" }, 0.18);
+      tl.fromTo(q("#f05p-t2"), { x: -180, opacity: 0 },
+        { x: 0, opacity: 1, duration: 0.4, ease: "expo.out" }, 0.44);
+
+      // waterfall-entry: los seis nombres caen en cascada, no de golpe. El
+      // stagger total se mantiene bajo ~0,5s para que llegue como UN solo beat.
+      tl.fromTo(qa(".f05p-nombre"), { opacity: 0, y: 34 },
+        { opacity: 1, y: 0, duration: 0.36, stagger: 0.075, ease: "power3.out" }, 0.88);
+
+      // El "17 campos" es el segundo dato del frame y llega cuando la lista ya
+      // asentó: si entran juntos, ninguno de los dos se lee.
+      tl.fromTo(q("#f05p-hairline"), { scaleX: 0 },
+        { scaleX: 1, duration: 0.44, ease: "power3.inOut" }, 1.72);
+      tl.fromTo(q("#f05p-p1"),
+        { scale: 1.14, filter: "blur(10px)", opacity: 0 },
+        { scale: 1, filter: "blur(0px)", opacity: 1, duration: 0.44, ease: "power4.out" }, 1.94);
+      tl.fromTo(q("#f05p-p2"), { opacity: 0, y: 20 },
+        { opacity: 1, y: 0, duration: 0.34, ease: "power3.out" }, 2.46);
+
+      // 2.9–3.4s: quietud antes del corte.
+    })();
+  </script>
+</template>

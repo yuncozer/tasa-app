@@ -1,0 +1,119 @@
+<template>
+  <div id="root" data-composition-id="08-quienes" data-start="0" data-duration="3.4" data-width="1080" data-height="1920">
+
+    <div id="f08q-suelo" class="clip f08q-suelo" data-start="0" data-duration="3.4" data-track-index="0"></div>
+
+    <div id="f08q-contenido" class="clip f08q-contenido" data-start="0" data-duration="3.4" data-track-index="1">
+
+      <div id="f08q-kicker" class="f08q-kicker">QUIÉNES LO NEGOCIARON</div>
+
+      <div class="f08q-firmas">
+        <div id="f08q-izq" class="f08q-firma">
+          <div class="f08q-bandera">EE.UU.</div>
+          <div class="f08q-nombre">Marco Rubio</div>
+          <div class="f08q-cargo">SECRETARIO DE ESTADO</div>
+        </div>
+        <div id="f08q-rule" class="f08q-rule"></div>
+        <div id="f08q-der" class="f08q-firma">
+          <div class="f08q-bandera">VENEZUELA</div>
+          <div class="f08q-nombre">Delcy Rodríguez</div>
+          <div class="f08q-cargo">PRESIDENTA ENCARGADA</div>
+        </div>
+      </div>
+
+      <div id="f08q-cita" class="f08q-cita">
+        <div class="f08q-cita-texto">«un hito histórico»</div>
+        <div class="f08q-cita-quien">DELCY RODRÍGUEZ, SOBRE EL ACUERDO</div>
+      </div>
+
+      <div class="m08-marca">
+        <img class="m08-marca-logo" src="assets/logo-latasa.png" alt="">
+        <span class="m08-marca-nombre">La Tasa</span>
+      </div>
+    </div>
+  </div>
+
+  <style>
+    @font-face { font-family: "Geist Sans"; src: url("assets/fonts/geist-latin.woff2") format("woff2");
+      font-weight: 100 900; font-style: normal; font-display: block; }
+
+    #root { width: 1080px; height: 1920px; position: relative; overflow: hidden;
+      container-type: size; font-family: "Geist Sans", sans-serif; color: #f1f5f9;
+      -webkit-font-smoothing: antialiased; }
+
+    .f08q-suelo { position: absolute; inset: 0; background: #0b1120; }
+    .f08q-contenido { position: absolute; inset: 0; }
+
+    .f08q-kicker { position: absolute; top: 116px; left: 60px;
+      font-weight: 500; font-size: 26px;
+      letter-spacing: 0.14em; text-transform: uppercase; color: #34d399; }
+
+    /* Sin retratos: los tres protagonistas ya salieron a la vez en la portada
+       del gancho, y repetirlos aquí en panelitos los achica. Lo que este frame
+       necesita mostrar no son caras, es que la firma tiene dos lados. */
+    .f08q-firmas { position: absolute; left: 60px; right: 60px; top: 620px; }
+    .f08q-firma { padding: 44px 0; }
+    .f08q-bandera { font-weight: 500; font-size: 26px; letter-spacing: 0.14em;
+      text-transform: uppercase; color: #34d399; }
+    .f08q-nombre { margin-top: 20px; font-weight: 700; font-size: 92px; line-height: 1.0;
+      letter-spacing: -0.03em; color: #f1f5f9; }
+    .f08q-cargo { margin-top: 20px; font-weight: 500; font-size: 28px;
+      letter-spacing: 0.12em; text-transform: uppercase; color: #94a3b8; }
+    .f08q-rule { width: 100%; height: 1px; background: #26324c; transform-origin: left center; }
+
+    .f08q-cita { position: absolute; left: 60px; right: 60px; top: 1206px; }
+    .f08q-cita-texto { font-weight: 700; font-size: 106px; line-height: 1.06;
+      letter-spacing: -0.02em; color: #34d399; }
+    .f08q-cita-quien { margin-top: 32px; font-weight: 500;
+      font-size: 24px; letter-spacing: 0.14em; text-transform: uppercase; color: #94a3b8; }
+
+    .m08-marca { position: absolute; top: 104px; right: 60px;
+      display: flex; align-items: center; gap: 16px; }
+    .m08-marca-logo { width: 60px; height: 60px; border-radius: 14px; display: block; }
+    .m08-marca-nombre { font-weight: 600; font-size: 38px; letter-spacing: -0.02em;
+      line-height: 1; color: #f1f5f9; }
+  </style>
+
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+  <script>
+    (function () {
+      var raiz = document.currentScript.parentNode.querySelector('[data-composition-id="08-quienes"]')
+        || document.querySelector('[data-composition-id="08-quienes"]');
+      var q = function (sel) { return raiz.querySelector(sel); };
+
+      window.__timelines = window.__timelines || {};
+      var tl = gsap.timeline({ paused: true });
+      window.__timelines["08-quienes"] = tl;
+
+      tl.fromTo(q(".m08-marca"), { opacity: 0, y: -10 },
+        { opacity: 1, y: 0, duration: 0.3, ease: "power3.out" }, 0.02);
+
+      tl.fromTo(q("#f08q-kicker"), { opacity: 0, y: -12 },
+        { opacity: 1, y: 0, duration: 0.32, ease: "power3.out" }, 0.04);
+
+      // comparison-split sin paneles: los dos lados llegan desde fuera, uno por
+      // lado, y el hairline los separa. Es el mismo gesto que tenían los
+      // retratos, con el peso pasado al nombre.
+      tl.fromTo(q("#f08q-izq"), { xPercent: -12, opacity: 0 },
+        { xPercent: 0, opacity: 1, duration: 0.44, ease: "power4.out" }, 0.10);
+      tl.fromTo(q("#f08q-rule"), { scaleX: 0 },
+        { scaleX: 1, duration: 0.44, ease: "power3.inOut" }, 0.34);
+      tl.fromTo(q("#f08q-der"), { xPercent: 12, opacity: 0 },
+        { xPercent: 0, opacity: 1, duration: 0.44, ease: "power4.out" }, 0.48);
+
+      // kinetic-beat-slam de un solo golpe sobre la cita.
+      tl.fromTo(q(".f08q-cita-texto"),
+        { scale: 1.22, filter: "blur(12px)", opacity: 0 },
+        { scale: 1, filter: "blur(0px)", opacity: 1, duration: 0.48, ease: "power4.out" }, 1.10);
+      tl.fromTo(q(".f08q-cita-quien"), { opacity: 0, y: 14 },
+        { opacity: 1, y: 0, duration: 0.32, ease: "power3.out" }, 1.54);
+
+      // depth-of-field-blur: los nombres ceden el foco a la cita.
+      tl.fromTo(q(".f08q-firmas"),
+        { filter: "blur(0px)", opacity: 1 },
+        { filter: "blur(3px)", opacity: 0.5, duration: 0.6, ease: "power2.inOut" }, 1.12);
+
+      // 2.2–3.4s: quietud sostenida sobre la cita.
+    })();
+  </script>
+</template>

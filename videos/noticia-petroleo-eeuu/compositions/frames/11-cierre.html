@@ -1,0 +1,112 @@
+<template>
+  <div id="root" data-composition-id="11-cierre" data-start="0" data-duration="3.6" data-width="1080" data-height="1920">
+
+    <div id="f10-suelo" class="clip f10-suelo" data-start="0" data-duration="3.6" data-track-index="0"></div>
+
+    <div id="f10-contenido" class="clip f10-contenido" data-start="0" data-duration="3.6" data-track-index="1">
+      <div id="f10-acento" class="f10-acento" data-layout-allow-overlap=""></div>
+
+      <div id="f10-num" class="f10-num">11</div>
+
+      <div class="f10-bloque">
+        <div id="f10-l1" class="f10-linea" data-layout-allow-overlap="">¿Y esto mueve</div>
+        <div id="f10-l2" class="f10-linea" data-layout-allow-overlap="">la tasa?</div>
+        <div id="f10-sub" class="f10-sub">Nadie lo ha dicho todavía.</div>
+      </div>
+
+      <div class="f10-firma">
+        <div id="f10-rule" class="f10-rule"></div>
+        <div id="f10-marca" class="f10-marca">LA TASA · @LATASA.ONLINE</div>
+      </div>
+      <div class="m11-marca">
+        <img class="m11-marca-logo" src="assets/logo-latasa.png" alt="">
+        <span class="m11-marca-nombre">La Tasa</span>
+      </div>
+    </div>
+  </div>
+
+  <style>
+    @font-face { font-family: "Geist Sans"; src: url("assets/fonts/geist-latin.woff2") format("woff2");
+      font-weight: 100 900; font-style: normal; font-display: block; }
+
+    #root { width: 1080px; height: 1920px; position: relative; overflow: hidden;
+      container-type: size; font-family: "Geist Sans", sans-serif; color: #0b1120;
+      -webkit-font-smoothing: antialiased; }
+
+    /* Suelo --background: lo que se ve por debajo mientras el acento sube. */
+    .f10-suelo { position: absolute; inset: 0; background: #0b1120; }
+    .f10-contenido { position: absolute; inset: 0; }
+
+    .f10-acento { position: absolute; inset: 0; background: #34d399;
+      transform-origin: center bottom; }
+
+    .f10-num { position: absolute; top: 116px; left: 60px;
+      font-family: "Geist Sans", sans-serif; font-weight: 500; font-size: 26px;
+      letter-spacing: 0.14em; color: rgba(11,17,32,0.62); }
+
+    .f10-bloque { position: absolute; left: 60px; right: 60px; top: 760px; }
+    .f10-linea { font-weight: 900; font-size: 152px; line-height: 0.92;
+      letter-spacing: -0.045em; color: #0b1120; }
+    .f10-sub { margin-top: 56px; font-weight: 400; font-size: 52px; line-height: 1.35;
+      color: rgba(11,17,32,0.55); }
+
+    .f10-firma { position: absolute; left: 60px; top: 1420px; }
+    .f10-rule { width: 36px; height: 2px; background: #0b1120; transform-origin: left center; }
+    .f10-marca { margin-top: 26px; font-family: "Geist Sans", sans-serif; font-weight: 500;
+      font-size: 28px; letter-spacing: 0.14em; color: rgba(11,17,32,0.75); }
+
+    .m11-marca { position: absolute; top: 104px; right: 60px;
+      display: flex; align-items: center; gap: 16px; }
+    .m11-marca-logo { width: 60px; height: 60px; border-radius: 14px; display: block; }
+    .m11-marca-nombre { font-weight: 600; font-size: 38px; letter-spacing: -0.02em;
+      line-height: 1; color: #0b1120; }
+  </style>
+
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+  <script>
+    (function () {
+      var raiz = document.currentScript.parentNode.querySelector('[data-composition-id="11-cierre"]')
+        || document.querySelector('[data-composition-id="11-cierre"]');
+      var q = function (sel) { return raiz.querySelector(sel); };
+
+      window.__timelines = window.__timelines || {};
+      var tl = gsap.timeline({ paused: true });
+      window.__timelines["11-cierre"] = tl;
+
+      // La marca entra con el frame y se queda: es identidad, no un elemento
+      // narrativo, así que no compite con ningún golpe.
+      tl.fromTo(q(".m11-marca"), { opacity: 0, y: -10 },
+        { opacity: 1, y: 0, duration: 0.3, ease: "power3.out" }, 0.02);
+
+      // El cambio de registro es el remate: el verde de marca sube desde abajo,
+      // heredando la dirección del frame anterior. Transform, no clip-path.
+      tl.fromTo(q("#f10-acento"), { scaleY: 0 },
+        { scaleY: 1, duration: 0.26, ease: "power4.out" }, 0);
+
+      tl.fromTo(q("#f10-num"), { opacity: 0 },
+        { opacity: 1, duration: 0.3, ease: "power2.out" }, 0.26);
+
+      // kinetic-beat-slam: un golpe por línea, sobre la misma rejilla.
+      var PULSE = 0.3;
+      tl.fromTo(q("#f10-l1"),
+        { scale: 1.2, filter: "blur(11px)", opacity: 0 },
+        { scale: 1, filter: "blur(0px)", opacity: 1, duration: 0.44, ease: "power4.out" },
+        PULSE * 0.9);
+      tl.fromTo(q("#f10-l2"),
+        { y: 62, opacity: 0 },
+        { y: 0, opacity: 1, duration: 0.42, ease: "circ.out" },
+        PULSE * 2.0);
+
+      tl.fromTo(q("#f10-sub"), { opacity: 0, y: 20 },
+        { opacity: 1, y: 0, duration: 0.36, ease: "power3.out" }, 1.10);
+
+      // La firma cierra: primero el trazo, después la marca.
+      tl.fromTo(q("#f10-rule"), { scaleX: 0 },
+        { scaleX: 1, duration: 0.3, ease: "power3.inOut" }, 1.62);
+      tl.fromTo(q("#f10-marca"), { opacity: 0, y: 14 },
+        { opacity: 1, y: 0, duration: 0.34, ease: "power3.out" }, 1.80);
+
+      // 2.15–2.6s: quietud hasta el final. Es el último frame: nada sale de cuadro.
+    })();
+  </script>
+</template>
