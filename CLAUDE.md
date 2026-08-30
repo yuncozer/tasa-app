@@ -905,17 +905,39 @@ hace la gente en la calculadora y cómo le va a lo que se publica en Instagram.
   aviso y oculta varias en cuentas pequeñas, así que se piden **una por una**
   —pedirlas en lote hace que una sola métrica no disponible tumbe las demás— y
   lo que falla se muestra como `—`, nunca como `0`.
-- **La única sugerencia del panel es la franja horaria**, y por eso lleva su
-  propia letra pequeña. `compararFranjas()` (`lib/instagram-insights.ts`) mira
-  las últimas 50 publicaciones, las parte en mañana y tarde por su hora **de
-  Caracas** y compara la **mediana** de me gusta más comentarios — mediana y
-  no promedio porque un post viral desplazaría a su franja y haría recomendar
-  una hora por una casualidad. Se mide con interacciones públicas y no con el
-  alcance porque aquel exige una llamada de `insights` por publicación, o sea
-  cincuenta por cada visita a la pestaña. Con menos de cinco posts en alguna
-  franja, o con una diferencia por debajo del 15 %, **no recomienda**: dice que
-  todavía no se puede responder o que están parejas. Una recomendación sacada
-  de dos posts es una corazonada con cara de dato.
+- **Cada cifra de Instagram se compara con el período anterior.** Un "alcance:
+  4.120" no dice nada solo; "4.120, un 28 % más que los 30 días anteriores" sí.
+  Los totales se piden dos veces, con la ventana desplazada hacia atrás
+  (`totalDe(metrica, dias, desplazar)`), y el segundo grupo de llamadas va con
+  su propio `catch`: si Meta no da datos tan atrás se pierde la comparación,
+  nunca las cifras de este período. El color de la flecha lo decide
+  `mejorSiSube`, que aquí es verdadero — al revés que en el reporte semanal,
+  donde una tasa que sube es una devaluación y se pinta en rojo.
+- **Los seguidores llevan histórico propio** (`historico_instagram`, migración
+  `0016`), porque `followers_count` es un número instantáneo: Meta no dice
+  cuántos había hace una semana. Lo anota una vez al día el cron del resumen,
+  que ya lee el perfil para el correo — así no hay ni una llamada más a la
+  Graph API ni una escritura por visita al panel. La comparación acepta el
+  registro más cercano dentro de ±3 días, igual que el reporte semanal.
+- **El panel dice qué hacer, no solo cuánto.** `lib/consejos-instagram.ts`
+  convierte esas cifras en frases accionables **con reglas explícitas y sin
+  IA**: son criterios que se pueden discutir y corregir, no una opinión
+  generada que nadie puede auditar — la misma razón por la que la IA del
+  proyecto solo redacta prosa y nunca toca cifras. Tres reglas de la casa:
+  ninguna sugerencia sin muestra suficiente (cada regla declara su mínimo),
+  cada consejo trae la cifra que lo sostiene para poder contrastarla en la
+  misma pantalla, y nunca se inventa una causa — se describe lo medido y se
+  propone una acción.
+- **La sugerencia de franja horaria sale de `resumenActividad()`**
+  (`lib/instagram-insights.ts`), que con **una sola llamada** al listado saca
+  también cuántos posts salieron en el período y cuál fue el mejor. Parte los
+  posts en mañana y tarde por su hora **de Caracas** y compara la **mediana**
+  de me gusta más comentarios — mediana y no promedio porque un post viral
+  desplazaría a su franja y haría recomendar una hora por una casualidad. Se
+  mide con interacciones públicas y no con el alcance porque aquel exige una
+  llamada de `insights` por publicación, o sea cincuenta por cada visita a la
+  pestaña. Con menos de cinco posts en alguna franja, o con una diferencia por
+  debajo del 15 %, **no recomienda**.
 - **Instagram no devuelve métricas de cuenta más allá de 30 días.** El selector
   ofrece igualmente 90, que estira solo la mitad web, y la pantalla lo dice en
   vez de recortar la opción: "cómo viene el trimestre en el sitio" es una

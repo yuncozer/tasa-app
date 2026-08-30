@@ -21,6 +21,7 @@ import { brechaDelSnapshot } from "@/lib/brecha";
 import { leerAnaliticasWeb } from "@/lib/analiticas-web";
 import { diaCaracasISO, formatPercent, formatRate } from "@/lib/format";
 import { momentosArchivados } from "@/lib/historico";
+import { registrarSeguidores } from "@/lib/historico-instagram";
 import { leerAnaliticasInstagram } from "@/lib/instagram-insights";
 import { leerParadaPendiente } from "@/lib/parada";
 import { getRates } from "@/lib/rates";
@@ -109,6 +110,12 @@ async function bloqueInstagram(): Promise<string[]> {
   // `leerAnaliticasInstagram` no lanza: degrada métrica a métrica. Un `null`
   // aquí significa "la cuenta no expone eso", y sale como "sin dato".
   const ig = await leerAnaliticasInstagram(1, 1);
+
+  // De paso se anota el número de seguidores del día: la Graph API no guarda
+  // histórico y sin esto la cifra del panel no se puede comparar con nada.
+  // Va aquí y no en una llamada aparte porque el perfil ya está leído, y
+  // `registrarSeguidores` nunca lanza.
+  await registrarSeguidores(ig.perfil.seguidores, ig.perfil.publicaciones);
   const numero = (valor: number | null | undefined) =>
     valor === null || valor === undefined ? "sin dato" : String(valor);
 

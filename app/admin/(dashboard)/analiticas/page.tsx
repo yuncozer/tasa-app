@@ -23,11 +23,13 @@ import { ListaConteo } from "@/components/admin/ListaConteo";
 import { TarjetaMetrica } from "@/components/admin/TarjetaMetrica";
 import { leerAnaliticasWeb, type AnaliticasWeb } from "@/lib/analiticas-web";
 import { formatEntero, formatFechaCorta, formatPercent } from "@/lib/format";
+import { construirConsejos, type Consejo } from "@/lib/consejos-instagram";
+import { crecimientoSeguidores, type CrecimientoSeguidores } from "@/lib/historico-instagram";
 import {
-  compararFranjas,
   leerAnaliticasInstagram,
+  resumenActividad,
+  variacionPorcentual,
   type AnaliticasInstagram,
-  type ComparacionFranjas,
 } from "@/lib/instagram-insights";
 import { rateMeta } from "@/lib/rates";
 import type { RateKey } from "@/lib/types";
@@ -338,47 +340,68 @@ function BloqueEnlaces({ datos, dias }: { datos: AnaliticasWeb; dias: number }) 
 }
 
 /**
- * La recomendación de franja horaria.
+ * Qué hacer con las cifras de arriba.
  *
- * Es lo único del panel que sugiere algo en vez de limitarse a contar, así
- * que lleva su propia letra pequeña: con cuántos posts se dijo y cómo se
- * midió. Sin material suficiente no se calla —eso parecería un fallo— sino
- * que dice que todavía no se puede responder, que es distinto.
+ * Es la única parte del panel que sugiere en vez de contar, así que lleva su
+ * propia letra pequeña: cada consejo trae la cifra que lo sostiene, para que
+ * se pueda contrastar en la misma pantalla. Las reglas viven en
+ * `lib/consejos-instagram.ts` — explícitas y sin IA, para que se puedan
+ * discutir y corregir.
+ *
+ * Sin material suficiente no se calla del todo: dice que aún no hay con qué
+ * opinar, que es distinto de que no haya nada que decir.
  */
-function Franjas({ comparacion }: { comparacion: ComparacionFranjas | null }) {
-  if (!comparacion) {
+function Consejos({ consejos }: { consejos: Consejo[] }) {
+  if (consejos.length === 0) {
     return (
       <p className="rounded-2xl border border-border-soft bg-surface px-4 py-3 text-xs text-muted">
-        Todavía no hay publicaciones suficientes en las dos franjas para comparar mañana con tarde.
+        Todavía no hay suficientes publicaciones ni histórico para sacar conclusiones. Con unos días
+        más de datos aparecen aquí.
       </p>
     );
   }
 
-  const { mejor, diferencia, postsManana, postsTarde } = comparacion;
-
   return (
-    <div className="flex flex-col gap-1 rounded-2xl border border-border-soft bg-surface px-4 py-3">
-      <p className="text-sm font-medium">
-        {mejor === null
-          ? "Mañana y tarde rinden parecido"
-          : `Los posts de la ${mejor === "tarde" ? "tarde" : "mañana"} rinden ${formatPercent(diferencia)} más`}
-      </p>
-      <p className="text-xs text-muted">
-        Mediana de me gusta y comentarios · {postsManana} posts de mañana y {postsTarde} de tarde.
-        No usa el alcance porque exigiría una llamada por publicación.
-      </p>
-    </div>
+    <ul className="flex flex-col gap-2">
+      {consejos.map((consejo) => (
+        <li
+          key={consejo.titulo}
+          className={`flex flex-col gap-1 rounded-2xl border px-4 py-3 ${
+            consejo.tono === "atencion"
+              ? "border-warning/40 bg-warning/10"
+              : consejo.tono === "bien"
+                ? "border-accent/40 bg-accent/10"
+                : "border-border-soft bg-surface"
+          }`}
+        >
+          <p
+            className={`text-sm font-medium ${
+              consejo.tono === "atencion"
+                ? "text-warning"
+                : consejo.tono === "bien"
+                  ? "text-accent"
+                  : "text-foreground"
+            }`}
+          >
+            {consejo.titulo}
+          </p>
+          <p className="text-xs leading-relaxed text-muted">{consejo.porque}</p>
+        </li>
+      ))}
+    </ul>
   );
 }
 
 function BloqueInstagram({
   datos,
   dias,
-  franjas,
+  consejos,
+  crecimiento,
 }: {
   datos: AnaliticasInstagram;
   dias: number;
-  franjas: ComparacionFranjas | null;
+  consejos: Consejo[];
+  crecimiento: CrecimientoSeguidores;
 }) {
   const periodo = Math.min(dias, MAX_DIAS_INSTAGRAM);
 
@@ -400,28 +423,54 @@ function BloqueInstagram({
           etiqueta="Seguidores"
           icono={Users}
           valor={datos.perfil.seguidores}
-          apoyo={datos.perfil.username ? `@${datos.perfil.username}` : undefined}
+          apoyo={
+            crecimiento.anterior === null
+              ? "Sin histórico todavía"
+              : `Hace ${dias} días: ${formatEntero(crecimiento.anterior)}`
+          }
+          variacion={{
+            porcentaje: variacionPorcentual(datos.perfil.seguidores, crecimiento.anterior),
+          }}
         />
         <TarjetaMetrica
           etiqueta="Alcance"
           icono={Eye}
           valor={datos.totales.reach}
           apoyo="Cuentas distintas"
+          variacion={{
+            porcentaje: variacionPorcentual(datos.totales.reach, datos.totalesAnteriores.reach),
+          }}
         />
         <TarjetaMetrica
           etiqueta="Interacciones"
           icono={Heart}
           valor={datos.totales.total_interactions}
           apoyo="Me gusta, comentarios y guardados"
+          variacion={{
+            porcentaje: variacionPorcentual(
+              datos.totales.total_interactions,
+              datos.totalesAnteriores.total_interactions,
+            ),
+          }}
         />
         <TarjetaMetrica
           etiqueta="Visitas al perfil"
           icono={Sparkles}
           valor={datos.totales.profile_views}
+          apoyo={`Comparado con los ${dias} días anteriores`}
+          variacion={{
+            porcentaje: variacionPorcentual(
+              datos.totales.profile_views,
+              datos.totalesAnteriores.profile_views,
+            ),
+          }}
         />
       </div>
 
-      <Franjas comparacion={franjas} />
+      <section className="flex flex-col gap-3">
+        <h3 className="text-sm font-semibold uppercase tracking-wide text-muted">Qué hacer</h3>
+        <Consejos consejos={consejos} />
+      </section>
 
       {datos.alcanceDiario.length > 0 && (
         <div className="rounded-2xl border border-border-soft bg-surface px-4 py-4">
@@ -494,11 +543,18 @@ async function DatosInstagram({ dias }: { dias: number }) {
   // `leerAnaliticasInstagram` no lanza: degrada a la estructura vacía con sus
   // avisos, que es lo que la pantalla sabe mostrar métrica a métrica.
   // `compararFranjas` tampoco: devuelve `null` cuando no hay con qué opinar.
-  const [datos, franjas] = await Promise.all([
-    leerAnaliticasInstagram(Math.min(dias, MAX_DIAS_INSTAGRAM)),
-    compararFranjas(),
+  const periodo = Math.min(dias, MAX_DIAS_INSTAGRAM);
+  const [datos, actividad, crecimiento] = await Promise.all([
+    leerAnaliticasInstagram(periodo),
+    resumenActividad(periodo),
+    crecimientoSeguidores(periodo),
   ]);
-  return <BloqueInstagram datos={datos} dias={dias} franjas={franjas} />;
+
+  const consejos = construirConsejos({ analiticas: datos, actividad, crecimiento, dias: periodo });
+
+  return (
+    <BloqueInstagram datos={datos} dias={dias} consejos={consejos} crecimiento={crecimiento} />
+  );
 }
 
 export default async function AdminAnaliticasPage({

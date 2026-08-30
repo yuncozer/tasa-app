@@ -1,5 +1,5 @@
-import type { LucideIcon } from "lucide-react";
-import { formatEntero } from "@/lib/format";
+import { ArrowDown, ArrowUp, type LucideIcon } from "lucide-react";
+import { formatEntero, formatVariacion } from "@/lib/format";
 
 /**
  * Una cifra del panel de analíticas: qué mide, cuánto vale y el contexto que
@@ -29,17 +29,38 @@ import { formatEntero } from "@/lib/format";
  * una métrica que la fuente no expone no se leen igual: la misma regla que
  * `Sin comparación` en el reporte semanal.
  */
+/**
+ * La variación contra el período anterior.
+ *
+ * `mejorSiSube` existe porque el color no puede salir del signo: en las
+ * métricas de redes subir es bueno, mientras que en una tasa subir es una
+ * devaluación —por eso el reporte semanal pinta de rojo lo que sube—. Aquí se
+ * dice explícitamente para no heredar por accidente el criterio contrario.
+ */
+export interface VariacionMetrica {
+  /** En porcentaje sobre el período anterior; `null` si no hay con qué comparar. */
+  porcentaje: number | null;
+  mejorSiSube?: boolean;
+}
+
 export function TarjetaMetrica({
   etiqueta,
   valor,
   apoyo,
   icono: Icono,
+  variacion,
 }: {
   etiqueta: string;
   valor: number | null | undefined;
   apoyo?: string;
   icono?: LucideIcon;
+  variacion?: VariacionMetrica;
 }) {
+  const cambio = variacion?.porcentaje ?? null;
+  const sube = cambio !== null && cambio > 0;
+  const plano = cambio !== null && Math.abs(cambio) < 0.5;
+  const bueno = variacion?.mejorSiSube === false ? !sube : sube;
+  const Flecha = sube ? ArrowUp : ArrowDown;
   return (
     <div className="flex h-full flex-col gap-3 rounded-2xl border border-border-soft bg-surface px-4 py-4">
       <div className="flex items-start justify-between gap-2">
@@ -53,9 +74,28 @@ export function TarjetaMetrica({
         )}
       </div>
 
-      <p className="tabular text-2xl font-semibold leading-none sm:text-3xl">
-        {formatEntero(valor)}
-      </p>
+      <div className="flex flex-wrap items-baseline gap-2">
+        <p className="tabular text-2xl font-semibold leading-none sm:text-3xl">
+          {formatEntero(valor)}
+        </p>
+
+        {/* Sin comparación no se pinta nada: un "0 %" diría que no cambió,
+            que es distinto de no saberlo — la misma regla que `Sin
+            comparación` en el reporte semanal. */}
+        {cambio !== null &&
+          (plano ? (
+            <span className="text-xs text-muted">igual</span>
+          ) : (
+            <span
+              className={`flex items-center gap-0.5 text-xs font-medium ${
+                bueno ? "text-accent" : "text-warning"
+              }`}
+            >
+              <Flecha aria-hidden="true" className="size-3" />
+              <span className="tabular">{formatVariacion(cambio, "porcentaje")}</span>
+            </span>
+          ))}
+      </div>
 
       {apoyo && <p className="mt-auto text-xs leading-4 text-muted">{apoyo}</p>}
     </div>

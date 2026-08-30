@@ -34,6 +34,9 @@ type MetricaTotal = (typeof METRICAS_TOTALES)[number];
 /** El día es el máximo período que acepta la API para la serie; el rango lo pone `since`/`until`. */
 const MAX_DIAS = 30;
 
+/** Cuántos días caben en un día, para desplazar ventanas. */
+const DIA_S = 24 * 60 * 60;
+
 export interface PerfilInstagram {
   username: string | null;
   seguidores: number | null;
@@ -57,6 +60,12 @@ export interface AnaliticasInstagram {
   perfil: PerfilInstagram;
   /** Totales del período, `null` en las que la cuenta no expone. */
   totales: Partial<Record<MetricaTotal, number | null>>;
+  /**
+   * Los mismos totales, para el período inmediatamente anterior y de la misma
+   * duración. Es lo que convierte "alcance: 4.120" en "alcance: 4.120, un 18 %
+   * más que los 30 días anteriores", que es la cifra que de verdad dice algo.
+   */
+  totalesAnteriores: Partial<Record<MetricaTotal, number | null>>;
   /** Alcance día a día, para la barra del panel. Vacío si la métrica no está. */
   alcanceDiario: { fecha: string; valor: number }[];
   publicaciones: MediaConMetricas[];
@@ -78,6 +87,23 @@ const MINIMO_POR_FRANJA = 5;
 
 /** Antes o después del mediodía en Caracas: son las dos franjas en que se publica. */
 export type Franja = "manana" | "tarde";
+
+export interface PostDestacado {
+  caption: string | null;
+  permalink: string;
+  interacciones: number;
+  timestamp: string;
+}
+
+export interface ActividadInstagram {
+  franjas: ComparacionFranjas | null;
+  /** Cuántas publicaciones salieron dentro del período que se está mirando. */
+  postsEnPeriodo: number;
+  /** La que más interacciones públicas juntó en el período. */
+  mejorPost: PostDestacado | null;
+  /** La mediana de interacciones del período, para saber si el mejor destaca. */
+  medianaPeriodo: number | null;
+}
 
 export interface ComparacionFranjas {
   /** Qué franja rinde más, o `null` si la diferencia no llega a ser una. */
@@ -110,14 +136,24 @@ interface RespuestaInsights {
   }[];
 }
 
-/** Un total del período. `null` si esta cuenta no expone la métrica. */
-async function totalDe(metrica: MetricaTotal, dias: number): Promise<number | null> {
+/**
+ * Un total del período. `null` si esta cuenta no expone la métrica.
+ *
+ * `desplazar` corre la ventana hacia atrás tantos días como dure, que es lo
+ * que permite pedir "el período anterior" con la misma llamada: sin eso las
+ * cifras son números sueltos y no se puede decir si la cuenta crece.
+ */
+async function totalDe(
+  metrica: MetricaTotal,
+  dias: number,
+  desplazar = 0,
+): Promise<number | null> {
   const { accountId } = await credenciales();
   const body = await graph<RespuestaInsights>(`/${accountId}/insights`, {
     metric: metrica,
     metric_type: "total_value",
     period: "day",
-    ...rango(dias),
+    ...rango(dias, desplazar),
   });
   const valor = body.data?.[0]?.total_value?.value;
   return typeof valor === "number" ? valor : null;
@@ -130,12 +166,10 @@ async function totalDe(metrica: MetricaTotal, dias: number): Promise<number | nu
  * día en curso si el rango no lo alcanza, y el panel se abre justamente para
  * ver cómo va hoy.
  */
-function rango(dias: number): { since: string; until: string } {
-  const ahora = Math.floor(Date.now() / 1000);
-  return {
-    since: String(ahora - Math.min(dias, MAX_DIAS) * 24 * 60 * 60),
-    until: String(ahora),
-  };
+function rango(dias: number, desplazarDias = 0): { since: string; until: string } {
+  const ancho = Math.min(dias, MAX_DIAS) * DIA_S;
+  const hasta = Math.floor(Date.now() / 1000) - desplazarDias * DIA_S;
+  return { since: String(hasta - ancho), until: String(hasta) };
 }
 
 async function alcanceDiario(dias: number): Promise<{ fecha: string; valor: number }[]> {
@@ -225,6 +259,22 @@ async function publicaciones(cuantas: number): Promise<MediaConMetricas[]> {
   );
 }
 
+/**
+ * Cuánto cambió una cifra respecto de la anterior, en porcentaje.
+ *
+ * `null` cuando no hay con qué comparar o cuando la referencia es cero: un
+ * crecimiento "infinito" desde cero no es una cifra que se pueda enseñar, y
+ * un 0 % diría que no cambió, que es distinto de no saberlo.
+ */
+export function variacionPorcentual(
+  actual: number | null | undefined,
+  anterior: number | null | undefined,
+): number | null {
+  if (typeof actual !== "number" || typeof anterior !== "number") return null;
+  if (anterior === 0) return null;
+  return (actual / anterior - 1) * 100;
+}
+
 function mediana(valores: number[]): number {
   const orden = [...valores].sort((a, b) => a - b);
   const medio = Math.floor(orden.length / 2);
@@ -232,7 +282,9 @@ function mediana(valores: number[]): number {
 }
 
 /**
- * Si publicar por la mañana o por la tarde rinde más.
+ * Lo que se puede saber de la actividad reciente con **una sola llamada**: en
+ * qué franja rinde mejor, cuántos posts salieron en el período y cuál fue el
+ * mejor.
  *
  * **Se mide con las interacciones públicas** (me gusta + comentarios), que
  * vienen en el propio listado de medias, y no con el alcance: aquel exige una
@@ -248,26 +300,62 @@ function mediana(valores: number[]): number {
  * ni un cero: es "todavía no se puede responder", y la interfaz lo dice con
  * esas palabras en vez de enseñar una recomendación endeble.
  */
-export async function compararFranjas(): Promise<ComparacionFranjas | null> {
+export async function resumenActividad(dias: number): Promise<ActividadInstagram> {
+  const vacio: ActividadInstagram = {
+    franjas: null,
+    postsEnPeriodo: 0,
+    mejorPost: null,
+    medianaPeriodo: null,
+  };
+
   try {
     const { accountId } = await credenciales();
     const listado = await graph<{ data?: FilaMedia[] }>(`/${accountId}/media`, {
-      fields: "id,timestamp,like_count,comments_count",
+      fields: "id,caption,permalink,timestamp,like_count,comments_count",
       limit: String(POSTS_PARA_FRANJAS),
     });
 
     const manana: number[] = [];
     const tarde: number[] = [];
+    const delPeriodo: { post: PostDestacado; interacciones: number }[] = [];
+    const desde = Date.now() - dias * DIA_S * 1000;
 
     for (const media of listado.data ?? []) {
       const interacciones = (media.like_count ?? 0) + (media.comments_count ?? 0);
+      const cuando = new Date(media.timestamp).getTime();
+
       // La hora se lee en Caracas, no en UTC: publicar "a las 9" significa
       // las 9 de allá, que es lo que decide quién está mirando el teléfono.
-      const hora = horaCaracas(new Date(media.timestamp).getTime());
+      const hora = horaCaracas(cuando);
       (hora < 12 ? manana : tarde).push(interacciones);
+
+      if (cuando >= desde) {
+        delPeriodo.push({
+          post: {
+            caption: media.caption ?? null,
+            permalink: media.permalink,
+            interacciones,
+            timestamp: media.timestamp,
+          },
+          interacciones,
+        });
+      }
     }
 
-    if (manana.length < MINIMO_POR_FRANJA || tarde.length < MINIMO_POR_FRANJA) return null;
+    const mejor = delPeriodo.reduce<{ post: PostDestacado; interacciones: number } | null>(
+      (top, actual) => (top === null || actual.interacciones > top.interacciones ? actual : top),
+      null,
+    );
+
+    const base = {
+      postsEnPeriodo: delPeriodo.length,
+      mejorPost: mejor?.post ?? null,
+      medianaPeriodo: delPeriodo.length ? mediana(delPeriodo.map((f) => f.interacciones)) : null,
+    };
+
+    if (manana.length < MINIMO_POR_FRANJA || tarde.length < MINIMO_POR_FRANJA) {
+      return { ...vacio, ...base };
+    }
 
     const medianaManana = mediana(manana);
     const medianaTarde = mediana(tarde);
@@ -275,22 +363,25 @@ export async function compararFranjas(): Promise<ComparacionFranjas | null> {
     const menor = Math.min(medianaManana, medianaTarde);
 
     // Sin base con la que dividir no hay porcentaje que dar.
-    if (menor === 0) return null;
+    if (menor === 0) return { ...vacio, ...base };
 
     const diferencia = (mayor / menor - 1) * 100;
 
     return {
-      // Por debajo del 15 % la diferencia no sobrevive al ruido de una cuenta
-      // pequeña: se dice que están parejas en vez de recomendar una franja.
-      mejor: diferencia < 15 ? null : medianaTarde > medianaManana ? "tarde" : "manana",
-      diferencia,
-      medianaManana,
-      medianaTarde,
-      postsManana: manana.length,
-      postsTarde: tarde.length,
+      ...base,
+      franjas: {
+        // Por debajo del 15 % la diferencia no sobrevive al ruido de una
+        // cuenta pequeña: se dice que están parejas en vez de recomendar.
+        mejor: diferencia < 15 ? null : medianaTarde > medianaManana ? "tarde" : "manana",
+        diferencia,
+        medianaManana,
+        medianaTarde,
+        postsManana: manana.length,
+        postsTarde: tarde.length,
+      },
     };
   } catch {
-    return null;
+    return vacio;
   }
 }
 
@@ -311,6 +402,7 @@ export async function leerAnaliticasInstagram(
   const vacio: AnaliticasInstagram = {
     perfil: { username: null, seguidores: null, publicaciones: null },
     totales: {},
+    totalesAnteriores: {},
     alcanceDiario: [],
     publicaciones: [],
     avisos,
@@ -323,7 +415,7 @@ export async function leerAnaliticasInstagram(
     return vacio;
   }
 
-  const [datosPerfil, serie, posts, ...totales] = await Promise.all([
+  const [datosPerfil, serie, posts, ...medidas] = await Promise.all([
     perfil().catch((error: Error) => {
       avisos.push(`No se pudo leer el perfil: ${error.message}`);
       return vacio.perfil;
@@ -337,11 +429,22 @@ export async function leerAnaliticasInstagram(
       return [];
     }),
     ...METRICAS_TOTALES.map((metrica) => totalDe(metrica, dias).catch(() => null)),
+    // El período anterior va en su propio grupo de llamadas y con su propio
+    // `catch`: si Meta no da datos tan atrás, se pierde la comparación pero
+    // no las cifras de este período, que son las que siempre tienen que salir.
+    ...METRICAS_TOTALES.map((metrica) => totalDe(metrica, dias, dias).catch(() => null)),
   ]);
+
+  const cuantas = METRICAS_TOTALES.length;
+  const totales = medidas.slice(0, cuantas);
+  const anteriores = medidas.slice(cuantas);
 
   return {
     perfil: datosPerfil,
     totales: Object.fromEntries(METRICAS_TOTALES.map((metrica, i) => [metrica, totales[i]])),
+    totalesAnteriores: Object.fromEntries(
+      METRICAS_TOTALES.map((metrica, i) => [metrica, anteriores[i]]),
+    ),
     alcanceDiario: serie,
     publicaciones: posts,
     avisos,
