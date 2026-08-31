@@ -1,0 +1,94 @@
+<template>
+  <div id="root" data-composition-id="02-puente" data-start="0" data-duration="2.2"
+       data-width="1080" data-height="1920">
+
+    <div id="suelo-02-puente" class="clip suelo" data-start="0" data-duration="2.2" data-track-index="0"></div>
+
+    <div id="contenido-02-puente" class="clip contenido" data-start="0" data-duration="2.2" data-track-index="1">
+      <div class="marco">
+        <img id="foto" class="foto" src="public/fotos/portada-cara-a-cara.png" alt="" data-layout-allow-overflow />
+      </div>
+      <div class="velo"></div>
+
+      <div class="bloque">
+        <div id="l1" class="linea" data-layout-allow-overlap>Dos versiones</div>
+        <div id="l2" class="linea acento" data-layout-allow-overlap>del mismo acuerdo</div>
+      </div>
+
+      <div class="marcas"><div class="mk"></div><div class="mk"></div></div>
+      <div class="marca">
+        <img class="marca-logo" src="assets/logo-latasa.png" alt="" />
+        <span class="marca-nombre">La Tasa</span>
+      </div>
+    </div>
+  </div>
+
+  <style>
+    @font-face { font-family: "Geist Sans"; src: url("assets/fonts/geist-latin.woff2") format("woff2");
+      font-weight: 100 900; font-style: normal; font-display: block; }
+
+    #root { width: 1080px; height: 1920px; position: relative; overflow: hidden;
+      container-type: size; font-family: "Geist Sans", sans-serif; color: #f1f5f9;
+      -webkit-font-smoothing: antialiased; }
+
+    .suelo { position: absolute; inset: 0; background: #0b1120; }
+    .contenido { position: absolute; inset: 0; }
+    .tabular { font-variant-numeric: tabular-nums; }
+
+    .marco { position: absolute; inset: 0; overflow: hidden; }
+    .foto { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+    .velo { position: absolute; inset: 0; pointer-events: none; }
+
+    .kicker { position: absolute; top: 116px; left: 60px; font-weight: 500; font-size: 26px;
+      letter-spacing: 0.14em; text-transform: uppercase; color: #34d399; }
+    .hairline { position: absolute; left: 60px; width: 960px; height: 1px;
+      background: #26324c; transform-origin: left center; }
+
+    /* La marca va en las once pantallas, arriba a la derecha: si alguien descarga
+       el Reel y lo reparte suelto, la cuenta viaja con el. */
+    .marca { position: absolute; top: 104px; right: 60px;
+      display: flex; align-items: center; gap: 16px; }
+    .marca-logo { width: 60px; height: 60px; border-radius: 14px; display: block; }
+    .marca-nombre { font-weight: 600; font-size: 38px; letter-spacing: -0.02em;
+      line-height: 1; color: #f1f5f9; }
+    .foto { object-position: 50% 42%; filter: saturate(0.30) contrast(1.05) brightness(0.44); }
+    .velo { background: linear-gradient(180deg, rgba(11,17,32,.74) 0%, rgba(11,17,32,.64) 30%, rgba(11,17,32,.93) 62%, rgba(11,17,32,.99) 100%); }
+    .bloque { position: absolute; left: 60px; right: 60px; top: 852px; }
+    .linea { font-weight: 900; font-size: 104px; line-height: 1.0; letter-spacing: -0.045em; }
+    .acento { color: #34d399; }
+    .marcas { position: absolute; left: 60px; top: 1108px; display: flex; gap: 20px; }
+    .mk { width: 120px; height: 6px; background: #34d399; transform-origin: left center; }
+  </style>
+
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+  <script>
+    (function () {
+      var raiz = document.currentScript.parentNode.querySelector('[data-composition-id="02-puente"]')
+        || document.querySelector('[data-composition-id="02-puente"]');
+      var q = function (sel) { return raiz.querySelector(sel); };
+      var qa = function (sel) { return Array.prototype.slice.call(raiz.querySelectorAll(sel)); };
+
+      window.__timelines = window.__timelines || {};
+      var tl = gsap.timeline({ paused: true });
+      window.__timelines["02-puente"] = tl;
+
+      // Identidad, no elemento narrativo: entra con el frame y no compite.
+      tl.fromTo(q(".marca"), { opacity: 0, y: -10 },
+        { opacity: 1, y: 0, duration: 0.3, ease: "power3.out" }, 0.02);
+
+      // El push no se reinicia: continua donde lo dejo el gancho.
+      tl.fromTo(q("#foto"), { scale: 1.06 }, { scale: 1.10, duration: 2.2, ease: "none" }, 0);
+
+      // Frame puente: el mas corto del video. Es una respiracion entre el gancho
+      // y las dos versiones, no un frame de informacion — por eso no hay nada
+      // que leer despacio.
+      tl.fromTo(q("#l1"), { scale: 1.20, filter: "blur(12px)", opacity: 0 },
+        { scale: 1, filter: "blur(0px)", opacity: 1, duration: 0.40, ease: "power4.out" }, 0.06);
+      tl.fromTo(q("#l2"), { y: 66, opacity: 0 },
+        { y: 0, opacity: 1, duration: 0.38, ease: "circ.out" }, 0.34);
+      // Dos marcas, no tres: son dos versiones.
+      tl.fromTo(qa(".mk"), { scaleX: 0 },
+        { scaleX: 1, duration: 0.28, stagger: 0.12, ease: "power3.out" }, 0.74);
+    })();
+  </script>
+</template>

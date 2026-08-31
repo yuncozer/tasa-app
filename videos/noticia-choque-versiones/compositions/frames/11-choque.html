@@ -1,0 +1,98 @@
+<template>
+  <div id="root" data-composition-id="11-choque" data-start="0" data-duration="4.4"
+       data-width="1080" data-height="1920">
+
+    <div id="suelo-11-choque" class="clip suelo" data-start="0" data-duration="4.4" data-track-index="0"></div>
+
+    <div id="contenido-11-choque" class="clip contenido" data-start="0" data-duration="4.4" data-track-index="1">
+
+      <div class="kicker">LA MISMA FIRMA, DOS RELATOS</div>
+
+      <div class="lados">
+        <div id="lado-a" class="lado">
+          <div class="lado-quien">TRUMP</div>
+          <div class="lado-que">&laquo;Un regalo&raquo;</div>
+        </div>
+        <div id="rule" class="rule"></div>
+        <div id="lado-b" class="lado">
+          <div class="lado-quien">VENEZUELA</div>
+          <div class="lado-que acento tabular">209.335 millones</div>
+          <div class="lado-nota">de d&oacute;lares para el Estado</div>
+        </div>
+      </div>
+      <div class="marca">
+        <img class="marca-logo" src="assets/logo-latasa.png" alt="" />
+        <span class="marca-nombre">La Tasa</span>
+      </div>
+    </div>
+  </div>
+
+  <style>
+    @font-face { font-family: "Geist Sans"; src: url("assets/fonts/geist-latin.woff2") format("woff2");
+      font-weight: 100 900; font-style: normal; font-display: block; }
+
+    #root { width: 1080px; height: 1920px; position: relative; overflow: hidden;
+      container-type: size; font-family: "Geist Sans", sans-serif; color: #f1f5f9;
+      -webkit-font-smoothing: antialiased; }
+
+    .suelo { position: absolute; inset: 0; background: #0b1120; }
+    .contenido { position: absolute; inset: 0; }
+    .tabular { font-variant-numeric: tabular-nums; }
+
+    .marco { position: absolute; inset: 0; overflow: hidden; }
+    .foto { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+    .velo { position: absolute; inset: 0; pointer-events: none; }
+
+    .kicker { position: absolute; top: 116px; left: 60px; font-weight: 500; font-size: 26px;
+      letter-spacing: 0.14em; text-transform: uppercase; color: #34d399; }
+    .hairline { position: absolute; left: 60px; width: 960px; height: 1px;
+      background: #26324c; transform-origin: left center; }
+
+    /* La marca va en las once pantallas, arriba a la derecha: si alguien descarga
+       el Reel y lo reparte suelto, la cuenta viaja con el. */
+    .marca { position: absolute; top: 104px; right: 60px;
+      display: flex; align-items: center; gap: 16px; }
+    .marca-logo { width: 60px; height: 60px; border-radius: 14px; display: block; }
+    .marca-nombre { font-weight: 600; font-size: 38px; letter-spacing: -0.02em;
+      line-height: 1; color: #f1f5f9; }
+    .lados { position: absolute; left: 60px; right: 60px; top: 700px; }
+    .lado { padding: 40px 0; }
+    .lado-quien { font-weight: 500; font-size: 28px; letter-spacing: 0.14em;
+      text-transform: uppercase; color: #94a3b8; }
+    .lado-que { margin-top: 22px; font-weight: 900; font-size: 106px; line-height: 1.02;
+      letter-spacing: -0.04em; color: #f1f5f9; }
+    .lado-nota { margin-top: 18px; font-weight: 400; font-size: 40px; color: #94a3b8; }
+    .acento { color: #34d399; }
+    .rule { width: 100%; height: 1px; background: #26324c; transform-origin: left center; }
+  </style>
+
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+  <script>
+    (function () {
+      var raiz = document.currentScript.parentNode.querySelector('[data-composition-id="11-choque"]')
+        || document.querySelector('[data-composition-id="11-choque"]');
+      var q = function (sel) { return raiz.querySelector(sel); };
+      var qa = function (sel) { return Array.prototype.slice.call(raiz.querySelectorAll(sel)); };
+
+      window.__timelines = window.__timelines || {};
+      var tl = gsap.timeline({ paused: true });
+      window.__timelines["11-choque"] = tl;
+
+      // Identidad, no elemento narrativo: entra con el frame y no compite.
+      tl.fromTo(q(".marca"), { opacity: 0, y: -10 },
+        { opacity: 1, y: 0, duration: 0.3, ease: "power3.out" }, 0.02);
+
+      tl.fromTo(q(".kicker"), { opacity: 0, y: -12 },
+        { opacity: 1, y: 0, duration: 0.32, ease: "power3.out" }, 0.04);
+
+      // comparison-split: los dos lados llegan desde fuera, uno por lado, y el
+      // hairline los separa. El frame no elige: los pone a la misma altura.
+      tl.fromTo(q("#lado-a"), { xPercent: -12, opacity: 0 },
+        { xPercent: 0, opacity: 1, duration: 0.46, ease: "power4.out" }, 0.20);
+      tl.fromTo(q("#rule"), { scaleX: 0 },
+        { scaleX: 1, duration: 0.50, ease: "power3.inOut" }, 0.70);
+      tl.fromTo(q("#lado-b"), { xPercent: 12, opacity: 0 },
+        { xPercent: 0, opacity: 1, duration: 0.46, ease: "power4.out" }, 1.20);
+    })();
+  </script>
+</template>

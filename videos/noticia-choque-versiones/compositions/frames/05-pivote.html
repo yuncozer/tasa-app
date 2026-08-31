@@ -1,0 +1,101 @@
+<template>
+  <div id="root" data-composition-id="05-pivote" data-start="0" data-duration="3.2"
+       data-width="1080" data-height="1920">
+
+    <div id="suelo-05-pivote" class="clip suelo" data-start="0" data-duration="3.2" data-track-index="0"></div>
+
+    <div id="contenido-05-pivote" class="clip contenido" data-start="0" data-duration="3.2" data-track-index="1">
+
+      <div class="kicker">SU ALOCUCI&Oacute;N</div>
+
+      <div id="banda" class="banda">
+        <img class="banda-img" src="public/fotos/delcy-alocucion.webp" alt=""
+             data-layout-allow-overflow />
+      </div>
+      <div id="pie-banda" class="pie-banda">DELCY RODR&Iacute;GUEZ, EN EL CANAL DEL ESTADO</div>
+
+      <div class="bloque">
+        <div id="l1" class="linea" data-layout-allow-overlap>Caracas lo cuenta</div>
+        <div id="l2" class="linea acento" data-layout-allow-overlap>distinto</div>
+      </div>
+      <div class="marca">
+        <img class="marca-logo" src="assets/logo-latasa.png" alt="" />
+        <span class="marca-nombre">La Tasa</span>
+      </div>
+    </div>
+  </div>
+
+  <style>
+    @font-face { font-family: "Geist Sans"; src: url("assets/fonts/geist-latin.woff2") format("woff2");
+      font-weight: 100 900; font-style: normal; font-display: block; }
+
+    #root { width: 1080px; height: 1920px; position: relative; overflow: hidden;
+      container-type: size; font-family: "Geist Sans", sans-serif; color: #f1f5f9;
+      -webkit-font-smoothing: antialiased; }
+
+    .suelo { position: absolute; inset: 0; background: #0b1120; }
+    .contenido { position: absolute; inset: 0; }
+    .tabular { font-variant-numeric: tabular-nums; }
+
+    .marco { position: absolute; inset: 0; overflow: hidden; }
+    .foto { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+    .velo { position: absolute; inset: 0; pointer-events: none; }
+
+    .kicker { position: absolute; top: 116px; left: 60px; font-weight: 500; font-size: 26px;
+      letter-spacing: 0.14em; text-transform: uppercase; color: #34d399; }
+    .hairline { position: absolute; left: 60px; width: 960px; height: 1px;
+      background: #26324c; transform-origin: left center; }
+
+    /* La marca va en las once pantallas, arriba a la derecha: si alguien descarga
+       el Reel y lo reparte suelto, la cuenta viaja con el. */
+    .marca { position: absolute; top: 104px; right: 60px;
+      display: flex; align-items: center; gap: 16px; }
+    .marca-logo { width: 60px; height: 60px; border-radius: 14px; display: block; }
+    .marca-nombre { font-weight: 600; font-size: 38px; letter-spacing: -0.02em;
+      line-height: 1; color: #f1f5f9; }
+    .banda { position: absolute; left: 60px; top: 420px; width: 960px; height: 539px;
+      overflow: hidden; border-radius: 20px; border: 1px solid #26324c; }
+    .banda-img { position: absolute; inset: 0; width: 100%; height: 100%;
+      object-fit: cover; object-position: 50% 42%;
+      filter: saturate(0.55) contrast(1.06) brightness(0.78); }
+    .pie-banda { position: absolute; left: 60px; top: 986px; font-weight: 500; font-size: 25px;
+      letter-spacing: 0.12em; text-transform: uppercase; color: #94a3b8; }
+
+    .bloque { position: absolute; left: 60px; right: 60px; top: 1108px; }
+    .linea { font-weight: 900; font-size: 104px; line-height: 1.0; letter-spacing: -0.045em; }
+    .acento { color: #34d399; }
+  </style>
+
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+  <script>
+    (function () {
+      var raiz = document.currentScript.parentNode.querySelector('[data-composition-id="05-pivote"]')
+        || document.querySelector('[data-composition-id="05-pivote"]');
+      var q = function (sel) { return raiz.querySelector(sel); };
+      var qa = function (sel) { return Array.prototype.slice.call(raiz.querySelectorAll(sel)); };
+
+      window.__timelines = window.__timelines || {};
+      var tl = gsap.timeline({ paused: true });
+      window.__timelines["05-pivote"] = tl;
+
+      // Identidad, no elemento narrativo: entra con el frame y no compite.
+      tl.fromTo(q(".marca"), { opacity: 0, y: -10 },
+        { opacity: 1, y: 0, duration: 0.3, ease: "power3.out" }, 0.02);
+
+      tl.fromTo(q(".kicker"), { opacity: 0, y: -12 },
+        { opacity: 1, y: 0, duration: 0.32, ease: "power3.out" }, 0.04);
+
+      // La banda entra entera, igual que la tarjeta del post: es el plano de la
+      // alocucion, y trocearlo le quita lo que tiene de documento.
+      tl.fromTo(q("#banda"), { y: 40, scale: 0.95, opacity: 0 },
+        { y: 0, scale: 1, opacity: 1, duration: 0.50, ease: "power4.out" }, 0.14);
+      tl.fromTo(q("#pie-banda"), { opacity: 0 },
+        { opacity: 1, duration: 0.30, ease: "power2.out" }, 0.62);
+
+      tl.fromTo(q("#l1"), { scale: 1.16, filter: "blur(11px)", opacity: 0 },
+        { scale: 1, filter: "blur(0px)", opacity: 1, duration: 0.42, ease: "power4.out" }, 0.86);
+      tl.fromTo(q("#l2"), { y: 62, opacity: 0 },
+        { y: 0, opacity: 1, duration: 0.40, ease: "circ.out" }, 1.18);
+    })();
+  </script>
+</template>

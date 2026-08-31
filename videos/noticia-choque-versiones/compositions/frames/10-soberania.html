@@ -1,0 +1,102 @@
+<template>
+  <div id="root" data-composition-id="10-soberania" data-start="0" data-duration="4.0"
+       data-width="1080" data-height="1920">
+
+    <div id="suelo-10-soberania" class="clip suelo" data-start="0" data-duration="4.0" data-track-index="0"></div>
+
+    <div id="contenido-10-soberania" class="clip contenido" data-start="0" data-duration="4.0" data-track-index="1">
+      <div class="marco">
+        <img id="foto" class="foto" src="public/fotos/delcy-alocucion.webp" alt="" data-layout-allow-overflow />
+      </div>
+      <div class="velo"></div>
+
+      <div class="kicker">SU MENSAJE POL&Iacute;TICO</div>
+
+      <div class="cita">
+        <div id="c1" class="cita-linea acento" data-layout-allow-overlap>&laquo;Venezuela</div>
+        <div id="c2" class="cita-linea acento" data-layout-allow-overlap>conserva la propiedad</div>
+        <div id="c3" class="cita-linea acento" data-layout-allow-overlap>y la soberan&iacute;a&raquo;</div>
+      </div>
+
+      <div id="hl" class="hairline" style="top: 1300px"></div>
+      <div id="nota" class="nota">Agradeci&oacute; a Trump y a Marco Rubio.</div>
+      <div class="marca">
+        <img class="marca-logo" src="assets/logo-latasa.png" alt="" />
+        <span class="marca-nombre">La Tasa</span>
+      </div>
+    </div>
+  </div>
+
+  <style>
+    @font-face { font-family: "Geist Sans"; src: url("assets/fonts/geist-latin.woff2") format("woff2");
+      font-weight: 100 900; font-style: normal; font-display: block; }
+
+    #root { width: 1080px; height: 1920px; position: relative; overflow: hidden;
+      container-type: size; font-family: "Geist Sans", sans-serif; color: #f1f5f9;
+      -webkit-font-smoothing: antialiased; }
+
+    .suelo { position: absolute; inset: 0; background: #0b1120; }
+    .contenido { position: absolute; inset: 0; }
+    .tabular { font-variant-numeric: tabular-nums; }
+
+    .marco { position: absolute; inset: 0; overflow: hidden; }
+    .foto { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+    .velo { position: absolute; inset: 0; pointer-events: none; }
+
+    .kicker { position: absolute; top: 116px; left: 60px; font-weight: 500; font-size: 26px;
+      letter-spacing: 0.14em; text-transform: uppercase; color: #34d399; }
+    .hairline { position: absolute; left: 60px; width: 960px; height: 1px;
+      background: #26324c; transform-origin: left center; }
+
+    /* La marca va en las once pantallas, arriba a la derecha: si alguien descarga
+       el Reel y lo reparte suelto, la cuenta viaja con el. */
+    .marca { position: absolute; top: 104px; right: 60px;
+      display: flex; align-items: center; gap: 16px; }
+    .marca-logo { width: 60px; height: 60px; border-radius: 14px; display: block; }
+    .marca-nombre { font-weight: 600; font-size: 38px; letter-spacing: -0.02em;
+      line-height: 1; color: #f1f5f9; }
+    .foto { object-position: 50% 40%; filter: grayscale(1) contrast(1.12) brightness(0.66) blur(18px); }
+    .velo { background: linear-gradient(180deg, rgba(11,17,32,.58) 0%, rgba(11,17,32,.40) 24%, rgba(11,17,32,.88) 54%, rgba(11,17,32,.98) 100%); }
+    .cita { position: absolute; left: 60px; right: 60px; top: 986px; }
+    .cita-linea { font-weight: 900; font-size: 88px; line-height: 1.06; letter-spacing: -0.04em; }
+    .acento { color: #34d399; }
+    .nota { position: absolute; left: 60px; right: 60px; top: 1346px;
+      font-weight: 400; font-size: 42px; line-height: 1.36; color: #94a3b8; }
+  </style>
+
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+  <script>
+    (function () {
+      var raiz = document.currentScript.parentNode.querySelector('[data-composition-id="10-soberania"]')
+        || document.querySelector('[data-composition-id="10-soberania"]');
+      var q = function (sel) { return raiz.querySelector(sel); };
+      var qa = function (sel) { return Array.prototype.slice.call(raiz.querySelectorAll(sel)); };
+
+      window.__timelines = window.__timelines || {};
+      var tl = gsap.timeline({ paused: true });
+      window.__timelines["10-soberania"] = tl;
+
+      // Identidad, no elemento narrativo: entra con el frame y no compite.
+      tl.fromTo(q(".marca"), { opacity: 0, y: -10 },
+        { opacity: 1, y: 0, duration: 0.3, ease: "power3.out" }, 0.02);
+
+      tl.fromTo(q("#foto"), { scale: 1.24 },
+        { scale: 1.14, duration: 2.6, ease: "power3.out" }, 0);
+      tl.to(q("#foto"), { scale: 1.18, duration: 1.4, ease: "none" }, 2.6);
+      tl.fromTo(q(".kicker"), { opacity: 0, y: -12 },
+        { opacity: 1, y: 0, duration: 0.32, ease: "power3.out" }, 0.06);
+
+      tl.fromTo(q("#c1"), { scale: 1.18, filter: "blur(12px)", opacity: 0 },
+        { scale: 1, filter: "blur(0px)", opacity: 1, duration: 0.44, ease: "power4.out" }, 0.24);
+      tl.fromTo(q("#c2"), { x: -200, opacity: 0 },
+        { x: 0, opacity: 1, duration: 0.40, ease: "expo.out" }, 0.66);
+      tl.fromTo(q("#c3"), { y: 60, rotation: 2, opacity: 0 },
+        { y: 0, rotation: 0, opacity: 1, duration: 0.44, ease: "circ.out" }, 1.08);
+
+      tl.fromTo(q("#hl"), { scaleX: 0 },
+        { scaleX: 1, duration: 0.44, ease: "power3.inOut" }, 1.70);
+      tl.fromTo(q("#nota"), { opacity: 0, y: 20 },
+        { opacity: 1, y: 0, duration: 0.34, ease: "power3.out" }, 1.94);
+    })();
+  </script>
+</template>

@@ -1,0 +1,105 @@
+<template>
+  <div data-hf-id="hf-dqmm" id="root" data-composition-id="07-plazos" data-start="0" data-duration="4.2" data-width="1080" data-height="1920">
+
+    <div data-hf-id="hf-nrqk" id="suelo-07-plazos" class="clip suelo" data-start="0" data-duration="4.2" data-track-index="0"></div>
+
+    <div data-hf-id="hf-lwct" id="contenido-07-plazos" class="clip contenido" data-start="0" data-duration="4.2" data-track-index="1">
+
+      <div data-hf-id="hf-129w" class="kicker">CUÁNTO DURA, SEGÚN QUIÉN</div>
+
+      <div data-hf-id="hf-5sbl" class="lados">
+        <div data-hf-id="hf-qbq0" id="lado-a" class="lado">
+          <div data-hf-id="hf-8pz2" class="lado-cifra tabular">100</div>
+          <div data-hf-id="hf-czua" class="lado-etq">AÑOS · LO QUE SE PUBLICÓ DESDE EL VIERNES</div>
+        </div>
+        <div data-hf-id="hf-u4he" id="rule" class="rule"></div>
+        <div data-hf-id="hf-yzlv" id="lado-b" class="lado">
+          <div data-hf-id="hf-9dww" class="lado-cifra acento tabular">25</div>
+          <div data-hf-id="hf-uvmg" class="lado-etq">AÑOS · LO QUE DIJO CARACAS ANOCHE</div>
+        </div>
+      </div>
+
+      <div data-hf-id="hf-w300" id="hl" class="hairline" style="top: 1372px"></div>
+      <div data-hf-id="hf-9mjp" id="nota" class="nota">El texto del acuerdo no se ha hecho público.</div>
+      <div data-hf-id="hf-1o9k" class="marca">
+        <img data-hf-id="hf-yyyo" class="marca-logo" src="assets/logo-latasa.png" alt="">
+        <span data-hf-id="hf-flbn" class="marca-nombre">La Tasa</span>
+      </div>
+    </div>
+  </div>
+
+  <style>
+    @font-face { font-family: "Geist Sans"; src: url("assets/fonts/geist-latin.woff2") format("woff2");
+      font-weight: 100 900; font-style: normal; font-display: block; }
+
+    #root { width: 1080px; height: 1920px; position: relative; overflow: hidden;
+      container-type: size; font-family: "Geist Sans", sans-serif; color: #f1f5f9;
+      -webkit-font-smoothing: antialiased; }
+
+    .suelo { position: absolute; inset: 0; background: #0b1120; }
+    .contenido { position: absolute; inset: 0; }
+    .tabular { font-variant-numeric: tabular-nums; }
+
+    .marco { position: absolute; inset: 0; overflow: hidden; }
+    .foto { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+    .velo { position: absolute; inset: 0; pointer-events: none; }
+
+    .kicker { position: absolute; top: 116px; left: 60px; font-weight: 500; font-size: 26px;
+      letter-spacing: 0.14em; text-transform: uppercase; color: #34d399; }
+    .hairline { position: absolute; left: 60px; width: 960px; height: 1px;
+      background: #26324c; transform-origin: left center; }
+
+    /* La marca va en las once pantallas, arriba a la derecha: si alguien descarga
+       el Reel y lo reparte suelto, la cuenta viaja con el. */
+    .marca { position: absolute; top: 104px; right: 60px;
+      display: flex; align-items: center; gap: 16px; }
+    .marca-logo { width: 60px; height: 60px; border-radius: 14px; display: block; }
+    .marca-nombre { font-weight: 600; font-size: 38px; letter-spacing: -0.02em;
+      line-height: 1; color: #f1f5f9; }
+    .lados { position: absolute; left: 60px; right: 60px; top: 760px; }
+    .lado { padding: 34px 0; }
+    .lado-cifra { font-weight: 900; font-size: 168px; line-height: 1.0;
+      letter-spacing: -0.05em; color: #94a3b8; }
+    .lado-etq { margin-top: 14px; font-weight: 500; font-size: 25px; letter-spacing: 0.13em;
+      text-transform: uppercase; color: #94a3b8; }
+    .acento { color: #34d399; }
+    .rule { width: 100%; height: 1px; background: #26324c; transform-origin: left center; }
+    .nota { position: absolute; left: 60px; right: 60px; top: 1418px;
+      font-weight: 400; font-size: 42px; line-height: 1.34; color: #94a3b8; }
+  </style>
+
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+  <script>
+    (function () {
+      var raiz = document.currentScript.parentNode.querySelector('[data-composition-id="07-plazos"]')
+        || document.querySelector('[data-composition-id="07-plazos"]');
+      var q = function (sel) { return raiz.querySelector(sel); };
+      var qa = function (sel) { return Array.prototype.slice.call(raiz.querySelectorAll(sel)); };
+
+      window.__timelines = window.__timelines || {};
+      var tl = gsap.timeline({ paused: true });
+      window.__timelines["07-plazos"] = tl;
+
+      // Identidad, no elemento narrativo: entra con el frame y no compite.
+      tl.fromTo(q(".marca"), { opacity: 0, y: -10 },
+        { opacity: 1, y: 0, duration: 0.3, ease: "power3.out" }, 0.02);
+
+      tl.fromTo(q(".kicker"), { opacity: 0, y: -12 },
+        { opacity: 1, y: 0, duration: 0.32, ease: "power3.out" }, 0.04);
+
+      // El 100 entra primero y en --muted: es lo que el lector ya trae en la
+      // cabeza. El 25 llega despues y en acento, porque es la novedad.
+      tl.fromTo(q("#lado-a"), { xPercent: -12, opacity: 0 },
+        { xPercent: 0, opacity: 1, duration: 0.44, ease: "power4.out" }, 0.18);
+      tl.fromTo(q("#rule"), { scaleX: 0 },
+        { scaleX: 1, duration: 0.48, ease: "power3.inOut" }, 0.64);
+      tl.fromTo(q("#lado-b"), { xPercent: 12, opacity: 0 },
+        { xPercent: 0, opacity: 1, duration: 0.44, ease: "power4.out" }, 1.10);
+
+      tl.fromTo(q("#hl"), { scaleX: 0 },
+        { scaleX: 1, duration: 0.44, ease: "power3.inOut" }, 1.86);
+      tl.fromTo(q("#nota"), { opacity: 0, y: 20 },
+        { opacity: 1, y: 0, duration: 0.34, ease: "power3.out" }, 2.10);
+    })();
+  </script>
+</template>

@@ -1,0 +1,122 @@
+<template>
+  <div id="root" data-composition-id="07-promesa" data-start="0" data-duration="3.6" data-width="1080" data-height="1920">
+
+    <div id="f06-suelo" class="clip f06-suelo" data-start="0" data-duration="3.6" data-track-index="0"></div>
+
+    <div id="f06-contenido" class="clip f06-contenido" data-start="0" data-duration="3.6" data-track-index="1">
+      <div class="f06-marco">
+        <img id="f06-foto" class="f06-foto" src="public/fotos/dinero.jpg" alt="">
+      </div>
+      <div class="f06-velo"></div>
+
+      <div id="f06-kicker" class="f06-kicker">LO QUE PROMETEN</div>
+
+      <div class="f06-bloque">
+        <div id="f06-p1" class="f07-promesa">
+          <div class="f06-cifra tabular" data-layout-allow-overlap="">US$ 100.000 <span class="f06-mill">millones</span></div>
+          <div class="f06-label">DE INVERSIÓN PRIVADA</div>
+        </div>
+
+        <div id="f06-p2" class="f07-promesa">
+          <div class="f06-texto">Miles de empleos</div>
+          <div class="f06-label">SEGÚN MARCO RUBIO</div>
+        </div>
+      </div>
+
+      <div id="f06-hairline" class="f06-hairline"></div>
+      <div id="f06-nota" class="f06-nota">Ninguna fecha confirmada.</div>
+      <div class="m07-marca">
+        <img class="m07-marca-logo" src="assets/logo-latasa.png" alt="">
+        <span class="m07-marca-nombre">La Tasa</span>
+      </div>
+    </div>
+  </div>
+
+  <style>
+    @font-face { font-family: "Geist Sans"; src: url("assets/fonts/geist-latin.woff2") format("woff2");
+      font-weight: 100 900; font-style: normal; font-display: block; }
+
+    #root { width: 1080px; height: 1920px; position: relative; overflow: hidden;
+      container-type: size; font-family: "Geist Sans", sans-serif; color: #f1f5f9;
+      -webkit-font-smoothing: antialiased; }
+
+    .f06-suelo { position: absolute; inset: 0; background: #0b1120; }
+    .f06-contenido { position: absolute; inset: 0; }
+    .tabular { font-variant-numeric: tabular-nums; }
+
+    .f06-marco { position: absolute; inset: 0; overflow: hidden; }
+    .f06-foto { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
+      object-position: 50% 50%; filter: grayscale(1) contrast(1.2) brightness(0.34); }
+    .f06-velo { position: absolute; inset: 0;
+      background: linear-gradient(180deg, rgba(11,17,32,.58) 0%, rgba(11,17,32,.68) 42%,
+        rgba(11,17,32,.92) 100%); }
+
+    .f06-kicker { position: absolute; top: 116px; left: 60px;
+      font-family: "Geist Sans", sans-serif; font-weight: 500; font-size: 26px;
+      letter-spacing: 0.14em; text-transform: uppercase; color: #34d399; }
+
+    .f06-bloque { position: absolute; left: 60px; right: 60px; top: 760px; }
+    .f07-promesa { margin-bottom: 96px; }
+    .f06-cifra { font-weight: 900; font-size: 132px; line-height: 0.98;
+      letter-spacing: -0.04em; color: #34d399; }
+    .f06-mill { font-weight: 700; font-size: 92px; }
+    .f06-texto { font-weight: 700; font-size: 118px; line-height: 1.0;
+      letter-spacing: -0.03em; color: #f1f5f9; }
+    .f06-label { margin-top: 22px; font-family: "Geist Sans", sans-serif; font-weight: 500;
+      font-size: 26px; letter-spacing: 0.14em; text-transform: uppercase; color: #94a3b8; }
+
+    .f06-hairline { position: absolute; left: 60px; top: 1408px; width: 960px; height: 1px;
+      background: #26324c; transform-origin: left center; }
+    .f06-nota { position: absolute; left: 60px; right: 60px; top: 1452px;
+      font-weight: 400; font-size: 42px; line-height: 1.4; color: #94a3b8; }
+
+    .m07-marca { position: absolute; top: 104px; right: 60px;
+      display: flex; align-items: center; gap: 16px; }
+    .m07-marca-logo { width: 60px; height: 60px; border-radius: 14px; display: block; }
+    .m07-marca-nombre { font-weight: 600; font-size: 38px; letter-spacing: -0.02em;
+      line-height: 1; color: #f1f5f9; }
+  </style>
+
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+  <script>
+    (function () {
+      var raiz = document.currentScript.parentNode.querySelector('[data-composition-id="07-promesa"]')
+        || document.querySelector('[data-composition-id="07-promesa"]');
+      var q = function (sel) { return raiz.querySelector(sel); };
+
+      window.__timelines = window.__timelines || {};
+      var tl = gsap.timeline({ paused: true });
+      window.__timelines["07-promesa"] = tl;
+
+      // La marca entra con el frame y se queda: es identidad, no un elemento
+      // narrativo, así que no compite con ningún golpe.
+      tl.fromTo(q(".m07-marca"), { opacity: 0, y: -10 },
+        { opacity: 1, y: 0, duration: 0.3, ease: "power3.out" }, 0.02);
+
+      // El push sigue cerrando, igual que en los frames anteriores.
+      tl.fromTo(q("#f06-foto"), { scale: 1.12 },
+        { scale: 1.03, duration: 1.5, ease: "power3.out" }, 0);
+      tl.to(q("#f06-foto"), { scale: 1.06, duration: 1.4, ease: "none" }, 1.5);
+
+      tl.fromTo(q("#f06-kicker"), { opacity: 0, y: -12 },
+        { opacity: 1, y: 0, duration: 0.32, ease: "power3.out" }, 0.04);
+
+      // Primer golpe: la cifra. Slam con desenfoque, como el gancho.
+      tl.fromTo(q("#f06-p1"),
+        { scale: 1.18, filter: "blur(12px)", opacity: 0 },
+        { scale: 1, filter: "blur(0px)", opacity: 1, duration: 0.48, ease: "power4.out" }, 0.34);
+
+      // Segundo golpe: la promesa de empleo, entrada distinta (waterfall-entry).
+      tl.fromTo(q("#f06-p2"), { y: 60, opacity: 0 },
+        { y: 0, opacity: 1, duration: 0.44, ease: "circ.out" }, 1.20);
+
+      // La advertencia llega última y se dibuja: es el matiz, no el titular.
+      tl.fromTo(q("#f06-hairline"), { scaleX: 0 },
+        { scaleX: 1, duration: 0.46, ease: "power3.inOut" }, 1.86);
+      tl.fromTo(q("#f06-nota"), { opacity: 0, y: 16 },
+        { opacity: 1, y: 0, duration: 0.34, ease: "power3.out" }, 2.12);
+
+      // 2.46–2.9s: quietud. Solo el push lento del fondo.
+    })();
+  </script>
+</template>

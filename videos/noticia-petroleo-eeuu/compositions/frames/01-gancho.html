@@ -1,0 +1,145 @@
+<template>
+  <div id="root" data-composition-id="01-gancho" data-start="0" data-duration="3.4" data-width="1080" data-height="1920">
+
+    <div id="f01-suelo" class="clip f01-suelo" data-start="0" data-duration="3.4" data-track-index="0"></div>
+
+    <div id="f01-contenido" class="clip f01-contenido" data-start="0" data-duration="3.4" data-track-index="1">
+      <div class="f01-marco">
+        <img id="f01-foto" class="f01-foto" src="public/fotos/portada.jpg" alt="">
+      </div>
+      <div class="f01-velo"></div>
+
+      <div id="f01-kicker" class="f01-kicker">ACUERDO EE.UU. – VENEZUELA</div>
+
+      <div class="f01-titular">
+        <div id="f01-l1" class="f01-linea" data-layout-allow-overlap="">¿El negocio</div>
+        <div id="f01-l2" class="f01-linea f01-acento" data-layout-allow-overlap="">
+          <span id="f01-l2g" class="f01-glitch">del siglo?</span>
+        </div>
+      </div>
+
+      <div class="f01-encuadre">
+        <div id="f01-m1" class="f01-encuadre-linea" data-layout-allow-overlap="">El megaacuerdo de Trump con</div>
+        <div id="f01-m2" class="f01-encuadre-linea" data-layout-allow-overlap="">Venezuela por el petróleo.</div>
+      </div>
+      <div class="m01-marca">
+        <img class="m01-marca-logo" src="assets/logo-latasa.png" alt="">
+        <span class="m01-marca-nombre">La Tasa</span>
+      </div>
+    </div>
+  </div>
+
+  <style>
+    @font-face { font-family: "Geist Sans"; src: url("assets/fonts/geist-latin.woff2") format("woff2");
+      font-weight: 100 900; font-style: normal; font-display: block; }
+
+    #root { width: 1080px; height: 1920px; position: relative; overflow: hidden;
+      container-type: size; font-family: "Geist Sans", sans-serif; color: #f1f5f9;
+      -webkit-font-smoothing: antialiased; }
+
+    .f01-suelo { position: absolute; inset: 0; background: #0b1120; }
+    .f01-contenido { position: absolute; inset: 0; }
+
+    .f01-marco { position: absolute; inset: 0; overflow: hidden; }
+    /* Unica foto del video que conserva color, y a media saturacion. Es una
+       composicion de portada —dos banderas, tres retratos y el pozo—, no una foto
+       de fuente: en blanco y negro pierde justo lo que la hace legible de un
+       vistazo. Las otras cinco siguen desaturadas del todo. */
+    .f01-foto { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
+      object-position: 50% 36%; filter: saturate(0.45) contrast(1.06) brightness(0.66); }
+    .f01-velo { position: absolute; inset: 0; pointer-events: none;
+      background: linear-gradient(180deg,
+        rgba(11,17,32,.50) 0%, rgba(11,17,32,.24) 22%, rgba(11,17,32,.40) 48%,
+        rgba(11,17,32,.78) 62%, rgba(11,17,32,.90) 78%, rgba(11,17,32,.95) 100%); }
+
+    .f01-kicker { position: absolute; top: 116px; left: 60px;
+      font-family: "Geist Sans", sans-serif; font-weight: 500; font-size: 26px;
+      letter-spacing: 0.14em; text-transform: uppercase; color: #34d399; }
+
+    /* La pregunta manda: es el unico momento display del frame. */
+    .f01-titular { position: absolute; left: 60px; right: 60px; top: 1112px; }
+    .f01-linea { font-weight: 900; font-size: 148px; line-height: 0.94;
+      letter-spacing: -0.045em; }
+    .f01-acento { color: #34d399; }
+    .f01-glitch { position: relative; display: inline-block; }
+
+    /* El encuadre va debajo y en cuerpo de lectura: contesta "de que hablamos"
+       sin competir con la pregunta. */
+    .f01-encuadre { position: absolute; left: 60px; right: 60px; top: 1420px; }
+    .f01-encuadre-linea { font-weight: 400; font-size: 54px; line-height: 1.32; color: #f1f5f9; }
+
+    .m01-marca { position: absolute; top: 104px; right: 60px;
+      display: flex; align-items: center; gap: 16px; }
+    .m01-marca-logo { width: 60px; height: 60px; border-radius: 14px; display: block; }
+    .m01-marca-nombre { font-weight: 600; font-size: 38px; letter-spacing: -0.02em;
+      line-height: 1; color: #f1f5f9; }
+  </style>
+
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+  <script>
+    (function () {
+      var raiz = document.currentScript.parentNode.querySelector('[data-composition-id="01-gancho"]')
+        || document.querySelector('[data-composition-id="01-gancho"]');
+      var q = function (sel) { return raiz.querySelector(sel); };
+
+      window.__timelines = window.__timelines || {};
+      var tl = gsap.timeline({ paused: true });
+      window.__timelines["01-gancho"] = tl;
+
+      // La marca entra con el frame y se queda: es identidad, no un elemento
+      // narrativo, así que no compite con ningún golpe.
+      tl.fromTo(q(".m01-marca"), { opacity: 0, y: -10 },
+        { opacity: 1, y: 0, duration: 0.3, ease: "power3.out" }, 0.02);
+
+      // Push de cámara continuo: la corriente del video empuja hacia adelante,
+      // nunca hacia atrás (multi-phase-camera, fase push).
+      tl.fromTo(q(".f01-marco"),
+        { scale: 1.10 }, { scale: 1.03, duration: 2.0, ease: "power3.out" }, 0);
+      tl.to(q(".f01-marco"), { scale: 1.06, duration: 1.4, ease: "none" }, 2.0);
+
+      // Chrome: la banda de la bandera y el kicker asientan primero (waterfall-entry).
+      tl.fromTo(q("#f01-kicker"), { opacity: 0, y: -14 },
+        { opacity: 1, y: 0, duration: 0.38, ease: "power3.out" }, 0.16);
+
+      // kinetic-beat-slam: una sola rejilla de pulsos, entradas DISTINTAS por línea.
+      // La pregunta completa aterriza antes del segundo 1,5: el gancho no puede
+      // depender de que el lector aguante hasta el final del frame.
+      var PULSE = 0.32;
+      var BEATS = [PULSE * 1.1, PULSE * 3.0];
+
+      tl.fromTo(q("#f01-l1"),
+        { scale: 1.32, filter: "blur(14px)", opacity: 0 },
+        { scale: 1, filter: "blur(0px)", opacity: 1, duration: 0.5, ease: "power4.out" },
+        BEATS[0]);
+
+      tl.fromTo(q("#f01-l2"),
+        { y: 86, rotation: 3, opacity: 0 },
+        { y: 0, rotation: 0, opacity: 1, duration: 0.46, ease: "circ.out" },
+        BEATS[1]);
+
+      // chromatic-glitch al aterrizar "del siglo?": vibración corta y resolución
+      // limpia. Desplazamiento derivado del tiempo cuantizado, nunca de Math.random.
+      var g = q("#f01-l2g");
+      var glitch = { t: 0 };
+      tl.fromTo(glitch, { t: 0 }, {
+        t: 1, duration: 0.14, ease: "none",
+        onUpdate: function () {
+          var paso = Math.floor(glitch.t * 7);
+          var d = ((paso * 37) % 7) - 3;
+          if (glitch.t >= 1) { d = 0; }
+          g.style.textShadow = d === 0 ? "none"
+            : (d + "px 0 0 rgba(52,211,153,.7), " + (-d) + "px 0 0 rgba(241,245,249,.35)");
+        }
+      }, BEATS[1] + 0.32);
+
+      // El encuadre llega después, línea a línea (waterfall-entry): primero se
+      // engancha, después se explica de qué va.
+      tl.fromTo(q("#f01-m1"), { opacity: 0, y: 26 },
+        { opacity: 1, y: 0, duration: 0.36, ease: "power3.out" }, 1.62);
+      tl.fromTo(q("#f01-m2"), { opacity: 0, y: 26 },
+        { opacity: 1, y: 0, duration: 0.36, ease: "power3.out" }, 1.78);
+
+      // 2.3–3.2s: quietud total antes del corte. Solo el push del fondo sigue vivo.
+    })();
+  </script>
+</template>
