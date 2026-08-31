@@ -1,0 +1,143 @@
+<template>
+  <div id="root" data-composition-id="02-solucion" data-start="0" data-duration="1"
+       data-width="1080" data-height="1920">
+    <div id="suelo-02-solucion" class="suelo clip" data-start="0" data-duration="1" data-track-index="0"></div>
+    <span class="oculto-var" data-var-source="montoEjemplo" data-var-text="montoEjemplo">100</span>
+    <span class="oculto-var" data-var-source="monedaOrigen" data-var-text="monedaOrigen">USD</span>
+    <span class="oculto-var" data-var-source="monedaDestino" data-var-text="monedaDestino">COP</span>
+    <span class="oculto-var" data-var-source="resultadoEjemplo" data-var-text="resultadoEjemplo">323.063</span>
+    <div id="app-02" class="app">
+      <div class="display">
+        <div class="rot">Tienes</div>
+        <div class="monto tabular"><span id="digitos-02"></span><span id="uni-origen-02" class="uni">USD</span></div>
+      </div>
+      <div id="resultado-02" class="resultado">
+        <div class="rot">Equivale a</div>
+        <div class="cifra tabular"><span id="cifra-02">323.063</span><span id="uni-destino-02" class="uni">COP</span></div>
+      </div>
+      <div class="teclado">
+        <div class="tecla" data-tecla="1" data-i="0">1</div>
+        <div class="tecla" data-tecla="2" data-i="1">2</div>
+        <div class="tecla" data-tecla="3" data-i="2">3</div>
+        <div class="tecla" data-tecla="4" data-i="3">4</div>
+        <div class="tecla" data-tecla="5" data-i="4">5</div>
+        <div class="tecla" data-tecla="6" data-i="5">6</div>
+        <div class="tecla" data-tecla="7" data-i="6">7</div>
+        <div class="tecla" data-tecla="8" data-i="7">8</div>
+        <div class="tecla" data-tecla="9" data-i="8">9</div>
+        <div class="tecla" data-tecla="," data-i="9">,</div>
+        <div class="tecla" data-tecla="0" data-i="10">0</div>
+        <div class="tecla" data-tecla="⌫" data-i="11">⌫</div>
+      </div>
+    </div>
+    <div id="frase-02" class="frase"><span class="pal">Con</span> <span class="pal">La</span> <span class="pal">Tasa</span> <span class="pal">lo</span> <span class="pal">sabes</span> <span class="pal">en</span> <span class="pal clave">dos</span> <span class="pal clave">segundos</span></div>
+  </div>
+  <style>
+  @font-face { font-family: "Geist Sans"; src: url("assets/geist-latin.woff2") format("woff2");
+    font-weight: 100 900; font-display: block; }
+  #root { width: 1080px; height: 1920px; position: relative; overflow: hidden;
+    font-family: "Geist Sans", system-ui, sans-serif; color: #f1f5f9;
+    -webkit-font-smoothing: antialiased; }
+  .suelo { position: absolute; inset: 0; background: #0b1120; }
+  .tabular { font-variant-numeric: tabular-nums; }
+  .oculto-var { display: none; }
+
+  .app { position: absolute; left: 80px; top: 300px; width: 920px; }
+  .display { background: #131c2f; border: 1px solid #26324c; border-radius: 16px;
+    padding: 34px 44px 38px; }
+  .rot { font-size: 24px; color: #94a3b8; letter-spacing: .07em; text-transform: uppercase; }
+  .monto { font-size: 112px; font-weight: 600; line-height: 1; margin-top: 16px;
+    display: flex; align-items: baseline; min-height: 112px; }
+  .monto .d { display: inline-block; opacity: 0; }
+  .monto .uni { font-weight: 400; font-size: 46px; color: #94a3b8; margin-left: 18px; }
+  .resultado { margin-top: 26px; border: 1px solid rgba(52,211,153,.4);
+    background: rgba(52,211,153,.1); border-radius: 16px; padding: 30px 44px 34px; opacity: 0; }
+  .resultado .cifra { font-size: 92px; font-weight: 600; color: #34d399; line-height: 1;
+    margin-top: 14px; display: flex; align-items: baseline; }
+  .resultado .uni { font-weight: 400; font-size: 38px; color: #94a3b8; margin-left: 18px; }
+  .teclado { margin-top: 30px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+  .tecla { height: 122px; border-radius: 12px; background: #1b273f;
+    border: 1px solid #26324c; display: flex; align-items: center; justify-content: center;
+    font-size: 50px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .frase { position: absolute; left: 80px; right: 80px; top: 1498px; text-align: center;
+    font-size: 44px; font-weight: 500; }
+  .frase .pal { display: inline-block; opacity: 0; }
+</style>
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+  <script>
+    (function () {
+      var raiz = document.currentScript.parentNode.querySelector('[data-composition-id="02-solucion"]')
+        || document.querySelector('[data-composition-id="02-solucion"]');
+      var q = function (sel) { return raiz.querySelector(sel); };
+      var qa = function (sel) { return Array.prototype.slice.call(raiz.querySelectorAll(sel)); };
+
+    function valorVar(raiz, id, porDefecto) {
+      var el = raiz.querySelector('[data-var-source="' + id + '"]');
+      var v = el && el.textContent ? el.textContent.trim() : "";
+      return v || porDefecto;
+    }
+      window.__timelines = window.__timelines || {};
+      var tl = gsap.timeline({ paused: true });
+      window.__timelines["02-solucion"] = tl;
+
+      var monto = valorVar(raiz, "montoEjemplo", "100");
+      q("#uni-origen-02").textContent = valorVar(raiz, "monedaOrigen", "USD");
+      q("#uni-destino-02").textContent = valorVar(raiz, "monedaDestino", "COP");
+      q("#cifra-02").textContent = valorVar(raiz, "resultadoEjemplo", "323.063");
+
+      // Un span por dígito: es lo que permite escalonar el tecleo.
+      var cont = q("#digitos-02");
+      cont.textContent = "";
+      var digitos = monto.split("").map(function (c) {
+        var s = document.createElement("span");
+        s.className = "d";
+        s.textContent = c;
+        cont.appendChild(s);
+        return s;
+      });
+
+      // Scene 1: la app llega con el corte. 200 ms y ya está.
+      tl.fromTo(q("#app-02"), { opacity: 0, scale: 0.985 },
+        { opacity: 1, scale: 1, duration: 0.2, ease: "power3.out" }, 0);
+
+      // Scene 2: se teclea dígito a dígito, 80 ms de separación
+      // (dynamic-content-sequencing), y cada uno enciende su tecla.
+      digitos.forEach(function (d, i) {
+        var t0 = 0.2 + i * 0.08;
+        tl.fromTo(d, { opacity: 0, y: 10 },
+          { opacity: 1, y: 0, duration: 0.12, ease: "power3.out" }, t0);
+        var tecla = qa('.tecla[data-tecla="' + d.textContent + '"]')[0];
+        if (tecla) {
+          // press-release-spring: compresión y recuperación, con el tinte de la app.
+          tl.fromTo(tecla, { scale: 1 }, { scale: 0.95, duration: 0.06, ease: "power2.out" }, t0)
+            .to(tecla, { scale: 1, duration: 0.16, ease: "power3.out" }, t0 + 0.06);
+          tl.fromTo(tecla,
+            { backgroundColor: "#1b273f", borderColor: "#26324c", color: "#f1f5f9" },
+            { backgroundColor: "rgba(52,211,153,0.2)", borderColor: "rgba(52,211,153,0.4)",
+              color: "#34d399", duration: 0.06, ease: "power2.out" }, t0)
+            .to(tecla, { backgroundColor: "#1b273f", borderColor: "#26324c",
+              color: "#f1f5f9", duration: 0.3, ease: "power3.out" }, t0 + 0.1);
+        }
+      });
+
+      // Scene 3: el resultado aterriza en 2.90s global. Es el pago del plano.
+      tl.fromTo(q("#resultado-02"), { opacity: 0, y: 28 },
+        { opacity: 1, y: 0, duration: 0.3, ease: "power3.out" }, 0.4);
+
+      // Scene 4: la frase, palabra por palabra, desde 4.00s global.
+      tl.fromTo(qa("#frase-02 .pal"), { opacity: 0, y: 16 },
+        { opacity: 1, y: 0, duration: 0.26, ease: "power3.out", stagger: 0.055 }, 1.5);
+
+      // Scene 5: revelado de la segunda mitad — lo que impide que el plano se congele.
+      tl.fromTo(qa("#frase-02 .clave"), { color: "#f1f5f9" },
+        { color: "#34d399", duration: 0.22, ease: "power2.out" }, 2.4)
+        .to(qa("#frase-02 .clave"), { color: "#f1f5f9", duration: 0.5, ease: "power2.inOut" }, 2.75);
+      tl.to(q("#resultado-02"), { scale: 1.02, duration: 0.2, ease: "power2.out" }, 2.4)
+        .to(q("#resultado-02"), { scale: 1, duration: 0.36, ease: "power3.out" }, 2.6);
+
+      // Scene 6: sostiene. Jitter de amplitud baja, finito, sin repeat.
+      tl.to(q("#resultado-02"), { y: -2, duration: 0.3, ease: "sine.inOut" }, 2.96)
+        .to(q("#resultado-02"), { y: 0, duration: 0.34, ease: "sine.inOut" }, 3.26);
+    })();
+  </script>
+</template>

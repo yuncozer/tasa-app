@@ -1,0 +1,135 @@
+<template>
+  <div id="root" data-composition-id="05-instagram" data-start="0" data-duration="1"
+       data-width="1080" data-height="1920">
+    <div id="suelo-05-instagram" class="suelo clip" data-start="0" data-duration="1" data-track-index="0"></div>
+    <span class="oculto-var" data-var-source="handleInstagram" data-var-text="handleInstagram">@latasa.online</span>
+    <div class="logo"><img src="assets/logo-latasa.png" alt=""></div>
+    <div class="pila">
+      <div id="post-c-05" class="post c"></div>
+      <div id="post-b-05" class="post b"></div>
+      <div id="post-a-05" class="post a">
+        <div class="cab">
+          <div class="av"><img src="assets/logo-avatar.png" alt=""></div>
+          <div class="nm">latasa.online</div>
+          <div id="seguir-05" class="seguir">Seguir</div>
+        </div>
+        <div class="tarjeta-post">
+          <div class="tp-rot">Tasas de hoy</div>
+          <div class="fila"><span class="lbl">Dólar BCV</span><span class="val">784,66<em>Bs</em></span></div>
+          <div class="fila"><span class="lbl">Binance venta</span><span class="val">913,50<em>Bs</em></span></div>
+          <div class="fila"><span class="lbl">Peso Binance</span><span class="val">0,2328<em>Bs</em></span></div>
+        </div>
+      </div>
+    </div>
+    <svg id="mano-05" class="mano" viewBox="0 0 200 250" width="200" height="250" aria-hidden="true">
+        <g fill="#f1f5f9" stroke="#0b1120" stroke-width="7" stroke-linejoin="round">
+          <rect x="25" y="130" width="38" height="70" rx="19" transform="rotate(-25 44 165)"/>
+          <rect x="138" y="88" width="33" height="48" rx="16"/>
+          <rect x="108" y="78" width="35" height="55" rx="17"/>
+          <rect x="68" y="12" width="38" height="112" rx="19"/>
+          <rect x="42" y="110" width="130" height="115" rx="42"/>
+        </g>
+      </svg>
+    <div id="onda-05" class="onda"></div>
+    <div id="frase-05" class="frase"><span class="pal">Cada</span> <span class="pal">mañana</span> <span class="pal">y</span> <span class="pal">cada</span> <span class="pal">tarde,</span> <span class="pal">tasas</span> <span class="pal">nuevas</span> <span class="pal">en</span> <span class="pal">Instagram</span></div>
+    <div id="handle-05" class="handle">@latasa.online</div>
+  </div>
+  <style>
+  @font-face { font-family: "Geist Sans"; src: url("assets/geist-latin.woff2") format("woff2");
+    font-weight: 100 900; font-display: block; }
+  #root { width: 1080px; height: 1920px; position: relative; overflow: hidden;
+    font-family: "Geist Sans", system-ui, sans-serif; color: #f1f5f9;
+    -webkit-font-smoothing: antialiased; }
+  .suelo { position: absolute; inset: 0; background: #0b1120; }
+  .tabular { font-variant-numeric: tabular-nums; }
+  .oculto-var { display: none; }
+
+  .logo { position: absolute; left: 120px; top: 150px; width: 130px; height: 130px; }
+  .logo img { width: 100%; height: 100%; display: block; border-radius: 32px; }
+  .pila { position: absolute; left: 140px; top: 400px; width: 800px; height: 780px; }
+  .post { position: absolute; left: 0; width: 800px; border-radius: 16px;
+    background: #131c2f; border: 1px solid #26324c; opacity: 0; }
+  .post.c { top: 130px; height: 620px; transform: scale(.88); opacity: 0; }
+  .post.b { top: 66px;  height: 630px; transform: scale(.94); opacity: 0; }
+  .post.a { top: 0; height: 640px; overflow: hidden; }
+  .cab { height: 100px; border-bottom: 1px solid #26324c;
+    display: flex; align-items: center; gap: 20px; padding: 0 26px; }
+  .av { width: 58px; height: 58px; border-radius: 50%; overflow: hidden; flex: none; }
+  .av img { width: 100%; height: 100%; display: block; }
+  .nm { font-size: 27px; font-weight: 500; }
+  .seguir { margin-left: auto; padding: 15px 36px; border-radius: 9999px;
+    background: #34d399; color: #0b1120; font-size: 25px; font-weight: 600; }
+  .tarjeta-post { margin: 26px; border-radius: 12px; background: #0b1120;
+    border: 1px solid #26324c; padding: 26px 30px; }
+  .tp-rot { font-size: 21px; color: #94a3b8; letter-spacing: .1em; text-transform: uppercase; }
+  .fila { display: flex; justify-content: space-between; align-items: baseline;
+    padding: 17px 0; border-bottom: 1px solid #26324c; }
+  .fila:last-child { border-bottom: 0; }
+  .fila .lbl { font-size: 25px; }
+  .fila .val { font-size: 30px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .fila .val em { font-style: normal; font-weight: 400; font-size: 21px; color: #94a3b8; margin-left: 8px; }
+  /* La punta cae en la esquina inferior derecha del botón: toca el objetivo sin
+     taparle la etiqueta, que está centrada más a la izquierda. */
+  .mano { position: absolute; left: 793px; top: 443px; opacity: 0; }
+  .onda { position: absolute; left: 880px; top: 455px; width: 20px; height: 20px;
+    margin: -10px 0 0 -10px; border-radius: 50%; border: 3px solid #34d399; opacity: 0; }
+  .frase { position: absolute; left: 80px; right: 80px; top: 1318px; text-align: center;
+    font-size: 42px; font-weight: 500; line-height: 1.34; }
+  .frase .pal { display: inline-block; opacity: 0; }
+  .handle { position: absolute; left: 0; right: 0; top: 1466px; text-align: center;
+    font-size: 46px; font-weight: 600; color: #34d399; opacity: 0; }
+</style>
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+  <script>
+    (function () {
+      var raiz = document.currentScript.parentNode.querySelector('[data-composition-id="05-instagram"]')
+        || document.querySelector('[data-composition-id="05-instagram"]');
+      var q = function (sel) { return raiz.querySelector(sel); };
+      var qa = function (sel) { return Array.prototype.slice.call(raiz.querySelectorAll(sel)); };
+
+    function valorVar(raiz, id, porDefecto) {
+      var el = raiz.querySelector('[data-var-source="' + id + '"]');
+      var v = el && el.textContent ? el.textContent.trim() : "";
+      return v || porDefecto;
+    }
+      window.__timelines = window.__timelines || {};
+      var tl = gsap.timeline({ paused: true });
+      window.__timelines["05-instagram"] = tl;
+
+      q("#handle-05").textContent = valorVar(raiz, "handleInstagram", "@latasa.online");
+
+      // Scene 1: la pila entra desde abajo, de atrás hacia delante.
+      tl.fromTo(q("#post-c-05"), { opacity: 0, y: 70 },
+        { opacity: .3, y: 0, duration: 0.3, ease: "power3.out" }, 0);
+      tl.fromTo(q("#post-b-05"), { opacity: 0, y: 70 },
+        { opacity: .55, y: 0, duration: 0.3, ease: "power3.out" }, 0.07);
+      tl.fromTo(q("#post-a-05"), { opacity: 0, y: 70 },
+        { opacity: 1, y: 0, duration: 0.3, ease: "power3.out" }, 0.14);
+
+      // Scene 2: el dedo entra desde fuera del cuadro por abajo a la derecha. Se
+      // parte en dos tramos con eases opuestos para que la trayectoria describa
+      // una curva en vez de una recta, que es como se mueve una mano de verdad.
+      tl.fromTo(q("#mano-05"), { opacity: 0, x: 190, y: 560 },
+        { opacity: 1, x: 46, y: 140, duration: 0.3, ease: "power2.out" }, 0.3)
+        .to(q("#mano-05"), { x: 0, y: 0, duration: 0.15, ease: "power3.in" }, 0.6);
+
+      // Scene 3: el toque. Botón y dedo se comprimen juntos (press-release-spring).
+      tl.to(q("#mano-05"), { scale: 0.94, duration: 0.07, ease: "power2.out" }, 0.75)
+        .to(q("#mano-05"), { scale: 1, duration: 0.16, ease: "power3.out" }, 0.82);
+      tl.to(q("#seguir-05"), { scale: 0.93, duration: 0.07, ease: "power2.out" }, 0.75)
+        .to(q("#seguir-05"), { scale: 1, duration: 0.16, ease: "power3.out" }, 0.82);
+      // La onda del cursor-click-ripple: finita, sin repeat.
+      tl.fromTo(q("#onda-05"), { opacity: .8, scale: 1 },
+        { opacity: 0, scale: 9, duration: 0.5, ease: "power2.out",
+          immediateRender: false }, 0.78);
+      // hard-cut word swap: el cambio de estado es el beat, sin fundido.
+      tl.call(function () { q("#seguir-05").textContent = "Siguiendo"; }, null, 0.82);
+
+      // Scene 4: revelado de la segunda mitad.
+      tl.fromTo(qa("#frase-05 .pal"), { opacity: 0, y: 14 },
+        { opacity: 1, y: 0, duration: 0.22, ease: "power3.out", stagger: 0.034 }, 0.92);
+      tl.fromTo(q("#handle-05"), { opacity: 0, y: 14 },
+        { opacity: 1, y: 0, duration: 0.26, ease: "power3.out" }, 1.20);
+    })();
+  </script>
+</template>

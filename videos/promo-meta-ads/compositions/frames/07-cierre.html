@@ -1,0 +1,89 @@
+<template>
+  <div id="root" data-composition-id="07-cierre" data-start="0" data-duration="1"
+       data-width="1080" data-height="1920">
+    <div id="suelo-07-cierre" class="suelo clip" data-start="0" data-duration="1" data-track-index="0"></div>
+    <span class="oculto-var" data-var-source="handleInstagram" data-var-text="handleInstagram">@latasa.online</span>
+    <div id="logo-07" class="logo"><img src="assets/logo-latasa.png" alt=""></div>
+    <div id="marca-07" class="marca"><span class="ch">L</span><span class="ch">a</span><span class="ch">&nbsp;</span><span class="ch">T</span><span class="ch">a</span><span class="ch">s</span><span class="ch">a</span></div>
+    <div id="handle-07" class="handle">@latasa.online</div>
+    <div id="wa-07" class="wa">
+      <svg viewBox="0 0 24 24" fill="#34d399" aria-hidden="true">
+        <path d="M12.04 2A9.9 9.9 0 0 0 2.1 11.9c0 1.75.46 3.46 1.34 4.97L2 22l5.28-1.38a9.9 9.9 0 0 0 4.76 1.21h.01a9.9 9.9 0 0 0 9.93-9.9A9.9 9.9 0 0 0 12.04 2Zm0 18.15h-.01a8.2 8.2 0 0 1-4.19-1.15l-.3-.18-3.12.82.83-3.05-.2-.31a8.2 8.2 0 0 1-1.26-4.38 8.24 8.24 0 1 1 8.25 8.25Zm4.52-6.17c-.25-.12-1.47-.72-1.69-.81-.23-.08-.39-.12-.56.13-.16.24-.64.8-.78.97-.15.16-.29.18-.53.06-.25-.13-1.05-.39-1.99-1.23-.74-.66-1.24-1.47-1.38-1.72-.15-.24-.02-.38.1-.5.11-.11.25-.29.37-.44.13-.15.17-.25.25-.42.09-.16.04-.31-.02-.43-.06-.12-.56-1.34-.76-1.84-.2-.48-.4-.42-.56-.42h-.47c-.16 0-.43.06-.65.31-.22.24-.85.84-.85 2.03s.87 2.36 1 2.52c.12.16 1.71 2.6 4.14 3.65.58.25 1.03.4 1.38.51.58.19 1.11.16 1.53.1.47-.07 1.47-.6 1.67-1.18.21-.58.21-1.07.15-1.18-.06-.1-.22-.16-.47-.29Z"/>
+      </svg>
+    </div>
+    <div id="frase-07" class="frase"><span class="pal">Síguenos.</span> <span class="pal">Únete.</span></div>
+  </div>
+  <style>
+  @font-face { font-family: "Geist Sans"; src: url("assets/geist-latin.woff2") format("woff2");
+    font-weight: 100 900; font-display: block; }
+  #root { width: 1080px; height: 1920px; position: relative; overflow: hidden;
+    font-family: "Geist Sans", system-ui, sans-serif; color: #f1f5f9;
+    -webkit-font-smoothing: antialiased; }
+  .suelo { position: absolute; inset: 0; background: #0b1120; }
+  .tabular { font-variant-numeric: tabular-nums; }
+  .oculto-var { display: none; }
+
+  /* Arranca en la esquina de la escena 6 y viaja al centro: el desplazamiento
+     está calculado desde 120/150 hasta el centro horizontal en y 560. */
+  .logo { position: absolute; left: 120px; top: 150px; width: 130px; height: 130px;
+    transform-origin: 50% 50%; }
+  .logo img { width: 100%; height: 100%; display: block; border-radius: 32px; }
+  .marca { position: absolute; left: 0; right: 0; top: 852px; text-align: center;
+    font-size: 104px; font-weight: 700; letter-spacing: -.025em; }
+  .marca .ch { display: inline-block; opacity: 0; }
+  .handle { position: absolute; left: 0; right: 0; top: 1000px; text-align: center;
+    font-size: 50px; font-weight: 600; color: #34d399; opacity: 0; }
+  .wa { position: absolute; left: 50%; top: 1108px; width: 108px; height: 108px;
+    margin-left: -54px; border-radius: 50%; background: #131c2f;
+    border: 1px solid #26324c; display: flex; align-items: center; justify-content: center;
+    opacity: 0; }
+  .wa svg { width: 58px; height: 58px; }
+  .frase { position: absolute; left: 0; right: 0; top: 1310px; text-align: center;
+    font-size: 48px; font-weight: 500; color: #94a3b8; }
+  .frase .pal { display: inline-block; opacity: 0; }
+</style>
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+  <script>
+    (function () {
+      var raiz = document.currentScript.parentNode.querySelector('[data-composition-id="07-cierre"]')
+        || document.querySelector('[data-composition-id="07-cierre"]');
+      var q = function (sel) { return raiz.querySelector(sel); };
+      var qa = function (sel) { return Array.prototype.slice.call(raiz.querySelectorAll(sel)); };
+
+    function valorVar(raiz, id, porDefecto) {
+      var el = raiz.querySelector('[data-var-source="' + id + '"]');
+      var v = el && el.textContent ? el.textContent.trim() : "";
+      return v || porDefecto;
+    }
+      window.__timelines = window.__timelines || {};
+      var tl = gsap.timeline({ paused: true });
+      window.__timelines["07-cierre"] = tl;
+
+      q("#handle-07").textContent = valorVar(raiz, "handleInstagram", "@latasa.online");
+
+      // Scene 1: el logo viaja de la esquina al centro y crece.
+      // El desplazamiento se calcula, no se escribe a mano, para que siga siendo
+      // correcto si cambia el tamaño del logo o el lienzo.
+      var LADO = 130, DESTINO_Y = 560, ESCALA = 2.6;
+      var dx = (1080 - LADO) / 2 - 120;
+      var dy = DESTINO_Y - 150;
+      tl.fromTo(q("#logo-07"),
+        { x: 0, y: 0, scale: 1 },
+        { x: dx, y: dy, scale: ESCALA, duration: 0.55, ease: "power3.out" }, 0);
+
+      // Scene 2: la marca se arma letra a letra, solapando el final del viaje.
+      tl.fromTo(qa("#marca-07 .ch"), { opacity: 0, y: 26 },
+        { opacity: 1, y: 0, duration: 0.24, ease: "power3.out", stagger: 0.035 }, 0.45);
+
+      // Scene 3: handle e ícono, escalonados.
+      tl.fromTo(q("#handle-07"), { opacity: 0, y: 16 },
+        { opacity: 1, y: 0, duration: 0.26, ease: "power3.out" }, 0.75);
+      tl.fromTo(q("#wa-07"), { opacity: 0, y: 16, scale: 0.9 },
+        { opacity: 1, y: 0, scale: 1, duration: 0.28, ease: "power3.out" }, 0.84);
+
+      // Scene 4: el cierre, palabra por palabra, y todo queda inmóvil.
+      tl.fromTo(qa("#frase-07 .pal"), { opacity: 0, y: 16 },
+        { opacity: 1, y: 0, duration: 0.26, ease: "power3.out", stagger: 0.09 }, 1.05);
+    })();
+  </script>
+</template>

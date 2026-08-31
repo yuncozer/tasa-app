@@ -49,3 +49,8 @@ videos/*/renders/
 videos/*/snapshots/
 videos/*/.hyperframes/
 videos/*/node_modules/
+
+# Cache derivada del editor de audio: el nombre lleva una marca de tiempo, asi
+# que cada apertura del Studio ensuciaria el diff sin aportar nada. El material
+# de verdad si se versiona, incluido el registro congelado de .media/.
+videos/*/.waveform-cache/

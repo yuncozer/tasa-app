@@ -1,0 +1,51 @@
+<template>
+  <div id="root" data-composition-id="04-bisagra" data-start="0" data-duration="1"
+       data-width="1080" data-height="1920">
+    <div id="suelo-04-bisagra" class="suelo clip" data-start="0" data-duration="1" data-track-index="0"></div>
+    <div id="logo-04" class="logo"><img src="assets/logo-latasa.png" alt=""></div>
+    <div id="gratis-04" class="gratis">Gratis.</div>
+  </div>
+  <style>
+  @font-face { font-family: "Geist Sans"; src: url("assets/geist-latin.woff2") format("woff2");
+    font-weight: 100 900; font-display: block; }
+  #root { width: 1080px; height: 1920px; position: relative; overflow: hidden;
+    font-family: "Geist Sans", system-ui, sans-serif; color: #f1f5f9;
+    -webkit-font-smoothing: antialiased; }
+  .suelo { position: absolute; inset: 0; background: #0b1120; }
+  .tabular { font-variant-numeric: tabular-nums; }
+  .oculto-var { display: none; }
+
+  .logo { position: absolute; left: 120px; top: 150px; width: 130px; height: 130px;
+    border-radius: 32px; opacity: 0; }
+  .logo img { width: 100%; height: 100%; display: block; border-radius: 32px; }
+  .gratis { position: absolute; left: 0; right: 0; top: 760px; text-align: center;
+    font-size: 260px; font-weight: 700; color: #34d399; line-height: 1;
+    letter-spacing: -.035em; opacity: 0; }
+</style>
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+  <script>
+    (function () {
+      var raiz = document.currentScript.parentNode.querySelector('[data-composition-id="04-bisagra"]')
+        || document.querySelector('[data-composition-id="04-bisagra"]');
+      var q = function (sel) { return raiz.querySelector(sel); };
+      var qa = function (sel) { return Array.prototype.slice.call(raiz.querySelectorAll(sel)); };
+
+    function valorVar(raiz, id, porDefecto) {
+      var el = raiz.querySelector('[data-var-source="' + id + '"]');
+      var v = el && el.textContent ? el.textContent.trim() : "";
+      return v || porDefecto;
+    }
+      window.__timelines = window.__timelines || {};
+      var tl = gsap.timeline({ paused: true });
+      window.__timelines["04-bisagra"] = tl;
+
+      // Scene 1: el logo entra desde fuera de cuadro a su esquina definitiva.
+      tl.fromTo(q("#logo-04"), { opacity: 0, x: -260 },
+        { opacity: 1, x: 0, duration: 0.35, ease: "power3.out" }, 0);
+      // Scene 2: solapa 50 ms con la anterior para que el plano tenga un solo arranque.
+      tl.fromTo(q("#gratis-04"), { opacity: 0, y: 40, scale: 0.95 },
+        { opacity: 1, y: 0, scale: 1, duration: 0.4, ease: "power3.out" }, 0.22);
+      // Scene 3: quietud hasta el corte. El logo queda en 120/150, escala 1, opacidad 1.
+    })();
+  </script>
+</template>

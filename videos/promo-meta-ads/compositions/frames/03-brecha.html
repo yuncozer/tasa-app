@@ -1,0 +1,94 @@
+<template>
+  <div id="root" data-composition-id="03-brecha" data-start="0" data-duration="1"
+       data-width="1080" data-height="1920">
+    <div id="suelo-03-brecha" class="suelo clip" data-start="0" data-duration="1" data-track-index="0"></div>
+    <span class="oculto-var" data-var-source="brechaPorcentaje" data-var-text="brechaPorcentaje">16,4%</span>
+    <div id="bloom-03" class="bloom"></div>
+    <div id="rot-03" class="rot3">La brecha de hoy</div>
+    <div id="tarjeta-03" class="tarjeta">
+      <div id="hero-03" class="hero tabular">16,4%</div>
+      <div id="sub-03" class="sub"><span class="pal">de</span> <span class="pal">lo</span> <span class="pal">que</span> <span class="pal">pagas</span> <span class="pal">de</span> <span class="pal">más</span> <span class="pal">fuera</span> <span class="pal">del</span> <span class="pal">BCV</span></div>
+    </div>
+  </div>
+  <style>
+  @font-face { font-family: "Geist Sans"; src: url("assets/geist-latin.woff2") format("woff2");
+    font-weight: 100 900; font-display: block; }
+  #root { width: 1080px; height: 1920px; position: relative; overflow: hidden;
+    font-family: "Geist Sans", system-ui, sans-serif; color: #f1f5f9;
+    -webkit-font-smoothing: antialiased; }
+  .suelo { position: absolute; inset: 0; background: #0b1120; }
+  .tabular { font-variant-numeric: tabular-nums; }
+  .oculto-var { display: none; }
+
+  .bloom { position: absolute; left: 50%; top: 780px; width: 1000px; height: 1000px;
+    margin-left: -500px; margin-top: -500px; border-radius: 50%; opacity: 0;
+    background: radial-gradient(circle, rgba(52,211,153,.16) 0%, rgba(52,211,153,0) 68%); }
+  .rot3 { position: absolute; left: 0; right: 0; top: 372px; text-align: center;
+    font-size: 32px; color: #94a3b8; letter-spacing: .14em; text-transform: uppercase;
+    opacity: 0; }
+  .tarjeta { position: absolute; left: 40px; top: 470px; width: 1000px;
+    background: #131c2f; border: 1px solid #26324c; border-radius: 16px;
+    padding: 70px 50px 76px; opacity: 0; }
+  .hero { font-size: 300px; font-weight: 700; color: #34d399; line-height: .92;
+    text-align: center; letter-spacing: -.03em; }
+  .sub { margin-top: 52px; font-size: 46px; color: #94a3b8; text-align: center;
+    line-height: 1.32; }
+  .sub .pal { display: inline-block; opacity: 0; }
+</style>
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+  <script>
+    (function () {
+      var raiz = document.currentScript.parentNode.querySelector('[data-composition-id="03-brecha"]')
+        || document.querySelector('[data-composition-id="03-brecha"]');
+      var q = function (sel) { return raiz.querySelector(sel); };
+      var qa = function (sel) { return Array.prototype.slice.call(raiz.querySelectorAll(sel)); };
+
+    function valorVar(raiz, id, porDefecto) {
+      var el = raiz.querySelector('[data-var-source="' + id + '"]');
+      var v = el && el.textContent ? el.textContent.trim() : "";
+      return v || porDefecto;
+    }
+      window.__timelines = window.__timelines || {};
+      var tl = gsap.timeline({ paused: true });
+      window.__timelines["03-brecha"] = tl;
+
+      var destino = valorVar(raiz, "brechaPorcentaje", "16,4%");
+      // Se separa el número del resto (el "%") para poder contarlo y devolver
+      // al final exactamente la cadena de la variable, con su coma decimal.
+      var m = destino.match(/-?[\d.,]+/);
+      var crudo = m ? m[0] : "16,4";
+      var sufijo = destino.slice((m ? m.index : 0) + crudo.length);
+      var objetivo = parseFloat(crudo.replace(/\./g, "").replace(",", ".")) || 0;
+      var decimales = (crudo.split(",")[1] || "").length;
+      var hero = q("#hero-03");
+      var estado = { v: 0 };
+      function pintar() {
+        hero.textContent = estado.v.toFixed(decimales).replace(".", ",") + sufijo;
+      }
+      pintar();
+
+      // Scene 1: solo el rótulo. La tarjeta todavía no existe.
+      tl.fromTo(q("#rot-03"), { opacity: 0, y: 12 },
+        { opacity: 1, y: 0, duration: 0.34, ease: "power3.out" }, 0);
+
+      // Scene 2: quietud bajo el riser. Lo único que evoluciona es el bloom.
+      tl.fromTo(q("#bloom-03"), { opacity: 0, scale: 0.6 },
+        { opacity: 1, scale: 1, duration: 1.5, ease: "power2.inOut" }, 0.5);
+
+      // Scene 3: impacto en 8.0s global. La tarjeta aterriza y el contador arranca.
+      tl.fromTo(q("#tarjeta-03"), { opacity: 0, scale: 0.9 },
+        { opacity: 1, scale: 1, duration: 0.4, ease: "power3.out" }, 2.0);
+      // counting-dynamic-scale: la cifra crece mientras sube, así la subida se siente.
+      tl.fromTo(hero, { scale: 0.82 }, { scale: 1, duration: 0.4, ease: "power3.out" }, 2.0);
+      tl.to(estado, { v: objetivo, duration: 0.4, ease: "power2.out", onUpdate: pintar }, 2.0);
+
+      // Scene 4: revelado de la segunda mitad, palabra por palabra.
+      tl.fromTo(qa("#sub-03 .pal"), { opacity: 0, y: 14 },
+        { opacity: 1, y: 0, duration: 0.24, ease: "power3.out", stagger: 0.05 }, 2.4);
+
+      // Scene 5: un solo realce sobre la cifra y a sostener. Sin semáforo de color.
+      tl.to(hero, { scale: 1.03, duration: 0.18, ease: "power2.out" }, 3.05)
+        .to(hero, { scale: 1, duration: 0.3, ease: "power3.out" }, 3.23);
+    })();
+  </script>
+</template>

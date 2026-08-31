@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en" data-composition-variables="[{&quot;id&quot;:&quot;montoEjemplo&quot;,&quot;type&quot;:&quot;string&quot;,&quot;label&quot;:&quot;Monto que se teclea&quot;,&quot;default&quot;:&quot;100&quot;},{&quot;id&quot;:&quot;monedaOrigen&quot;,&quot;type&quot;:&quot;string&quot;,&quot;label&quot;:&quot;Moneda origen&quot;,&quot;default&quot;:&quot;USD&quot;},{&quot;id&quot;:&quot;monedaDestino&quot;,&quot;type&quot;:&quot;string&quot;,&quot;label&quot;:&quot;Moneda destino&quot;,&quot;default&quot;:&quot;COP&quot;},{&quot;id&quot;:&quot;resultadoEjemplo&quot;,&quot;type&quot;:&quot;string&quot;,&quot;label&quot;:&quot;Resultado ya formateado&quot;,&quot;default&quot;:&quot;323.063&quot;},{&quot;id&quot;:&quot;brechaPorcentaje&quot;,&quot;type&quot;:&quot;string&quot;,&quot;label&quot;:&quot;Brecha (%)&quot;,&quot;default&quot;:&quot;16,4%&quot;},{&quot;id&quot;:&quot;handleInstagram&quot;,&quot;type&quot;:&quot;string&quot;,&quot;label&quot;:&quot;Handle de Instagram&quot;,&quot;default&quot;:&quot;@latasa.online&quot;},{&quot;id&quot;:&quot;enlaceCanalWhatsapp&quot;,&quot;type&quot;:&quot;string&quot;,&quot;label&quot;:&quot;Enlace del canal de WhatsApp&quot;,&quot;default&quot;:&quot;latasa.online/wa&quot;}]">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=1080, height=1920">
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js" integrity="sha384-sG0Hv1tP1lZCk9KQmrIbY/XNwi+OY84GQqhMscbnsoBFqAz8KNCil1kvfL3Hbbk2" crossorigin="anonymous"></script>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        width: 1080px;
+        height: 1920px;
+        overflow: hidden;
+        background: #000;
+      }
+      #root {
+        position: relative;
+        width: 1080px;
+        height: 1920px;
+        overflow: hidden;
+        background: #0b1120;
+      }
+      .scene {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <div data-hf-id="hf-qv3y" id="root" data-composition-id="main" data-start="0" data-duration="15" data-width="1080" data-height="1920">
+      <!-- sonido -->
+      <!-- primer dígito -->
+      <audio data-hf-id="hf-scal" id="sfx-tick-1" src=".media/audio/sfx/sfx_001.mp3" data-start="2.7" data-duration="0.5" data-track-index="20" data-volume="0.2"></audio>
+      <!-- segundo dígito -->
+      <audio data-hf-id="hf-4etn" id="sfx-tick-2" src=".media/audio/sfx/sfx_001.mp3" data-start="2.78" data-duration="0.5" data-track-index="21" data-volume="0.2"></audio>
+      <!-- tercer dígito -->
+      <audio data-hf-id="hf-la5s" id="sfx-tick-3" src=".media/audio/sfx/sfx_001.mp3" data-start="2.86" data-duration="0.5" data-track-index="22" data-volume="0.2"></audio>
+      <!-- el resultado aterriza: el pago de la escena 2 -->
+      <audio data-hf-id="hf-0rc3" id="sfx-whoosh-resultado" src=".media/audio/sfx/sfx_004.mp3" data-start="2.88" data-duration="1" data-track-index="23" data-volume="0.22"></audio>
+      <!-- tensión durante la quietud previa al remate -->
+      <audio data-hf-id="hf-a9zo" id="sfx-riser" src=".media/audio/sfx/sfx_002.mp3" data-start="6.5" data-duration="1.5" data-track-index="24" data-volume="0.18" data-media-start="8.5"></audio>
+      <!-- la brecha aterriza: el pago de la pieza -->
+      <audio data-hf-id="hf-8ewn" id="sfx-impacto" src=".media/audio/sfx/sfx_003.mp3" data-start="8" data-duration="2.2" data-track-index="25" data-volume="0.3"></audio>
+      <!-- cola breve tras el impacto -->
+      <audio data-hf-id="hf-6ww4" id="sfx-sparkle" src=".media/audio/sfx/sfx_005.mp3" data-start="8.42" data-duration="0.9" data-track-index="26" data-volume="0.14"></audio>
+      <!-- entra el logo y «Gratis.» -->
+      <audio data-hf-id="hf-zl0k" id="sfx-chime-bisagra" src=".media/audio/sfx/sfx_005.mp3" data-start="9.5" data-duration="1" data-track-index="27" data-volume="0.24"></audio>
+      <!-- entrada de la escena de Instagram -->
+      <audio data-hf-id="hf-aavm" id="sfx-whoosh-ig" src=".media/audio/sfx/sfx_004.mp3" data-start="10.5" data-duration="1" data-track-index="28" data-volume="0.18"></audio>
+      <!-- entrada de la escena de WhatsApp -->
+      <audio data-hf-id="hf-5oga" id="sfx-whoosh-wa" src=".media/audio/sfx/sfx_004.mp3" data-start="12" data-duration="1" data-track-index="29" data-volume="0.18"></audio>
+      <!-- cierre; después, silencio -->
+      <audio data-hf-id="hf-ebhj" id="sfx-chime-cierre" src=".media/audio/sfx/sfx_005.mp3" data-start="13.5" data-duration="1.5" data-track-index="30" data-volume="0.28"></audio>
+      <!-- /sonido -->
+      <div data-hf-id="hf-zdt9" id="el-01-dolor" class="scene" data-composition-id="01-dolor" data-composition-src="compositions/frames/01-dolor.html" data-start="0" data-duration="2.5" data-track-index="1"></div>
+
+      <div data-hf-id="hf-hsu4" id="el-02-solucion" class="scene" data-composition-id="02-solucion" data-composition-src="compositions/frames/02-solucion.html" data-start="2.5" data-duration="3.5" data-track-index="1"></div>
+
+      <div data-hf-id="hf-52wv" id="el-03-brecha" class="scene" data-composition-id="03-brecha" data-composition-src="compositions/frames/03-brecha.html" data-start="6" data-duration="3.5" data-track-index="1"></div>
+
+      <div data-hf-id="hf-ptnp" id="el-04-bisagra" class="scene" data-composition-id="04-bisagra" data-composition-src="compositions/frames/04-bisagra.html" data-start="9.5" data-duration="1" data-track-index="1"></div>
+
+      <div data-hf-id="hf-itl4" id="el-05-instagram" class="scene" data-composition-id="05-instagram" data-composition-src="compositions/frames/05-instagram.html" data-start="10.5" data-duration="1.5" data-track-index="1"></div>
+
+      <div data-hf-id="hf-0rxy" id="el-06-whatsapp" class="scene" data-composition-id="06-whatsapp" data-composition-src="compositions/frames/06-whatsapp.html" data-start="12" data-duration="1.5" data-track-index="1"></div>
+
+      <div data-hf-id="hf-u8pt" id="el-07-cierre" class="scene" data-composition-id="07-cierre" data-composition-src="compositions/frames/07-cierre.html" data-start="13.5" data-duration="1.5" data-track-index="1"></div>
+
+    </div>
+
+    <script>
+      window.__timelines = window.__timelines || {};
+      window.__timelines["main"] = gsap.timeline({ paused: true });
+    </script>
+  </body>
+</html>
