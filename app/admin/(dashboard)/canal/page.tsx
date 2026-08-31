@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { BotonCopiarTexto } from "@/components/BotonCopiarTexto";
+import { enlaceWhatsapp } from "@/lib/atajos";
 import { formatMensajeCanal } from "@/lib/canal-whatsapp";
 import { formatRelative } from "@/lib/format";
 import { listarMediaSemana, type MediaReciente } from "@/lib/instagram";
@@ -74,6 +75,7 @@ export default async function AdminCanalPage({
               caption: seleccionado.caption,
               permalinkPost: seleccionado.permalink,
             })}
+            enlaceCanal={enlaceWhatsapp()}
           />
         </div>
       )}

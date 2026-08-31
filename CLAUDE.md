@@ -2320,13 +2320,26 @@ pegar a mano en el canal. El envío lo sigue haciendo el admin.
   (`components/BotonCopiarTexto.tsx`). Es el mismo criterio que
   `captionOverride` en noticias: lo que arma la plantilla es un punto de
   partida, no algo intocable.
-- **Un botón "Compartir" abre el selector nativo del sistema** cuando el
-  navegador soporta `navigator.share` (Web Share API) — WhatsApp queda a un
-  toque, sin el salto de copiar y cambiar de app a mano. Se oculta por
-  completo si no está disponible (la mayoría de navegadores de escritorio),
-  mismo criterio que el botón "Pegar" de la calculadora: un botón que nunca
-  funciona es peor que no tenerlo. "Copiar mensaje" se queda como respaldo
-  universal.
+- **Ningún botón puede publicar en el canal, y la interfaz no lo finge.**
+  WhatsApp no expone los canales como destino del selector nativo
+  —`navigator.share` solo ofrece chats, grupos y estado— ni existe un
+  esquema de enlace que abra el compositor de un canal con texto precargado.
+  Es la misma pared que impide automatizar el envío, un escalón más abajo:
+  sin API oficial de Meta, el último paso lo da una persona. Por eso el
+  botón principal es **"Copiar y abrir canal"**, que copia el mensaje y
+  navega a `ENLACE_WHATSAPP` para que allí solo quede pegar; es un `<a>` y
+  no un botón con `window.open` porque abrir ventana después de esperar al
+  portapapeles rompe la cadena del gesto y el navegador lo bloquea. Sin
+  `ENLACE_WHATSAPP` configurado el botón no se pinta y "Copiar mensaje"
+  vuelve a ser el principal, mismo criterio que `/wa`: no ofrecer un enlace
+  que no lleva a ningún sitio.
+- **"Compartir" se queda, pero dice que lleva a un chat.** Se llamaba solo
+  "Compartir" y se leía como si mandara al canal, que es justo lo que no
+  hace; sigue siendo útil para pasarle el mensaje a alguien suelto. Se
+  oculta por completo donde no hay `navigator.share` (la mayoría de
+  navegadores de escritorio), mismo criterio que el botón "Pegar" de la
+  calculadora: un botón que nunca funciona es peor que no tenerlo. "Copiar
+  mensaje" se queda como respaldo universal.
 
 ## Cómo trabajar en este proyecto
 
