@@ -7,15 +7,24 @@ import { BotonRedactarIa } from "@/components/BotonRedactarIa";
 import { conAnalisisSemanal } from "@/lib/caption";
 
 /**
- * Panel del reporte semanal: se mira y se publica.
+ * Panel del reporte semanal: se mira y se publica, al feed o como Historia.
  *
- * Las cifras no se editan a mano —salen del snapshot y del histórico— así que
- * el único campo es el análisis: un párrafo de contexto, opcional, que se puede
- * escribir o pedirle a la IA. Va aparte de las cifras a propósito; el caption
- * que se publica lo compone el servidor con las tasas del momento, y de aquí
- * solo viaja esa prosa.
+ * Las cifras no se editan a mano —salen del snapshot y del histórico—, pero el
+ * texto sí: el análisis es un párrafo de contexto opcional que se escribe o se
+ * le pide a la IA, y el caption entero se puede reescribir antes de publicar.
+ * Mientras no se toque manda el servidor, que lo recompone con las tasas del
+ * momento; en cuanto se edita viaja tal cual como `captionOverride`, mismo
+ * criterio que `/admin/noticia`.
  */
 
+type Destino = "feed" | "historia";
+
+/**
+ * El estado es uno por destino y no uno solo: el feed y la Historia se publican
+ * por separado —a veces solo uno de los dos— y un estado compartido dejaría el
+ * "Publicado" del post colgando debajo del botón de la Historia. Mismo reparto
+ * que `AlertaBrechaPanel`.
+ */
 type Estado =
   | { paso: "inicial" }
   | { paso: "publicando" }
@@ -52,41 +61,65 @@ export function ReporteSemanalPanel({
    */
   const [marca, setMarca] = useState("");
   const [analisis, setAnalisis] = useState("");
-  const [estado, setEstado] = useState<Estado>({ paso: "inicial" });
+  /**
+   * El caption reescrito a mano, o `null` mientras se use el propuesto.
+   *
+   * Se distingue el `null` de la cadena vacía a propósito: son dos cosas
+   * distintas —"todavía no lo he tocado" y "lo he borrado"—, y solo la primera
+   * debe seguir recomponiéndose sola cuando cambia el análisis. Sin esa
+   * distinción, escribir el análisis después de editar el caption pisaría lo
+   * tecleado sin avisar.
+   */
+  const [captionEditado, setCaptionEditado] = useState<string | null>(null);
+  const [feed, setFeed] = useState<Estado>({ paso: "inicial" });
+  const [historia, setHistoria] = useState<Estado>({ paso: "inicial" });
 
-  const publicando = estado.paso === "publicando";
+  // Mientras uno de los dos está saliendo se bloquean ambos, igual que en la
+  // alerta de brecha: los dos leen las tasas del momento en el servidor, y
+  // dispararlos a la vez le pide a Meta dos descargas de imágenes que se
+  // renderizan al vuelo sin ninguna necesidad.
+  const publicando = feed.paso === "publicando" || historia.paso === "publicando";
   /**
    * El caption tal como saldría. Se compone con la misma función que usa el
    * servidor al publicar, así que lo que se lee aquí y lo que sale son lo
    * mismo, con el párrafo en el mismo sitio.
    */
-  const conAnalisis = conAnalisisSemanal(caption, analisis);
+  const propuesto = conAnalisisSemanal(caption, analisis);
+  const conAnalisis = captionEditado ?? propuesto;
   const base = "/api/og/instagram-semanal";
   const refresco = marca ? `&t=${marca}` : "";
   const cuadrada = `${base}?proporcion=1:1${refresco}`;
   const vertical = `${base}?proporcion=9:16${refresco}`;
 
-  async function publicar() {
+  async function publicar(destino: Destino) {
     // Mismo resguardo que `/admin/hoy` y `/admin/parada`: esto sale a la
     // cuenta real y no se deshace, y en el teléfono el botón queda a un dedo
-    // de distancia mientras se revisa la imagen.
+    // de distancia mientras se revisa la imagen. Feed e Historia se confirman
+    // por separado, igual que se disparan por separado: el texto nombra cuál.
     if (
       !window.confirm(
-        "Esto publica el reporte semanal en la cuenta real de Instagram. No se puede deshacer. ¿Publicar ahora?",
+        `Esto publica el reporte semanal ${destino === "historia" ? "como Historia" : "en el feed"} de la cuenta real de Instagram. No se puede deshacer. ¿Publicar ahora?`,
       )
     ) {
       return;
     }
+
+    const setEstado = destino === "historia" ? setHistoria : setFeed;
 
     setEstado({ paso: "publicando" });
     try {
       const response = await fetch("/api/admin/publish-semanal", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        // Solo el análisis. Las cifras las recompone el servidor con las tasas
-        // vigentes, que es lo que impide publicar un número viejo de una
-        // pestaña que lleva horas abierta.
-        body: JSON.stringify({ analisis: analisis.trim() || undefined }),
+        // El caption solo viaja si se reescribió; si no, lo recompone el
+        // servidor con las tasas vigentes, que es lo que impide publicar un
+        // número viejo de una pestaña que lleva horas abierta. La Historia no
+        // lleva ninguno de los dos: Meta ignora el caption en `STORIES`.
+        body: JSON.stringify({
+          destino,
+          analisis: analisis.trim() || undefined,
+          captionOverride: captionEditado?.trim() || undefined,
+        }),
       });
       if (!response.ok) {
         setEstado({ paso: "error", mensaje: await leerError(response) });
@@ -131,18 +164,16 @@ export function ReporteSemanalPanel({
         />
         <button
           type="button"
-          onClick={publicar}
+          onClick={() => publicar("feed")}
           disabled={publicando}
           className="flex items-center justify-center gap-2 rounded-2xl bg-accent px-4 py-3 text-sm font-semibold text-background transition active:scale-95 disabled:opacity-60"
         >
-          {publicando && <Spinner className="size-4" />}
-          {publicando ? "Publicando…" : "Publicar en el feed"}
+          {feed.paso === "publicando" && <Spinner className="size-4" />}
+          {feed.paso === "publicando" ? "Publicando…" : "Publicar en el feed"}
         </button>
 
-        {estado.paso === "publicado" && (
-          <p className="text-xs text-accent">Publicado. Media ID: {estado.mediaId}</p>
-        )}
-        {estado.paso === "error" && <p className="text-xs text-warning">{estado.mensaje}</p>}
+        {feed.paso === "publicado" && <p className="text-xs text-accent">Publicado. Media ID: {feed.mediaId}</p>}
+        {feed.paso === "error" && <p className="text-xs text-warning">{feed.mensaje}</p>}
       </section>
 
       <section className="flex flex-col gap-3">
@@ -153,15 +184,34 @@ export function ReporteSemanalPanel({
           className="mx-auto h-auto w-1/2 rounded-2xl border border-border-soft"
           aspecto="9:16"
         />
-        <p className="text-xs leading-relaxed text-muted">
-          La Story se sube a mano: publicada por la API no admite sticker de enlace, que es lo que la hace útil.
-        </p>
+        <button
+          type="button"
+          onClick={() => publicar("historia")}
+          disabled={publicando}
+          className="flex items-center justify-center gap-2 rounded-2xl bg-accent px-4 py-3 text-sm font-semibold text-background transition active:scale-95 disabled:opacity-60"
+        >
+          {historia.paso === "publicando" && <Spinner className="size-4" />}
+          {historia.paso === "publicando" ? "Publicando…" : "Publicar como Historia"}
+        </button>
+
+        {historia.paso === "publicado" && (
+          <p className="text-xs text-accent">Historia publicada. Media ID: {historia.mediaId}</p>
+        )}
+        {historia.paso === "error" && <p className="text-xs text-warning">{historia.mensaje}</p>}
+
+        {/* La descarga se queda: publicada por la API, la Historia no admite
+            sticker de enlace, así que subirla a mano sigue siendo la vía para
+            cuando sí se le quiera poner uno. */}
         <a
           href={`${base}?proporcion=9:16&descargar=1`}
           className="rounded-2xl border border-border-soft px-4 py-3 text-center text-sm font-semibold transition active:scale-95"
         >
           Descargar 9:16
         </a>
+        <p className="text-xs leading-relaxed text-muted">
+          Publicada desde aquí, la Historia sale sin sticker de enlace: la Graph API no lo admite. Si lo quieres,
+          descárgala y súbela a mano.
+        </p>
       </section>
 
       <section className="flex flex-col gap-2">
@@ -187,12 +237,37 @@ export function ReporteSemanalPanel({
       </section>
 
       <section className="flex flex-col gap-2">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">Caption</h2>
-        {/* `whitespace-pre-wrap` sobre un `<p>` y no un `<pre>`: aquel heredaría
-            la mono del navegador, y el proyecto usa una sola familia. */}
-        <p className="whitespace-pre-wrap rounded-2xl border border-border-soft bg-surface px-4 py-3 text-xs leading-relaxed text-muted">
-          {conAnalisis}
-        </p>
+        <div className="flex items-baseline justify-between gap-2">
+          <label htmlFor="caption" className="text-sm font-semibold uppercase tracking-wide text-muted">
+            Caption
+          </label>
+          {captionEditado !== null && (
+            <button
+              type="button"
+              onClick={() => setCaptionEditado(null)}
+              className="rounded-full border border-border-soft px-3 py-1 text-xs font-medium text-muted transition active:scale-95"
+            >
+              Restaurar propuesto
+            </button>
+          )}
+        </div>
+        <textarea
+          id="caption"
+          value={conAnalisis}
+          onChange={(e) => setCaptionEditado(e.target.value)}
+          rows={12}
+          className="whitespace-pre-wrap rounded-2xl border border-border-soft bg-surface px-4 py-3 text-xs leading-relaxed text-foreground outline-none"
+        />
+        {captionEditado === null ? (
+          <p className="text-xs leading-relaxed text-muted">
+            Se recompone solo con las tasas del momento al publicar. Si lo editas, se publica tal cual lo dejes.
+          </p>
+        ) : (
+          <p className="text-xs leading-relaxed text-warning">
+            Caption escrito a mano: sale tal cual, con las cifras que tenga ahora. Ya no se recompone al publicar ni
+            recoge lo que escribas en el análisis.
+          </p>
+        )}
       </section>
     </div>
   );

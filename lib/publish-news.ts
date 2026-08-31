@@ -588,9 +588,10 @@ export async function prepararPublicacion(payload: PublicacionPayload): Promise<
 /**
  * La imagen del reporte semanal, para que Meta la descargue.
  *
- * Al feed va el cuadrado: el 9:16 es para Story, que la Graph API publica sin
- * sticker de enlace —lo que la hace útil— así que esa se descarga y se sube a
- * mano desde `/admin/semanal`.
+ * Al feed va el cuadrado y a la Historia el 9:16, y las dos las publica
+ * `/admin/semanal`. Publicada por la Graph API la Historia sale sin sticker de
+ * enlace —no lo admite—, así que el botón de descargar el 9:16 sigue ahí para
+ * cuando sí se le quiera poner uno y subirla a mano.
  */
 export function urlReporteSemanal(proporcion: "1:1" | "9:16"): string {
   const siteUrl = process.env.SITE_URL;

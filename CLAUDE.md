@@ -689,10 +689,34 @@ una con su valor y **cuánto se movió en siete días**. Se dispara a mano desde
   que caiga ahí queda tapado. Los 104 px de la variación que pedía el diseño solo
   caben en vertical (y ahí bajan a 76); en el cuadrado, a ese tamaño se perdían la
   tercera tarjeta y el pie entero.
-- **La Story no se publica desde la app, se descarga.** Una Story por la Graph API
-  no admite sticker de enlace ni texto, que es lo que la hace útil. El botón baja
-  el PNG con `?descargar=1` —por cabecera, no con el atributo `download`, que en
-  iOS es poco fiable— y se sube a mano.
+- **La Story se publica desde la app, y también se descarga.** Durante un
+  tiempo solo se descargaba, con el argumento de que una Story por la Graph
+  API no admite sticker de enlace ni texto —"que es lo que la hace útil"—.
+  Eso vale cuando la pieza lleva un llamado a la acción, no siempre: el
+  reporte semanal se lee entero en la imagen, igual que las Historias del
+  post diario y la de la alerta de brecha, que ya se publican solas. Así que
+  el botón "Publicar como Historia" manda el 9:16 por `publishStory()`, y el
+  de descargar sigue ahí para los días en que sí se le quiera poner un
+  sticker y subirla a mano. La descarga va con `?descargar=1` por cabecera y
+  no con el atributo `download`, que en iOS es poco fiable.
+- **Feed e Historia se publican por separado, y cada uno lleva su estado.**
+  Son dos publicaciones distintas y hay días en que sale solo una; con un
+  estado compartido, el "Publicado" del post quedaría colgando debajo del
+  botón de la Historia. Mientras uno sale se bloquean los dos: ambos hacen
+  que Meta descargue una imagen que se renderiza al vuelo, y dispararlos a la
+  vez es pedir ese trabajo por duplicado sin ninguna necesidad. Es el mismo
+  reparto que ya tenía `AlertaBrechaPanel`.
+- **El caption se puede reescribir antes de publicar.** Lo que arma la
+  plantilla es un punto de partida, mismo criterio que `captionOverride` en
+  `/admin/noticia`. Mientras no se toque manda el servidor —que es la razón
+  de ser de este route: recomponer las cifras con las tasas del momento, para
+  que una pestaña abierta desde la mañana no publique un número viejo—; en
+  cuanto se edita viaja como `captionOverride` y sale tal cual. Por eso el
+  estado distingue `null` de la cadena vacía: son "no lo he tocado" y "lo he
+  borrado", y solo el primero debe seguir recomponiéndose solo cuando cambia
+  el análisis. Sin esa distinción, escribir el análisis después de editar el
+  caption pisaría lo tecleado sin avisar. La interfaz dice en cuál de los dos
+  modos está y ofrece "Restaurar propuesto" para volver.
 - **El reporte semanal no se puede programar**, y `materializarParaProgramar` lo
   rechaza explícitamente. La regla del proyecto es que el post se congela al
   programarlo, y este resuelve su imagen al publicar leyendo las tasas del
