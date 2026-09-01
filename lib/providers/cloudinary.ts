@@ -363,6 +363,17 @@ export interface MarcaVideo {
   /** Crédito de quien grabó el clip. Solo sale si se pide. */
   fuente?: string;
   /**
+   * Quita el sello de marca superpuesto sobre el clip.
+   *
+   * El sello va por defecto —es la identidad que viaja con el video si alguien
+   * lo descarga y lo reparte suelto—, pero hay material donde estorba: un clip
+   * prestado cuyo encuadre ya carga con la marca de agua de su fuente, o un
+   * Reel montado aparte que trae la suya incrustada. Se decide **por clip**,
+   * igual que el cintillo, y nunca por defecto: apagarlo es una excepción que
+   * alguien pide a mano en `/admin/noticia`.
+   */
+  sinSello?: boolean;
+  /**
    * Intervalo en el que se ve el cintillo, en segundos. Sin `fin`, dura todo
    * el clip — `inicio` solo no basta para decidirlo porque 0 es un inicio
    * válido. Sin `inicio`, el intervalo arranca en el segundo 0.
@@ -420,11 +431,16 @@ function transformacionMarca(
   formato: FormatoVideo,
   cintilloPublicId?: string,
   intervalo?: { inicio?: number; fin: number },
+  sinSello = false,
 ) {
   return [
     { ...LIENZO[formato], crop: "pad", background: "#0b1120" },
-    { overlay: SELLO_PUBLIC_ID, width: 800, crop: "scale", opacity: 10 },
-    { flags: "layer_apply", gravity: "north_west", x: 150, y: yDelSello(LIENZO[formato].height) },
+    ...(sinSello
+      ? []
+      : [
+          { overlay: SELLO_PUBLIC_ID, width: 800, crop: "scale", opacity: 10 },
+          { flags: "layer_apply", gravity: "north_west", x: 150, y: yDelSello(LIENZO[formato].height) },
+        ]),
     ...(cintilloPublicId
       ? [
           { overlay: cintilloPublicId, width: LIENZO[formato].width, crop: "scale" },
@@ -480,7 +496,7 @@ export async function urlVideoConMarca(
     resource_type: "video",
     secure: true,
     format: FORMATO_VIDEO_ENTREGADO,
-    transformation: transformacionMarca(formato, cintillo, intervaloDe(marca)),
+    transformation: transformacionMarca(formato, cintillo, intervaloDe(marca), marca.sinSello),
   });
 }
 
@@ -506,7 +522,10 @@ export async function urlDescargaVideo(
     resource_type: "video",
     secure: true,
     format: FORMATO_VIDEO_ENTREGADO,
-    transformation: [...transformacionMarca(formato, cintillo, intervaloDe(marca)), { flags: "attachment" }],
+    transformation: [
+      ...transformacionMarca(formato, cintillo, intervaloDe(marca), marca.sinSello),
+      { flags: "attachment" },
+    ],
   });
 }
 
@@ -530,7 +549,7 @@ export async function urlFotogramaConMarca(
     secure: true,
     format: "jpg",
     start_offset: String(segundo ?? 0),
-    transformation: transformacionMarca(formato, cintillo, intervaloDe(marca)),
+    transformation: transformacionMarca(formato, cintillo, intervaloDe(marca), marca.sinSello),
   });
 }
 

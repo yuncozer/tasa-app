@@ -20,7 +20,11 @@ import { cargarEnvLocal } from "./_env";
  *   npx tsx scripts/preview-marca.ts --public-id <id> --tipo video
  *
  * Opciones: `--titulo`, `--fuente`, `--proporcion 1:1|4:5`, `--segundo N`,
- * `--desde N --hasta N`.
+ * `--desde N --hasta N`, `--sin-sello`.
+ *
+ * `--sin-sello` quita el sello superpuesto, que es el mismo interruptor que
+ * `/admin/noticia` ofrece por clip: material que ya trae su propia marca de
+ * agua no necesita la nuestra encima.
  *
  * `--titulo` y `--fuente` alimentan las dos mitades: en las imágenes son el
  * titular y el crédito del marco; en el video, el cintillo. Con
@@ -60,6 +64,7 @@ interface Opciones {
   segundo: number;
   desde?: number;
   hasta?: number;
+  sinSello: boolean;
   proporcion: ProporcionCarrusel;
 }
 
@@ -69,6 +74,7 @@ function leerOpciones(argv: string[]): Opciones {
     fuente: FUENTE_POR_DEFECTO,
     segundo: 0,
     proporcion: "1:1",
+    sinSello: false,
   };
 
   for (let i = 0; i < argv.length; i += 1) {
@@ -114,6 +120,11 @@ function leerOpciones(argv: string[]): Opciones {
         if (!Number.isFinite(opciones.hasta)) throw new Error("--hasta acepta un número");
         i += 1;
         break;
+      case "--sin-sello":
+        // Sin valor: es un interruptor, igual que en `/admin/noticia`.
+        opciones.sinSello = true;
+        break;
+
       default:
         if (arg.startsWith("--")) throw new Error(`Opción desconocida: ${arg}`);
         opciones.archivo = arg;
@@ -190,6 +201,7 @@ async function mostrarVideo(publicId: string, opciones: Opciones): Promise<void>
     fuente: opciones.fuente || undefined,
     inicio: opciones.hasta !== undefined ? opciones.desde : undefined,
     fin: opciones.hasta,
+    sinSello: opciones.sinSello,
   };
 
   for (const { formato, titulo } of formatos) {

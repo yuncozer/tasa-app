@@ -291,6 +291,9 @@ const MAX_SEGUNDOS_CINTILLO = 60;
  * `fuente`. Sin título ni fuente el video sale solo con el sello, que es
  * exactamente como salía entonces.
  *
+ * `sinSello` quita el sello superpuesto, y por eso se lee con igualdad
+ * estricta: lo que no lo pida explícitamente sigue llevando la marca.
+ *
  * `fin` es lo que decide si hay intervalo: sin él, `inicio` se descarta —un
  * inicio sin fin no significa nada— y el cintillo dura todo el clip, igual
  * que siempre. Con `fin`, `inicio` se acota a `[0, fin)` y el propio `fin` a
@@ -299,7 +302,13 @@ const MAX_SEGUNDOS_CINTILLO = 60;
  * los 60 segundos del video sin importar dónde arrancó.
  */
 export function leerMarcaVideo(valor: unknown): MarcaVideo {
-  const item = valor as { titulo?: unknown; fuente?: unknown; inicio?: unknown; fin?: unknown } | null;
+  const item = valor as {
+    titulo?: unknown;
+    fuente?: unknown;
+    inicio?: unknown;
+    fin?: unknown;
+    sinSello?: unknown;
+  } | null;
 
   const titulo = typeof item?.titulo === "string" ? recortarTitulo(item.titulo) : "";
 
@@ -315,6 +324,10 @@ export function leerMarcaVideo(valor: unknown): MarcaVideo {
     fuente: limpiarFuente(item?.fuente),
     inicio: fin !== undefined && inicio! > 0 ? inicio : undefined,
     fin,
+    // El sello va salvo que se pida quitarlo: comparación estricta con `true`
+    // para que un payload viejo de la cola —que ni conoce el campo— siga
+    // saliendo marcado, igual que el día en que se programó.
+    sinSello: item?.sinSello === true ? true : undefined,
   };
 }
 

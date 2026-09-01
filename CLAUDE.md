@@ -1946,9 +1946,30 @@ Vive en `lib/providers/cloudinary.ts`, con tres detalles que costó encontrar:
 - Se encaja con `pad` y no con `fill`: recortar perdería los bordes del
   encuadre que grabó el usuario.
 
-La marca de identidad es el **sello** superpuesto, que va en todo video. La
-banda de abajo es otra cosa: es el **cintillo**, y es opcional — ver la sección
-siguiente.
+La marca de identidad es el **sello** superpuesto, que va por defecto en todo
+video. La banda de abajo es otra cosa: es el **cintillo**, y es opcional — ver
+la sección siguiente.
+
+**El sello se puede quitar por clip** (`MarcaVideo.sinSello`, interruptor "Con
+el sello de marca" en `/admin/noticia`, y `--sin-sello` en
+`scripts/preview-marca.ts`). No es una preferencia estética: hay material que
+ya llega con la marca de agua de su fuente, o un Reel montado aparte que trae
+la suya incrustada, y superponer la nuestra encima deja dos sellos peleándose
+el mismo rincón. Tres cosas que respetar:
+
+- **Va apagado por defecto y se lee con igualdad estricta** (`sinSello === true`
+  en `leerMarcaVideo`). El sello es lo que hace que la cuenta viaje con el
+  video si alguien lo descarga y lo reparte suelto, así que quitarlo tiene que
+  ser una excepción que alguien pide a mano — nunca algo que se cuele por un
+  campo ausente. Por lo mismo, los posts que ya están en la cola de programadas
+  (cuyo payload ni conoce el campo) siguen saliendo sellados, igual que el día
+  en que se congelaron.
+- **Se decide por clip y no por post**, igual que el cintillo: cada video de un
+  carrusel y el Reel llevan su propia `MarcaVideo`.
+- **Quitar el sello no quita el cintillo**, que es la otra vía por la que la
+  cuenta viaja con el video (lleva la taza y el `@latasa.online`). Un video sin
+  sello y sin cintillo sale completamente sin marca — se decidió así a
+  sabiendas, porque es justo el caso del material que ya trae la ajena.
 
 - La fuente del video es un campo **aparte del `sourceHost`** que llena el
   marco de las imágenes, y en un carrusel va por elemento: un clip prestado no

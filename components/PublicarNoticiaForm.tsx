@@ -49,6 +49,12 @@ interface Extra {
   /** Cintillo de este clip. Se decide por video, no para todo el post. */
   cintillo?: Cintillo;
   /**
+   * Solo aplica a `tipo === "video"`: quita el sello de marca superpuesto.
+   * Se decide por clip, igual que el cintillo, y va apagado por defecto — el
+   * sello es la identidad que viaja con el video si alguien lo descarga.
+   */
+  sinSello?: boolean;
+  /**
    * Solo aplica a `tipo === "imagen"`: sin marco, se publica el PNG crudo tal
    * como se subió, sin pasar por la plantilla de marca. `undefined`/`false`
    * es el comportamiento de siempre.
@@ -94,7 +100,15 @@ function textoDeSubida({ que, fase }: Subida): string {
 type Principal =
   | { tipo: "subida"; publicId: string; sinMarco?: boolean }
   | { tipo: "articulo"; url: string }
-  | { tipo: "video"; publicId: string; fuente?: string; titulo?: string; inicio?: number; fin?: number };
+  | {
+      tipo: "video";
+      publicId: string;
+      fuente?: string;
+      titulo?: string;
+      inicio?: number;
+      fin?: number;
+      sinSello?: boolean;
+    };
 
 type Estado =
   | { paso: "inicial" }
@@ -142,9 +156,17 @@ async function leerError(response: Response): Promise<string> {
  * revisado.
  */
 function aElementos(lista: Extra[]): ElementoCarruselEntrada[] {
-  return lista.map(({ tipo, publicId, fuente, cintillo, sinMarco }) =>
+  return lista.map(({ tipo, publicId, fuente, cintillo, sinMarco, sinSello }) =>
     tipo === "video"
-      ? { tipo, publicId, fuente, titulo: cintillo?.titulo, inicio: cintillo?.inicio, fin: cintillo?.fin }
+      ? {
+          tipo,
+          publicId,
+          fuente,
+          titulo: cintillo?.titulo,
+          inicio: cintillo?.inicio,
+          fin: cintillo?.fin,
+          sinSello,
+        }
       : { tipo, publicId, sinMarco },
   );
 }
@@ -162,6 +184,7 @@ interface SemillaManual {
   videoPrincipalPublicId?: string;
   fuenteVideoPrincipal?: string;
   cintilloVideoPrincipal?: Cintillo;
+  sinSelloVideoPrincipal?: boolean;
   imagenPrincipalSinMarco?: boolean;
   proporcion: ProporcionCarrusel;
   extras: Extra[];
@@ -205,6 +228,7 @@ function semillaDeEdicion(payload?: PublicacionPayload): SemillaManual | null {
                 cintillo: elemento.titulo
                   ? { titulo: elemento.titulo, inicio: elemento.inicio, fin: elemento.fin }
                   : undefined,
+                sinSello: elemento.sinSello === true,
               }
             : {
                 clave: `${elemento.publicId}-${indice}`,
@@ -225,6 +249,7 @@ function semillaDeEdicion(payload?: PublicacionPayload): SemillaManual | null {
         cintilloVideoPrincipal: principal.titulo
           ? { titulo: principal.titulo, inicio: principal.inicio, fin: principal.fin }
           : undefined,
+        sinSelloVideoPrincipal: principal.sinSello === true,
       };
     }
 
@@ -326,6 +351,9 @@ export function PublicarNoticiaForm({
   const [fuenteVideoPrincipal, setFuenteVideoPrincipal] = useState<string | undefined>(
     semilla?.fuenteVideoPrincipal,
   );
+  const [sinSelloVideoPrincipal, setSinSelloVideoPrincipal] = useState<boolean>(
+    semilla?.sinSelloVideoPrincipal === true,
+  );
   const [cintilloVideoPrincipal, setCintilloVideoPrincipal] = useState<Cintillo | undefined>(
     semilla?.cintilloVideoPrincipal,
   );
@@ -383,6 +411,7 @@ export function PublicarNoticiaForm({
         titulo: cintilloVideoPrincipal?.titulo,
         inicio: cintilloVideoPrincipal?.inicio,
         fin: cintilloVideoPrincipal?.fin,
+        sinSello: sinSelloVideoPrincipal,
       }
     : imagenPublicId
       ? { tipo: "subida", publicId: imagenPublicId, sinMarco: imagenPrincipalSinMarco }
@@ -485,6 +514,7 @@ export function PublicarNoticiaForm({
           titulo: cintilloVideoPrincipal?.titulo,
           inicio: cintilloVideoPrincipal?.inicio,
           fin: cintilloVideoPrincipal?.fin,
+          sinSello: sinSelloVideoPrincipal,
         },
         preview,
       );
@@ -656,6 +686,7 @@ export function PublicarNoticiaForm({
             titulo: cintilloVideoPrincipal?.titulo,
             inicio: cintilloVideoPrincipal?.inicio,
             fin: cintilloVideoPrincipal?.fin,
+            sinSello: sinSelloVideoPrincipal,
           },
           preview,
         );
@@ -695,6 +726,22 @@ export function PublicarNoticiaForm({
   function cambiarCintilloExtra(clave: string, cintillo: Cintillo | undefined) {
     editarCampoDelMarco(() => {
       setExtras(extras.map((extra) => (extra.clave === clave ? { ...extra, cintillo } : extra)));
+    });
+  }
+
+  /**
+   * Sello del video principal. Como el cintillo, no regenera la vista previa
+   * en cada pulsación: la capa la compone Cloudinary al pedir la URL, así que
+   * se marca desactualizada y el usuario pulsa "Actualizar vista previa".
+   */
+  function cambiarSinSelloVideoPrincipal() {
+    editarCampoDelMarco(() => setSinSelloVideoPrincipal((valor) => !valor));
+  }
+
+  /** Igual, para un video del carrusel: el sello se decide por clip. */
+  function cambiarSinSelloExtra(clave: string) {
+    editarCampoDelMarco(() => {
+      setExtras(extras.map((extra) => (extra.clave === clave ? { ...extra, sinSello: !extra.sinSello } : extra)));
     });
   }
 
@@ -1158,6 +1205,20 @@ export function PublicarNoticiaForm({
                         />
                       )}
 
+                      <button
+                        type="button"
+                        aria-pressed={sinSelloVideoPrincipal}
+                        onClick={cambiarSinSelloVideoPrincipal}
+                        disabled={publicando}
+                        className={`rounded-xl border px-3 py-2 text-xs font-semibold transition active:scale-95 disabled:opacity-50 ${
+                          sinSelloVideoPrincipal
+                            ? "border-accent bg-accent/15 text-accent"
+                            : "border-border-soft bg-surface text-muted"
+                        }`}
+                      >
+                        {sinSelloVideoPrincipal ? "Sin el sello de marca" : "Con el sello de marca"}
+                      </button>
+
                       {/* Un video principal no lleva el titular del marco, así
                           que el cintillo es la única forma de titularlo. */}
                       <ControlCintillo
@@ -1416,6 +1477,20 @@ export function PublicarNoticiaForm({
                             className="rounded-xl border border-border-soft bg-surface px-4 py-3 text-base text-foreground outline-none"
                           />
                         )}
+
+                        <button
+                          type="button"
+                          aria-pressed={extra.sinSello === true}
+                          onClick={() => cambiarSinSelloExtra(extra.clave)}
+                          disabled={publicando}
+                          className={`rounded-xl border px-3 py-2 text-xs font-semibold transition active:scale-95 disabled:opacity-50 ${
+                            extra.sinSello
+                              ? "border-accent bg-accent/15 text-accent"
+                              : "border-border-soft bg-surface text-muted"
+                          }`}
+                        >
+                          {extra.sinSello ? "Sin el sello de marca" : "Con el sello de marca"}
+                        </button>
 
                         <ControlCintillo
                           idPrefijo={`cintillo-${extra.clave}`}
