@@ -58,6 +58,14 @@ export function PublicarVideoForm({
     ? { titulo: edicion.payload.titulo, inicio: edicion.payload.inicio, fin: edicion.payload.fin }
     : undefined;
   const [fuenteAplicada, setFuenteAplicada] = useState("");
+  /**
+   * El sello va salvo que se pida quitarlo: es la identidad que viaja con el
+   * video si alguien lo descarga y lo reparte suelto, así que apagarlo es una
+   * excepción para material que ya trae la marca de agua de su fuente.
+   */
+  const [sinSello, setSinSello] = useState(edicion?.payload.sinSello === true);
+  /** El sello horneado en la URL que se está mirando, para detectar cambios. */
+  const [sinSelloAplicado, setSinSelloAplicado] = useState(false);
   const [cintillo, setCintillo] = useState<Cintillo | undefined>(cintilloInicial);
   /** El cintillo horneado en la URL que se está mirando, para detectar cambios. */
   const [cintilloAplicado, setCintilloAplicado] = useState<Cintillo | undefined>();
@@ -78,10 +86,11 @@ export function PublicarVideoForm({
    */
   async function pedirPreview(
     videoPublicId: string,
-    overrides?: { fuente?: string; cintillo?: Cintillo },
+    overrides?: { fuente?: string; cintillo?: Cintillo; sinSello?: boolean },
   ): Promise<void> {
     const fuenteUsada = overrides?.fuente ?? fuenteDeseada;
     const cintilloUsado = overrides ? overrides.cintillo : cintillo;
+    const sinSelloUsado = overrides?.sinSello ?? sinSello;
     const preview = await fetch("/api/admin/preview-video", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -91,6 +100,7 @@ export function PublicarVideoForm({
         titulo: cintilloUsado?.titulo,
         inicio: cintilloUsado?.inicio,
         fin: cintilloUsado?.fin,
+        sinSello: sinSelloUsado,
       }),
     });
     if (!preview.ok) {
@@ -104,6 +114,7 @@ export function PublicarVideoForm({
     };
     setFuenteAplicada(fuenteUsada);
     setCintilloAplicado(cintilloUsado);
+    setSinSelloAplicado(sinSelloUsado);
     setEstado({ paso: "preview", videoUrl, descargaUrl, conCintillo, videoPublicId });
   }
 
@@ -114,6 +125,7 @@ export function PublicarVideoForm({
         await pedirPreview(edicion.payload.videoPublicId, {
           fuente: edicion.payload.fuente ?? "",
           cintillo: cintilloInicial,
+          sinSello: edicion.payload.sinSello === true,
         });
       } catch {
         setEstado({ paso: "error", mensaje: "No se pudo cargar la vista previa del video" });
@@ -189,6 +201,7 @@ export function PublicarVideoForm({
         titulo: cintilloAplicado?.titulo,
         inicio: cintilloAplicado?.inicio,
         fin: cintilloAplicado?.fin,
+        sinSello: sinSelloAplicado,
       }),
       });
       if (!response.ok) {
@@ -207,6 +220,7 @@ export function PublicarVideoForm({
   const desactualizado =
     conVideo !== null &&
     (fuenteDeseada !== fuenteAplicada ||
+      sinSello !== sinSelloAplicado ||
       JSON.stringify(cintillo ?? null) !== JSON.stringify(cintilloAplicado ?? null));
 
   return (
@@ -214,8 +228,8 @@ export function PublicarVideoForm({
       <div className="flex flex-col gap-1">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">Video propio</h2>
         <p className="text-xs text-muted">
-          Se le montan los sellos de La Tasa y se publica como Reel. El crédito de la fuente es
-          opcional.
+          Se le montan los sellos de La Tasa y se publica como Reel. El sello, el cintillo y el
+          crédito de la fuente son opcionales.
         </p>
       </div>
 
@@ -294,7 +308,13 @@ export function PublicarVideoForm({
               capa que no se aplique es invisible: Cloudinary sirve el clip sin
               ella y sin error, y se publicaría creyendo que la lleva. */}
           <p className={`text-xs ${conVideo.conCintillo ? "text-accent" : "text-muted"}`}>
-            {conVideo.conCintillo ? "Cintillo aplicado" : "Sin cintillo: solo el sello de marca"}
+            {conVideo.conCintillo
+              ? sinSelloAplicado
+                ? "Cintillo aplicado, sin el sello"
+                : "Cintillo aplicado"
+              : sinSelloAplicado
+                ? "Sin cintillo y sin sello: el video va sin marca"
+                : "Sin cintillo: solo el sello de marca"}
           </p>
 
           {/* Enlace y no botón con `fetch`: la URL ya viene con `fl_attachment`
@@ -334,6 +354,20 @@ export function PublicarVideoForm({
               />
             )}
 
+            <button
+              type="button"
+              aria-pressed={sinSello}
+              onClick={() => setSinSello(!sinSello)}
+              disabled={publicando}
+              className={`rounded-xl border px-4 py-3 text-sm font-semibold transition active:scale-95 disabled:opacity-50 ${
+                sinSello
+                  ? "border-accent bg-accent/15 text-accent"
+                  : "border-border-soft bg-surface text-muted"
+              }`}
+            >
+              {sinSello ? "Sin el sello de marca" : "Con el sello de marca"}
+            </button>
+
             <ControlCintillo
               idPrefijo="cintillo-reel"
               valor={cintillo}
@@ -345,7 +379,8 @@ export function PublicarVideoForm({
           {desactualizado && (
             <div className="flex flex-col gap-2 rounded-2xl border border-warning/40 bg-warning/5 px-4 py-3">
               <p className="text-sm text-warning">
-                Cambiaste la fuente o el cintillo: el video de arriba ya no es el que se publicaría.
+                Cambiaste la fuente, el sello o el cintillo: el video de arriba ya no es el que se
+                publicaría.
               </p>
               <button
                 type="button"
@@ -435,6 +470,7 @@ export function PublicarVideoForm({
                     titulo: cintilloAplicado?.titulo || undefined,
                     inicio: cintilloAplicado?.inicio,
                     fin: cintilloAplicado?.fin,
+                    sinSello: sinSelloAplicado || undefined,
                   } satisfies PublicacionPayload)
                 : null
             }

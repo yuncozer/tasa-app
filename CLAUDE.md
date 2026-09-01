@@ -1965,7 +1965,16 @@ el mismo rincón. Tres cosas que respetar:
   (cuyo payload ni conoce el campo) siguen saliendo sellados, igual que el día
   en que se congelaron.
 - **Se decide por clip y no por post**, igual que el cintillo: cada video de un
-  carrusel y el Reel llevan su propia `MarcaVideo`.
+  carrusel y el Reel llevan su propia `MarcaVideo`. Son dos formularios
+  distintos y el interruptor tiene que estar en los dos: `PublicarVideoForm`
+  (el Reel de video propio) y `PublicarNoticiaForm` (el video principal y cada
+  video del carrusel). La primera versión solo lo puso en el segundo y desde el
+  Reel no había forma de apagarlo.
+- **La línea que dice qué marca lleva el video nombra las dos capas.** Existía
+  ya para el cintillo, porque una capa que no se aplica es invisible —
+  Cloudinary sirve el clip sin ella y sin error— y se publicaría creyendo que
+  la lleva. Con el sello apagable hay cuatro combinaciones y la línea las
+  distingue, incluida la de "sin marca" a secas.
 - **Quitar el sello no quita el cintillo**, que es la otra vía por la que la
   cuenta viaja con el video (lleva la taza y el `@latasa.online`). Un video sin
   sello y sin cintillo sale completamente sin marca — se decidió así a
