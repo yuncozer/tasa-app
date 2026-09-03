@@ -1,4 +1,5 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHmac } from "node:crypto";
+import { sonIguales } from "@/lib/comparar";
 
 /**
  * Firma de los parámetros de `app/api/og/instagram-post-news`.
@@ -19,8 +20,8 @@ function ordenar(params: Record<string, string>): string {
 }
 
 function secreto(): string {
-  const secret = process.env.CRON_SECRET;
-  if (!secret) throw new Error("Falta configurar CRON_SECRET");
+  const secret = process.env.FIRMA_IMAGENES_SECRET || process.env.CRON_SECRET;
+  if (!secret) throw new Error("Falta configurar FIRMA_IMAGENES_SECRET (o CRON_SECRET como respaldo)");
   return secret;
 }
 
@@ -29,8 +30,5 @@ export function signNewsImageParams(params: Record<string, string>): string {
 }
 
 export function verifyNewsImageParams(params: Record<string, string>, signature: string): boolean {
-  const esperada = Buffer.from(signNewsImageParams(params));
-  const recibida = Buffer.from(signature);
-  if (esperada.length !== recibida.length) return false;
-  return timingSafeEqual(esperada, recibida);
+  return sonIguales(signNewsImageParams(params), signature);
 }
