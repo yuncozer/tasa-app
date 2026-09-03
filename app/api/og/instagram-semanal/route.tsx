@@ -1,4 +1,5 @@
 import { ImageResponse } from "next/og";
+import { techoDeImagenes } from "@/lib/og-limite";
 import type { NextRequest } from "next/server";
 import { formatVariacion } from "@/lib/format";
 import { AIRE_LATERAL, AVISO_SEMANAL, COLOR, LogoTaza, Pie, leerFontBuffer, leerSvgComoDataUri } from "@/lib/og-shared";
@@ -324,6 +325,9 @@ function proporcionDesdeQuery(request: NextRequest): Proporcion {
 }
 
 export async function GET(request: NextRequest) {
+  const techo = techoDeImagenes(request);
+  if (techo) return techo;
+
   const proporcion = proporcionDesdeQuery(request);
 
   const [snapshot, geistRegular, geistBold, instagramIcon, browserIcon] = await Promise.all([

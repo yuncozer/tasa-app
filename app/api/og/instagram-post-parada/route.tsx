@@ -1,4 +1,5 @@
 import { ImageResponse } from "next/og";
+import { techoDeImagenes } from "@/lib/og-limite";
 import sharp from "sharp";
 import { COLOR, LogoTaza, Pie, leerFontBuffer, leerSvgComoDataUri } from "@/lib/og-shared";
 import { leerParadaPendiente } from "@/lib/parada";
@@ -164,7 +165,10 @@ function Portada({
   );
 }
 
-export async function GET() {
+export async function GET(request: Request) {
+  const techo = techoDeImagenes(request);
+  if (techo) return techo;
+
   const borrador = await leerParadaPendiente();
   if (!borrador || borrador.compra === null || borrador.venta === null) {
     return new Response("Todavía no hay un borrador de La Parada con compra y venta confirmadas", { status: 404 });

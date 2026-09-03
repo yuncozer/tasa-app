@@ -1,4 +1,5 @@
 import { ImageResponse } from "next/og";
+import { techoDeImagenes } from "@/lib/og-limite";
 import type { NextRequest } from "next/server";
 import { formatClock, formatDate, formatFechaCorta, formatRate, vigenciaBcv } from "@/lib/format";
 import {
@@ -209,6 +210,9 @@ function PostImage({
 }
 
 export async function GET(request: NextRequest) {
+  const techo = techoDeImagenes(request);
+  if (techo) return techo;
+
   const proporcion = proporcionDesdeQuery(request);
 
   const [snapshot, geistRegular, geistBold, instagramIcon, browserIcon, banderaVe, ...banderasSvg] = await Promise.all([

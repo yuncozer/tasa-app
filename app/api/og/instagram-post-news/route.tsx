@@ -1,4 +1,5 @@
 import type { NextRequest } from "next/server";
+import { techoDeImagenes } from "@/lib/og-limite";
 import { ImageResponse } from "next/og";
 import sharp from "sharp";
 import { AVISO_NOTICIA, COLOR, Encabezado, Pie, leerFontBuffer, leerSvgComoDataUri } from "@/lib/og-shared";
@@ -146,6 +147,9 @@ function nombreDeArchivo(title: string | null): string {
 }
 
 export async function GET(request: NextRequest) {
+  const techo = techoDeImagenes(request);
+  if (techo) return techo;
+
   const params = request.nextUrl.searchParams;
   const title = params.get("title");
   const image = params.get("image");

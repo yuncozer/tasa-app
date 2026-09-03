@@ -1,4 +1,5 @@
 import { ImageResponse } from "next/og";
+import { techoDeImagenes } from "@/lib/og-limite";
 import type { NextRequest } from "next/server";
 import { construirAlertaBrecha, type AlertaBrecha } from "@/lib/alerta-brecha";
 import { diaCaracasISO, formatClock, formatFechaCorta, formatVariacion } from "@/lib/format";
@@ -455,6 +456,9 @@ function compararDesdeQuery(request: NextRequest): boolean {
 }
 
 export async function GET(request: NextRequest) {
+  const techo = techoDeImagenes(request);
+  if (techo) return techo;
+
   const proporcion = proporcionDesdeQuery(request);
   const comparar = compararDesdeQuery(request);
 
