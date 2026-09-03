@@ -1,4 +1,4 @@
-import { withCache } from "@/lib/cache";
+import { olvidarSiViejo, withCache } from "@/lib/cache";
 import { roundToDisplayPrecision } from "@/lib/format";
 import { fetchBcvRates } from "@/lib/providers/bcv";
 import { fetchBinanceRate } from "@/lib/providers/binance";
@@ -223,7 +223,31 @@ async function buildSnapshot(): Promise<RatesSnapshot> {
   };
 }
 
+/** La clave con la que la fotografía vive en la caché en memoria. */
+const CLAVE_CACHE = "rates";
+
 /** Fotografía de tasas cacheada 5 minutos. */
 export function getRates(): Promise<RatesSnapshot> {
-  return withCache("rates", TTL_MS, buildSnapshot);
+  return withCache(CLAVE_CACHE, TTL_MS, buildSnapshot);
+}
+
+/**
+ * Lo que hace el botón "Actualizar tasas": tirar la copia guardada para que
+ * la siguiente lectura vuelva a preguntar a los proveedores.
+ *
+ * **Solo tira las tasas, y solo si ya tienen cierta edad.** Antes esto era un
+ * `clearCache()` que vaciaba el Map entero —incluidos el token de Instagram y
+ * la tarjeta de La Parada— y lo disparaba cualquiera con solo pedir
+ * `/?actualizar=loquesea`. Como el parámetro cambia en cada petición, tampoco
+ * la CDN amortiguaba: un bucle trivial forzaba una ronda completa al BCV, a
+ * Binance dos veces y a datos.gov.co por cada request. El riesgo no era
+ * nuestro servidor sino que la fuente nos bloquee, y entonces la app se queda
+ * sin las cifras que son toda su razón de ser.
+ *
+ * Los 20 segundos son el margen de lo que un dedo puede pedir de verdad:
+ * pulsar el botón dos veces seguidas ya no cuesta dos rondas, y nadie que lo
+ * use como está pensado nota la diferencia.
+ */
+export function pedirTasasFrescas(): void {
+  olvidarSiViejo(CLAVE_CACHE, 20_000);
 }

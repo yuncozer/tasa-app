@@ -12,6 +12,8 @@
 interface Entry<T> {
   value: T;
   expiresAt: number;
+  /** Cuándo se guardó este valor. Lo necesita `olvidarSiViejo`. */
+  guardadoEn: number;
   inFlight: Promise<T> | null;
 }
 
@@ -30,7 +32,8 @@ export async function withCache<T>(
 
   const inFlight = fetcher()
     .then((value) => {
-      store.set(key, { value, expiresAt: Date.now() + ttlMs, inFlight: null });
+      const ahora = Date.now();
+      store.set(key, { value, expiresAt: ahora + ttlMs, guardadoEn: ahora, inFlight: null });
       return value;
     })
     .catch((error) => {
@@ -46,6 +49,7 @@ export async function withCache<T>(
   store.set(key, {
     value: entry?.value as T,
     expiresAt: entry?.expiresAt ?? 0,
+    guardadoEn: entry?.guardadoEn ?? 0,
     inFlight,
   });
 
@@ -64,7 +68,23 @@ export function olvidar(key: string): void {
   store.delete(key);
 }
 
-/** Vacía la caché. Solo se usa desde `/api/rates?refresh=1`. */
-export function clearCache(): void {
-  store.clear();
+/**
+ * Olvida una entrada, pero solo si su valor ya tiene cierta edad.
+ *
+ * Es lo que usa el botón "Actualizar tasas" (ver `pedirTasasFrescas()` en
+ * `lib/rates.ts`). Existe para que un refresco pedido desde fuera no se
+ * traduzca en una ronda a los proveedores por cada petición: lo que se
+ * refresca a mano tiene un ritmo humano, y por debajo de unos segundos no hay
+ * nada nuevo que traer.
+ *
+ * Devuelve si llegó a borrar algo, por si alguien quiere distinguir "se pidió
+ * y se hizo" de "se pidió y era demasiado pronto".
+ */
+export function olvidarSiViejo(key: string, edadMinimaMs: number): boolean {
+  const entry = store.get(key);
+  if (!entry) return false;
+  if (Date.now() - entry.guardadoEn < edadMinimaMs) return false;
+
+  store.delete(key);
+  return true;
 }

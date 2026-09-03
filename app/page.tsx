@@ -7,9 +7,8 @@ import { OfflineNotice } from "@/components/OfflineNotice";
 import { ParadaCard } from "@/components/ParadaCard";
 import { RatePanel } from "@/components/RatePanel";
 import { SocialCTA } from "@/components/SocialCTA";
-import { clearCache } from "@/lib/cache";
 import { paradaDelDia } from "@/lib/parada";
-import { getRates } from "@/lib/rates";
+import { getRates, pedirTasasFrescas } from "@/lib/rates";
 
 /**
  * Las tasas se obtienen en el servidor, así que se ven apenas carga la página,
@@ -19,7 +18,9 @@ import { getRates } from "@/lib/rates";
  *
  * El botón "Actualizar tasas" navega con `?actualizar=<marca de tiempo>`: sin ese
  * parámetro la petición volvería a leer la caché y el usuario vería los mismos
- * números.
+ * números. El parámetro es público —lo puede escribir cualquiera—, así que
+ * quien decide si de verdad se vuelve a preguntar es `pedirTasasFrescas()`,
+ * que solo tira las tasas y solo si ya tienen unos segundos.
  */
 export default async function Home({
   searchParams,
@@ -27,7 +28,7 @@ export default async function Home({
   searchParams: Promise<{ actualizar?: string }>;
 }) {
   const { actualizar } = await searchParams;
-  if (actualizar) clearCache();
+  if (actualizar) pedirTasasFrescas();
 
   const [snapshot, parada] = await Promise.all([getRates(), paradaDelDia()]);
 
