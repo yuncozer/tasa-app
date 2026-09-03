@@ -204,3 +204,26 @@ export function notificarFalloToken(error: unknown): Promise<boolean> {
       `<p>Si esto se repite, el token caducará y dejará de publicarse todo. Se puede renovar a mano desde <a href="${enlace}">${enlace}</a>.</p>`,
   );
 }
+
+/**
+ * Alguien está probando contraseñas en `/admin/login`.
+ *
+ * Es el único aviso de este módulo que no habla de algo que se quedó a
+ * medias, y por eso vale la pena: hasta ahora un intento de entrada era
+ * completamente silencioso —ni contador, ni bloqueo, ni rastro— y detrás de
+ * esa contraseña están los botones que publican en la cuenta real.
+ *
+ * Sale **una vez por ventana**, cuando el cupo se agota, no en cada intento
+ * bloqueado: la regla de la casa es que un aviso repetido se convierte en
+ * ruido que se ignora, y aquí además el propio correo sería el ataque.
+ */
+export function avisarIntentosLogin(intentos: number, ventanaMs: number): Promise<boolean> {
+  const minutos = Math.round(ventanaMs / 60000);
+  const enlace = enlaceAdmin("/admin");
+  return notificar(
+    "Intentos fallidos de entrar al panel",
+    `<p>Se bloquearon los intentos de acceso a <strong>/admin/login</strong>: ${intentos} en los últimos ${minutos} minutos desde la misma dirección.</p>` +
+      `<p>Si no fuiste vos, conviene cambiar <code>ADMIN_PASSWORD</code> y subir <code>SESSION_VERSION</code>, que cierra de golpe todas las sesiones abiertas.</p>` +
+      `<p>El panel sigue en <a href="${enlace}">${enlace}</a>.</p>`,
+  );
+}

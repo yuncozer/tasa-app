@@ -46,7 +46,9 @@ export default async function AdminLoginPage({
 
         {error && (
           <p className="rounded-2xl border border-warning/40 bg-warning/5 px-4 py-3 text-sm text-warning">
-            Contraseña incorrecta.
+            {error === "limite"
+              ? "Demasiados intentos. Esperá unos minutos antes de volver a probar."
+              : "Contraseña incorrecta."}
           </p>
         )}
 
