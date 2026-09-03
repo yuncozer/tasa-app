@@ -1,5 +1,6 @@
 import type { NextRequest } from "next/server";
 import { apiError, apiJson } from "@/lib/api";
+import { esCronAutorizado } from "@/lib/cron-auth";
 import { notificarProgramadaFallida } from "@/lib/notificar";
 import { resumenPublicacion } from "@/lib/publish-news";
 import { reclamarEnProceso, reclamarVencida } from "@/lib/programadas";
@@ -28,8 +29,7 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 
 export async function GET(request: NextRequest) {
-  const auth = request.headers.get("authorization");
-  if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!esCronAutorizado(request)) {
     return apiError("No autorizado", undefined, 401);
   }
 

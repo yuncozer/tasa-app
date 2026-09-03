@@ -1,5 +1,6 @@
 import { leerAjustesDiaSeguro } from "@/lib/ajustes-publicacion";
 import { apiError, apiJson } from "@/lib/api";
+import { esCronAutorizado } from "@/lib/cron-auth";
 import { revisarCordura } from "@/lib/cordura-tasas";
 import { notificarEsperaLarga } from "@/lib/notificar";
 import { publicarTasasDelDia } from "@/lib/publish-hoy";
@@ -36,8 +37,7 @@ const INTENTOS_PARA_AVISAR = 15;
 const MINUTOS_DE_ESPERA = INTENTOS_PARA_AVISAR * 2;
 
 export async function GET(request: Request) {
-  const auth = request.headers.get("authorization");
-  if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!esCronAutorizado(request)) {
     return apiError("No autorizado", undefined, 401);
   }
 

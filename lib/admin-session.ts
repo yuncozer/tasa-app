@@ -1,4 +1,5 @@
-import { createHash, createHmac, timingSafeEqual } from "node:crypto";
+import { createHmac } from "node:crypto";
+import { sonIguales } from "@/lib/comparar";
 
 /**
  * Sesión de `/admin`: una sola contraseña (`ADMIN_PASSWORD`, distinta de
@@ -46,19 +47,6 @@ function contrasena(): string {
   return password;
 }
 
-/**
- * Compara sin filtrar por dónde difieren **ni cuánto miden**.
- *
- * `timingSafeEqual` exige dos búferes del mismo tamaño, así que compararlos
- * en crudo obligaba a mirar la longitud primero y devolver `false` — lo que
- * delata el largo de la contraseña. Sobre el resumen SHA-256 no: siempre son
- * 32 bytes, difieran en lo que difieran.
- */
-function iguales(a: string, b: string): boolean {
-  const resumen = (valor: string) => createHash("sha256").update(valor).digest();
-  return timingSafeEqual(resumen(a), resumen(b));
-}
-
 function firmar(version: string, emitido: number): string {
   return createHmac("sha256", contrasena())
     .update(`${MENSAJE}|${version}|${emitido}`)
@@ -72,7 +60,7 @@ export function crearTokenSesion(): string {
 }
 
 export function esContrasenaValida(password: string): boolean {
-  return iguales(contrasena(), password);
+  return sonIguales(contrasena(), password);
 }
 
 export function esSesionValida(token: string | undefined): boolean {
@@ -96,5 +84,5 @@ export function esSesionValida(token: string | undefined): boolean {
   const edad = Date.now() - emitido;
   if (edad < 0 || edad > MAX_EDAD_MS) return false;
 
-  return iguales(firmar(v, emitido), firma);
+  return sonIguales(firmar(v, emitido), firma);
 }

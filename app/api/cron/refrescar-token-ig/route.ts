@@ -1,4 +1,5 @@
 import { apiError, apiJson } from "@/lib/api";
+import { esCronAutorizado } from "@/lib/cron-auth";
 import { DIAS_PARA_AVISAR, estadoToken, refrescarToken } from "@/lib/instagram-token";
 import { notificarFalloToken } from "@/lib/notificar";
 
@@ -23,8 +24,7 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 
 export async function GET(request: Request) {
-  const auth = request.headers.get("authorization");
-  if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!esCronAutorizado(request)) {
     return apiError("No autorizado", undefined, 401);
   }
 
