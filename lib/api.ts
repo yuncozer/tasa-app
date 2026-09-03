@@ -33,8 +33,28 @@ export function apiJson(data: unknown, opciones?: { cachear?: boolean }): Respon
  *
  * Nunca se cachean: si una fuente se cae, el fallo no debe quedarse pegado en la
  * CDN un minuto más de lo necesario.
+ *
+ * **El detalle no sale en producción.** `error.message` aquí no es un texto
+ * nuestro: es lo que dijera la excepción, y los módulos que hablan con
+ * Supabase lanzan `Supabase respondió <código>: <cuerpo de PostgREST>`, con
+ * lo que ese cuerpo traiga dentro. Eso viajaba al cliente por `/api/rates`,
+ * `/api/convert` y las tres rutas por proveedor, todas públicas. Quien pide
+ * una tasa no puede hacer nada con ese texto; quien busca por dónde entrar,
+ * sí. Fuera de producción se conserva entero, que es donde de verdad sirve.
+ *
+ * El mensaje corto (`message`) sigue saliendo siempre: lo escribimos
+ * nosotros, dice qué falló sin decir cómo está montado por dentro, y es lo
+ * que necesita quien consume la API para saber si reintentar.
+ *
+ * Y se registra en el servidor pase lo que pase: lo que se deja de contar
+ * fuera tiene que seguir estando en los logs de Vercel, o depurar una fuente
+ * caída se vuelve adivinar.
  */
 export function apiError(message: string, error?: unknown, status = 502): Response {
-  const detail = error instanceof Error ? error.message : undefined;
+  if (error !== undefined) console.error(`[api] ${message}`, error);
+
+  const detail =
+    process.env.NODE_ENV === "production" ? undefined : error instanceof Error ? error.message : undefined;
+
   return Response.json({ error: message, detail }, { status, headers: { "Cache-Control": SIN_CACHE } });
 }
