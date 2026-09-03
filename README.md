@@ -58,12 +58,12 @@ mercado es la mejor aproximación verificable.
 
 | Método | Ruta | Devuelve |
 | --- | --- | --- |
-| `GET` | `/api/rates` | Todas las tasas. `?refresh=1` salta la caché |
+| `GET` | `/api/rates` | Todas las tasas. `?refresh=1` pide una lectura nueva si la guardada ya tiene 20 s |
 | `GET` | `/api/rates/bcv` | Dólar y euro oficiales |
 | `GET` | `/api/rates/binance` | Mercado P2P en VES y en COP, con compra, venta y punto medio, para una operación de referencia |
 | `GET` | `/api/rates/cop` | TRM, precio P2P del peso y sus dos valores en Bs |
 | `POST` | `/api/convert` | Equivalencias de un monto |
-| `GET` | `/api/health` | Estado de cada proveedor (`200` sano, `207` degradado) |
+| `GET` | `/api/health` | Estado de cada proveedor (`200` sano, `207` degradado). Dice si responde y su degradación, nunca el error interno |
 
 ```bash
 curl -X POST localhost:3000/api/convert \
@@ -121,6 +121,8 @@ ellas, el resto de la app funciona igual. Ver `.env.example`.
 | `PERFIL_INSTAGRAM_URL` | `instagram.com/latasa.online` | Destino de `/ig` |
 | `ENLACE_WHATSAPP` | — | Destino de `/wa`. Sin ella la ruta no existe |
 | `ADMIN_PASSWORD` | — | Contraseña de `/admin`. Secreto aparte de `CRON_SECRET` |
+| `SESSION_VERSION` | `1` | Subirla invalida de golpe todas las sesiones abiertas de `/admin`, sin cambiar la contraseña |
+| `FIRMA_IMAGENES_SECRET` | `CRON_SECRET` | Secreto con el que se firman los parámetros de `instagram-post-news`. Separado a propósito: rotar la firma no debería obligar a rotar el acceso a publicar |
 | `OPENROUTER_API_KEY` | — | Clave de OpenRouter. Sin ella no aparecen los botones de "Redactar con IA" (ver [Textos con IA](#textos-con-ia)) |
 | `OPENROUTER_MODELOS` | lista de `lib/ia.ts` | Modelos a probar, en orden, separados por comas |
 | `RESEND_API_KEY` | — | Clave de Resend para los avisos por correo. Sin ella no se manda ninguno y todo lo demás sigue igual |
@@ -154,9 +156,17 @@ simultáneas y, si un proveedor falla, conserva el último valor bueno en lugar 
 tarjeta vacía. El botón "Actualizar tasas" navega con `?actualizar=<marca>` para forzar una
 consulta nueva.
 
+Ese parámetro lo puede escribir cualquiera, así que quien decide si de verdad se vuelve a
+preguntar es `pedirTasasFrescas()`: olvida **solo** la clave de las tasas —nunca el Map
+entero, donde también viven el token de Instagram y la tarjeta de La Parada— y solo si el
+valor guardado ya tiene 20 segundos. Sin ese freno, un bucle desde fuera forzaba una ronda
+al BCV, a Binance y a datos.gov.co por petición, con el riesgo de que la fuente bloquee la
+IP.
+
 Los proveedores se consultan con `Promise.allSettled`: que Binance esté caído no impide ver
 la tasa del BCV. Lo que falte se marca en la interfaz como "dato no disponible" y queda
-explicado en `/api/health`.
+explicado en `/api/health`, que publica el nombre del proveedor y su aviso pero no el texto
+del error: ese va a los logs del servidor y al panel, no a una ruta pública.
 
 ## Publicación automática en Instagram
 

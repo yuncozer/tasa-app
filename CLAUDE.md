@@ -1737,6 +1737,116 @@ se ve un Reel— y el guion de voz queda en `GUION-CAPCUT.txt` para grabarlo apa
   es decorativa: es lo que impide que una versión pese más que la otra.
 
 
+### Las defensas son de una sola línea cada una, y ninguna es autenticación
+
+La app no guarda dinero ni datos personales, así que lo que hay que proteger
+son otras dos cosas: **que nadie publique con la marca de La Tasa** y **que
+nadie pueda envenenar las cifras**, ni las que se muestran ni las que se miden.
+Todo lo de abajo sale de auditar eso, y comparte un criterio: cada capa hace una
+cosa acotada y **ninguna pretende ser autenticación** donde no puede haberla.
+
+- **La sesión de `/admin` es revocable, y eso es lo que la hace una sesión.** El
+  token es `<version>.<emitido>.<firma>` (`lib/admin-session.ts`). Antes era el
+  HMAC de un mensaje fijo, o sea el mismo valor para siempre: cerrar sesión
+  borraba la cookie del navegador pero no invalidaba nada, así que cualquier
+  copia de ese valor —una captura, un dispositivo prestado— seguía abriendo el
+  panel hasta que se cambiara `ADMIN_PASSWORD`. Ahora caduca sola a los 30 días
+  **por dentro** (no por el `Max-Age`, que lo controla quien tenga la cookie) y
+  `SESSION_VERSION` cierra todas las sesiones abiertas de golpe, que es el botón
+  de pánico. No lo cambies a un token opaco guardado en tabla: eso es una
+  consulta a Supabase en cada carga del panel, y lo que se gana —revocar una
+  sesión suelta— no lo necesita un panel de un solo usuario.
+- **El login cuenta los intentos y avisa una vez.** Una sola contraseña delante
+  de los botones que publican, sin contador ni rastro, se podía probar entera en
+  silencio. El aviso sale **al agotar el cupo**, no en cada intento bloqueado: un
+  correo por petición convertiría el propio aviso en el ataque, misma regla que
+  ya rige los crons que reintentan solos.
+- **`lib/limite-intentos.ts` es en memoria, y eso es una renuncia declarada.** En
+  Vercel cada instancia tiene su contador y un reinicio lo borra —igual que
+  `lib/cache.ts` y por el mismo motivo, que la alternativa es un viaje a Supabase
+  por petición—. Detiene el bucle trivial de un script, no un ataque repartido
+  entre muchas IP. Se eligió así a sabiendas: el 99 % de lo que llega a una app
+  de este tamaño es lo primero. Tiene tope de claves (`MAX_CLAVES`) porque sin él
+  la defensa sería el ataque: quien varíe `x-forwarded-for` llenaría la memoria
+  de la función.
+- **Refrescar las tasas no vacía la caché entera.** `clearCache()` ya no existe.
+  Hacía `store.clear()` del Map completo —token de Instagram y tarjeta de La
+  Parada incluidos— y lo disparaba cualquiera con `?actualizar=loquesea` o
+  `?refresh=1`; como el parámetro cambia en cada petición, tampoco la CDN
+  amortiguaba, así que un bucle forzaba una ronda al BCV, a Binance y a
+  datos.gov.co por request. El riesgo no era el servidor sino **que la fuente
+  bloquee la IP**, y entonces la app se queda sin las cifras que son toda su
+  razón de ser. Ahora `pedirTasasFrescas()` olvida solo la clave de las tasas y
+  solo si ya tiene 20 segundos.
+- **`/api/eventos` tiene techo, y sigue contestando 204 siempre.** Es la única
+  ruta pública que escribe en Supabase. Controlaba bien *qué* se guarda y nada
+  controlaba *cuánto*, y unas métricas que se pueden inflar desde fuera no sirven
+  para decidir nada —ni para sostener una conversación con un anunciante—. El 204
+  se mantiene también al descartar: quien llama es un `sendBeacon` que no mira la
+  respuesta, y un 4xx solo diría desde fuera cuándo salta el límite. El descarte
+  por `Sec-Fetch-Site` deja pasar al navegador que no manda ninguna de las dos
+  cabeceras: perder los eventos de los teléfonos viejos de esta audiencia es peor
+  que el abuso que se evita.
+- **El guardián de los crons fallaba en abierto.** La plantilla que comparaba con
+  `Bearer ${process.env.CRON_SECRET}` produce la cadena literal `Bearer
+  undefined` cuando la variable no está definida, así que una petición con esa
+  cabecera entraba —en las siete rutas, incluida la que publica—.
+  `esCronAutorizado()` (`lib/cron-auth.ts`) rechaza sin secreto y lo anota en el
+  log: un fallo de configuración y un intento de acceso no son lo mismo cuando
+  estás mirando por qué no publicó.
+- **Los secretos se comparan por su resumen** (`lib/comparar.ts`).
+  `timingSafeEqual` exige búferes del mismo tamaño, así que compararlos en crudo
+  obliga a mirar la longitud primero, y eso delata el largo del secreto
+  esperado. Vive suelto porque lo usan los tres guardianes —la cookie, el cron y
+  la firma de las imágenes—: dos copias de una comparación de secretos es como se
+  cuelan las divergencias.
+- **`FIRMA_IMAGENES_SECRET` separa dos vidas útiles.** `CRON_SECRET` firmaba los
+  parámetros de `instagram-post-news` *y* autenticaba los disparos. Rotar la
+  firma obligaba a tocar cron-job.org en la misma maniobra, que es cuando se
+  cometen errores. Cae a `CRON_SECRET` si no está, así que una instalación que no
+  la configure se comporta igual que antes.
+- **`apiError` no manda el detalle en producción.** `error.message` no es un
+  texto nuestro: es lo que dijera la excepción, y los módulos de Supabase lanzan
+  `Supabase respondió <código>: <cuerpo de PostgREST>`. Eso salía por
+  `/api/rates`, `/api/convert` y las tres rutas por proveedor. Se registra
+  siempre en el servidor: lo que se deja de contar fuera tiene que seguir en los
+  logs, o depurar una fuente caída se vuelve adivinar.
+- **`/api/health` dice si un proveedor responde, nunca por qué falló.** Publicaba
+  `providers[].error` entero, o sea un mapa en vivo del montaje sin pedirle a
+  nadie una contraseña. `warning` **sí** se conserva, y la distinción es la que
+  importa: ese texto lo escribimos nosotros, es de conjunto cerrado y es lo que
+  hace útil la ruta —explica una cifra rara sin explicar la infraestructura—.
+- **Las rutas OG llevan techo por IP y no caché**, y confundir las dos cosas
+  reintroduce un fallo ya pagado. Son públicas por necesidad (Meta las descarga
+  al publicar) y cuestan ~0,8 s de Satori más una lectura a Supabase. Cachearlas
+  es lo primero que uno piensa y es justo lo que no se puede hacer: el cron
+  congela `snapshot_hoy` y un instante después Meta pide esa misma URL, así que
+  una copia en la CDN le entregaría la imagen del ciclo anterior y el post
+  saldría con la imagen diciendo una cifra y el caption otra — el fallo que
+  `lib/snapshot-hoy.ts` existe para evitar. Se acota cuántas veces se puede
+  pedir, no cuánto dura la copia. Devuelven 429 con `Retry-After` y no el 204
+  silencioso de `/api/eventos`: aquí quien llama es un rastreador que sabe leerlo
+  y volver.
+- **Las cabeceras se reparten en dos grupos** (`next.config.ts`). Las que no
+  restringen de dónde se carga contenido van en todas las rutas. La CSP de
+  contenido va **solo en lo público**, que es donde está el 100 % de los
+  visitantes y donde el inventario de orígenes es corto; `/admin` carga imágenes
+  y video de Cloudinary, previas en `blob:` y sube archivos directo a su API, y
+  es la única superficie que no se puede comprobar sin entrar con la contraseña,
+  así que recibe solo `frame-ancestors`. El `'unsafe-inline'` de `script-src` es
+  la concesión conocida: Next inyecta su arranque de hidratación en línea y
+  quitarlo exige nonces por petición, o sea un middleware que este proyecto no
+  tiene. HSTS va **sin** `includeSubDomains`: no hay inventario de subdominios
+  que garantice HTTPS en todos, y esa cabecera no se puede desandar a mitad.
+- **Las diez tablas llevan RLS activada y ninguna política**, verificado contra
+  producción, y `analiticas_web` está restringida a `service_role`. Los diez
+  avisos `rls_enabled_no_policy` del linter de Supabase son **intencionados**: no
+  los "arregles" añadiendo políticas. La migración `0017` retira el `execute` de
+  `rls_auto_enable()` a `anon`, la única función del esquema que no había salido
+  de este repo —la pone la plataforma, es el disparador que activa RLS sola, y
+  sigue funcionando sin el privilegio porque a un disparador lo invoca el motor
+  como su propietario—.
+
 ### El aviso legal se queda
 
 El pie declara que los datos son de terceros, que La Tasa no fija ni certifica
