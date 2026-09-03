@@ -1,0 +1,28 @@
+-- Cerrar `rls_auto_enable()`, la única función del esquema público que no
+-- había salido de este repo.
+--
+-- Apareció al auditar la base contra producción: existe, es `SECURITY
+-- DEFINER` y tiene `EXECUTE` concedido a `anon` y a `authenticated`, o sea
+-- que PostgREST la anuncia en `/rest/v1/rpc/rls_auto_enable` para cualquiera
+-- con la clave pública. La pone la propia plataforma —es el disparador de
+-- evento que activa RLS sola en cada tabla nueva, que es justamente por lo
+-- que las diez tablas de este proyecto la tienen— así que no se toca lo que
+-- hace, solo quién puede pedirla.
+--
+-- **El riesgo real es bajo y conviene decirlo**: devuelve `event_trigger`, y
+-- Postgres no deja invocar por RPC una función de disparador, así que la
+-- llamada falla antes de hacer nada. Lo que se arregla es otra cosa: que el
+-- linter de Supabase la marque en cada revisión —ruido que tapa el hallazgo
+-- de al lado el día que haya uno de verdad— y que una función con privilegios
+-- del propietario esté anunciada al rol anónimo sin que nadie lo haya
+-- decidido.
+--
+-- Retirar `EXECUTE` no impide que siga funcionando: un disparador lo invoca
+-- el motor como su propietario y no comprueba el privilegio del rol que hizo
+-- el DDL. Verificado tras aplicarlo: las tablas nuevas siguen naciendo con
+-- RLS activada.
+--
+-- Si algún día la plataforma vuelve a conceder el privilegio (una migración
+-- suya, un proyecto restaurado), esta migración se puede volver a aplicar tal
+-- cual: es idempotente.
+revoke execute on function public.rls_auto_enable() from anon, authenticated, public;
