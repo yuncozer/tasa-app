@@ -154,7 +154,7 @@ const RASTREADORES = /bot|crawler|spider|facebookexternalhit|whatsapp|preview|cu
  * lo que llega desde una ruta se guarda tal cual, así que tiene que estar
  * enumerado aquí y no venir de la URL.
  */
-export type Atajo = "/hoy" | "/wa" | "/ig" | "/laparada" | "/p";
+export type Atajo = "/hoy" | "/wa" | "/ig" | "/laparada" | "/e";
 
 /**
  * Anota un clic en un atajo del dominio.
@@ -171,7 +171,19 @@ export type Atajo = "/hoy" | "/wa" | "/ig" | "/laparada" | "/p";
  */
 export async function registrarAtajo(
   atajo: Atajo,
-  cabeceras: { userAgent: string | null; referer: string | null },
+  cabeceras: {
+    userAgent: string | null;
+    referer: string | null;
+    /**
+     * La ruta concreta, cuando el atajo tiene varias: `/e/<slug>` apunta a un
+     * post distinto por slug, y sin esto todos sus clics se sumarían en una
+     * sola cifra sin poder saber cuál se abrió. El slug no viene de la URL
+     * cruda sino del que la página acaba de resolver contra la tabla, así que
+     * no es texto que alguien pueda inventar desde fuera — que es la razón por
+     * la que `detalle` sigue siendo del conjunto cerrado.
+     */
+    ruta?: string;
+  },
 ): Promise<void> {
   try {
     if (cabeceras.userAgent && RASTREADORES.test(cabeceras.userAgent)) return;
@@ -179,7 +191,7 @@ export async function registrarAtajo(
     await guardarEvento({
       fecha: diaCaracasISO(Date.now()),
       tipo: "atajo",
-      ruta: atajo,
+      ruta: cabeceras.ruta ?? atajo,
       detalle: atajo,
       sesion: `atajo-${crypto.randomUUID()}`,
       // El servidor no puede saber si el teléfono es táctil ni si la app está

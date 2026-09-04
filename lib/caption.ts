@@ -14,13 +14,32 @@ function sitioUrl(): string {
 }
 
 /** Primera línea del pie: el marcador que permite quitarlo y reponerlo fresco. */
-const MARCA_PIE = "📲 ¿Quieres ver la publicación de hoy con las tasas actualizadas?";
+/**
+ * La línea que precede al enlace del post, y son **dos** porque no todos los
+ * posts llevan al mismo sitio.
+ *
+ * La de tasas pregunta por "las tasas actualizadas", que es cierto cuando el
+ * enlace es `/hoy` o `/laparada` —atajos que resuelven siempre a la
+ * publicación de cifras más reciente—. Sobre una noticia esa pregunta no
+ * describe nada: quien la recibe no va a encontrar tasas al otro lado, y el
+ * mensaje pierde credibilidad justo en la línea que invita a pulsar.
+ *
+ * `quitarPieEnlaces` reconoce las dos, o volver a formatear un mensaje que ya
+ * llevaba pie iría acumulando uno detrás de otro.
+ */
+const MARCA_PIE_TASAS = "📲 ¿Quieres ver la publicación de hoy con las tasas actualizadas?";
+const MARCA_PIE_POST = "📲 Mira la publicación completa y síguenos en Instagram:";
+
+/** Cuál de las dos líneas encabeza el pie. */
+export type VariantePie = "tasas" | "post";
+
+const MARCAS_PIE = [MARCA_PIE_TASAS, MARCA_PIE_POST];
 
 /**
  * La línea con la que cierran las cifras antes del pie. La usan el post
  * diario y el reporte semanal —cada uno con su propio pie después— y
  * `quitarPieEnlaces` la reconoce como el otro punto de corte posible, junto a
- * `MARCA_PIE`.
+ * las dos `MARCA_PIE_*`.
  */
 const LINEA_CALCULADORA = "Convierte cualquier monto en la calculadora completa: link en la bio.";
 
@@ -35,12 +54,12 @@ const LINEA_CALCULADORA = "Convierte cualquier monto en la calculadora completa:
  * mismo criterio que ya usa `enlaceWhatsapp()` en `next.config.ts` — no
  * publicar un enlace que no lleva a ningún sitio.
  */
-export function pieEnlaces(destinoPost: string): string {
+export function pieEnlaces(destinoPost: string, variante: VariantePie = "tasas"): string {
   const sitio = sitioUrl();
   const canal = enlaceWhatsapp();
 
   const bloques = [
-    `${MARCA_PIE}\n👉 ${destinoPost}`,
+    `${variante === "post" ? MARCA_PIE_POST : MARCA_PIE_TASAS}\n👉 ${destinoPost}`,
     `🧮 Calculadora de divisas completa:\n👉 ${sitio}`,
   ];
   if (canal) bloques.push(`📢 Únete a nuestro canal oficial de WhatsApp:\n👉 ${sitio}/wa`);
@@ -58,7 +77,7 @@ export function pieEnlaces(destinoPost: string): string {
  * —lo que va en su lugar es el pie de tres enlaces, que en WhatsApp sí son
  * clicables—:
  *
- * - `MARCA_PIE`, el pie de tres enlaces, en los posts publicados antes de que
+ * - Cualquiera de las dos `MARCA_PIE_*`, el pie de tres enlaces.
  *   las noticias dejaran de llevarlo.
  * - `LINEA_CALCULADORA`, el "link en la bio" del post diario y del semanal,
  *   que arrastra sus hashtags detrás.
@@ -78,7 +97,9 @@ export function quitarPieEnlaces(caption: string): string {
   const bloques = caption.split("\n\n");
   const idx = bloques.findIndex(
     (bloque) =>
-      bloque.startsWith(MARCA_PIE) || bloque === LINEA_CALCULADORA || esBloqueDeHashtags(bloque),
+      MARCAS_PIE.some((marca) => bloque.startsWith(marca)) ||
+      bloque === LINEA_CALCULADORA ||
+      esBloqueDeHashtags(bloque),
   );
   return (idx === -1 ? bloques : bloques.slice(0, idx)).join("\n\n").trimEnd();
 }
@@ -88,12 +109,18 @@ export function quitarPieEnlaces(caption: string): string {
  * anterior. Así se puede llamar sobre un caption ya publicado antes (al
  * reprogramar, por ejemplo) sin ir acumulando pies uno detrás de otro.
  */
-export function conPieEnlaces(caption: string, destinoPost: string): string {
+export function conPieEnlaces(
+  caption: string,
+  destinoPost: string,
+  variante: VariantePie = "tasas",
+): string {
   const cuerpo = quitarPieEnlaces(caption);
 
   // Sin cuerpo —un caption vacío, o uno que era solo el pie de otro post—, no
   // se antepone una línea en blanco de más.
-  return cuerpo ? `${cuerpo}\n\n${pieEnlaces(destinoPost)}` : pieEnlaces(destinoPost);
+  return cuerpo
+    ? `${cuerpo}\n\n${pieEnlaces(destinoPost, variante)}`
+    : pieEnlaces(destinoPost, variante);
 }
 
 /**

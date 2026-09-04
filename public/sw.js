@@ -10,7 +10,7 @@
  * respuesta de `/api/` desde la caché, porque ahí sí pasaría por fresca.
  */
 
-const VERSION = "v8";
+const VERSION = "v9";
 const ATAJOS = ["/hoy", "/laparada", "/ig", "/wa"];
 const CACHE_PAGINA = `latasa-pagina-${VERSION}`;
 const CACHE_ESTATICOS = `latasa-estaticos-${VERSION}`;
@@ -173,7 +173,11 @@ self.addEventListener("fetch", (event) => {
   // /hoy mostraría la portada en vez de abrir el post del día. `/p/` es la
   // misma idea pero con un slug por post en vez de una ruta fija, así que se
   // deja pasar por prefijo.
-  if (ATAJOS.includes(url.pathname) || url.pathname.startsWith("/p/")) return;
+  // `/e/` y `/p/` van por prefijo y no por ruta exacta como el resto de
+  // ATAJOS, porque cada post tiene su propio slug. `/p/` es la forma anterior
+  // de `/e/`, que sigue viva en captions ya publicados y redirige aquí.
+  if (ATAJOS.includes(url.pathname) || url.pathname.startsWith("/e/") || url.pathname.startsWith("/p/"))
+    return;
 
   // El panel no se cachea nunca, ni su HTML ni sus navegaciones. Tres motivos
   // que apuntan al mismo sitio: sus pantallas muestran estado del momento

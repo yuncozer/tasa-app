@@ -1,0 +1,27 @@
+-- La miniatura del post, para que el enlace del canal traiga tarjeta.
+--
+-- Cuando un post se comparte al canal de WhatsApp, el mensaje deja de llevar
+-- el permalink crudo de Instagram y pasa por `/e/<slug>`. Ese cambio existe
+-- por dos motivos —contar el clic, y que la vista previa la sirva este dominio
+-- en vez del muro de login de Instagram— y el segundo se queda a medias sin
+-- una imagen: una tarjeta de solo texto se ve como un enlace roto al lado de
+-- las que sí traen foto.
+--
+-- **No se guarda la URL de Instagram, se guarda el `public_id` de Cloudinary.**
+-- Las imágenes de la Graph API vienen de `scontent-*.cdninstagram.com` firmadas
+-- y con caducidad: verificado sobre esta misma cuenta, el parámetro `oe` de un
+-- post reciente vencía en 4,5 días. Guardar esa URL haría que la tarjeta se
+-- rompiera sola justo en los posts viejos, que son los que más tiempo llevan
+-- circulando en el canal. Por eso la imagen se copia a Cloudinary al
+-- compartir, y aquí queda su identificador, que no caduca.
+--
+-- Se copia **al compartir y no al publicar**: así solo ocupa cuota lo que de
+-- verdad se manda al canal. Medido sobre los posts de esta cuenta, cada
+-- miniatura pesa entre 89 y 121 KB — unos 3 MB al mes a treinta posts, contra
+-- los 25 créditos (25 GB) del plan gratuito.
+--
+-- Nula por diseño: los cuatro enlaces que ya existían son de antes de esto, y
+-- un post cuya subida a Cloudinary falle se comparte igual con la tarjeta
+-- genérica. La imagen es una mejora de la tarjeta, no un requisito del enlace
+-- — mismo criterio que `calentarVideo()`.
+alter table public.enlaces add column if not exists imagen text;

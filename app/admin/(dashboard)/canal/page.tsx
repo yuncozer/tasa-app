@@ -48,6 +48,19 @@ export default async function AdminCanalPage({
   const posts = await leerPosts();
   const seleccionado = posts?.find((item) => item.id === post) ?? null;
 
+  // El mensaje se arma antes del `return` y no dentro del JSX porque ya no es
+  // dar formato a un texto: `formatMensajeCanal` crea el atajo del post y, la
+  // primera vez, copia su miniatura a Cloudinary. Es idempotente —volver a
+  // abrir el mismo post reutiliza slug e imagen— pero conviene que se vea que
+  // aquí hay trabajo de servidor y no una plantilla.
+  const mensaje = seleccionado
+    ? await formatMensajeCanal({
+        caption: seleccionado.caption,
+        permalinkPost: seleccionado.permalink,
+        imagenUrl: seleccionado.imagenUrl,
+      })
+    : null;
+
   return (
     <>
       <AdminPageHeader
@@ -70,13 +83,7 @@ export default async function AdminCanalPage({
           <Link href="/admin/canal" className="text-xs font-medium text-muted underline">
             ← Elegir otro post
           </Link>
-          <BotonCopiarTexto
-            textoInicial={formatMensajeCanal({
-              caption: seleccionado.caption,
-              permalinkPost: seleccionado.permalink,
-            })}
-            enlaceCanal={enlaceWhatsapp()}
-          />
+          <BotonCopiarTexto textoInicial={mensaje ?? ""} enlaceCanal={enlaceWhatsapp()} />
         </div>
       )}
 

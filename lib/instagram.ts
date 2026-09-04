@@ -193,6 +193,16 @@ export interface MediaReciente {
   caption: string | null;
   permalink: string;
   timestamp: string;
+  /**
+   * Miniatura del post, para la tarjeta de `/e/<slug>`. En un video la Graph
+   * API la entrega en `thumbnail_url` y en una imagen en `media_url`, así que
+   * se normalizan a un solo campo aquí.
+   *
+   * **Caduca**: viene de `scontent-*.cdninstagram.com` firmada, con unos días
+   * de vida. Sirve para copiarla a Cloudinary en el momento, nunca para
+   * guardarla tal cual — ver `lib/canal-whatsapp.ts`.
+   */
+  imagenUrl: string | null;
 }
 
 /**
@@ -209,7 +219,7 @@ export async function listarMediaSemana(): Promise<MediaReciente[]> {
   const desde = Math.floor((Date.now() - SIETE_DIAS_MS) / 1000);
 
   const url = new URL(`${GRAPH_BASE}/${accountId}/media`);
-  url.searchParams.set("fields", "id,caption,permalink,timestamp");
+  url.searchParams.set("fields", "id,caption,permalink,timestamp,media_type,media_url,thumbnail_url");
   url.searchParams.set("since", String(desde));
   url.searchParams.set("access_token", accessToken);
 
@@ -217,7 +227,25 @@ export async function listarMediaSemana(): Promise<MediaReciente[]> {
   const body = await res.json();
   if (!res.ok) throw new InstagramApiError("No se pudo listar los posts recientes", body);
 
-  return (body.data ?? []) as MediaReciente[];
+  // La miniatura llega en un campo u otro según el tipo de media, y en un
+  // carrusel puede no llegar en ninguno. Se normaliza aquí para que quien la
+  // consume no tenga que conocer esa diferencia.
+  interface MediaCruda {
+    id: string;
+    caption?: string | null;
+    permalink: string;
+    timestamp: string;
+    media_url?: string;
+    thumbnail_url?: string;
+  }
+
+  return ((body.data ?? []) as MediaCruda[]).map((media) => ({
+    id: media.id,
+    caption: media.caption ?? null,
+    permalink: media.permalink,
+    timestamp: media.timestamp,
+    imagenUrl: media.thumbnail_url ?? media.media_url ?? null,
+  }));
 }
 
 /**

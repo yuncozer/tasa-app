@@ -289,7 +289,7 @@ const NOMBRE_ATAJO: Record<string, string> = {
   "/wa": "/wa · canal de WhatsApp",
   "/ig": "/ig · perfil de Instagram",
   "/laparada": "/laparada · post de La Parada",
-  "/p": "/p/… · posts de noticia",
+  "/e": "/e/… · posts compartidos al canal",
 };
 
 function BloqueEnlaces({ datos, dias }: { datos: AnaliticasWeb; dias: number }) {

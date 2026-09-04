@@ -12,7 +12,7 @@ import { sitioPublico } from "@/lib/sitio";
  * - **`/api/`**: son datos y no páginas. Indexar `/api/rates` pondría una
  *   fotografía de tasas caducada en los resultados, presentada como si fuera
  *   la de ahora — el mismo daño que el proyecto evita en todas partes.
- * - **Los atajos** (`/hoy`, `/laparada`, `/p/`): son redirecciones a
+ * - **Los atajos** (`/hoy`, `/laparada`, `/e/` y su forma anterior `/p/`): son redirecciones a
  *   Instagram cuyo destino cambia, así que lo que un buscador guardara hoy
  *   apuntaría mañana a otro post. Sus vistas previas se siguen viendo al
  *   compartirlas por WhatsApp, que es para lo que existen: el rastreador que
@@ -28,7 +28,7 @@ export default function robots(): MetadataRoute.Robots {
     rules: {
       userAgent: "*",
       allow: "/",
-      disallow: ["/admin", "/api/", "/hoy", "/laparada", "/p/"],
+      disallow: ["/admin", "/api/", "/hoy", "/laparada", "/e/", "/p/"],
     },
     sitemap: `${base}/sitemap.xml`,
     host: base,

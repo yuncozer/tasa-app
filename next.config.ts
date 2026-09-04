@@ -66,6 +66,22 @@ const CSP_PUBLICA = [
 ].join("; ");
 
 const nextConfig: NextConfig = {
+  /**
+   * `/p/<slug>` fue el nombre de `/e/<slug>` hasta que la ruta se reutilizó
+   * para los enlaces del canal. **La forma vieja tiene que seguir
+   * resolviendo**: cuatro captions publicados en agosto la llevan escrita, y un
+   * caption ya publicado no se puede reescribir desde el código.
+   *
+   * Aquí sí vale un `redirects()`, al contrario que en `/hoy`: lo que se evalúa
+   * al compilar es una reescritura de ruta a ruta, fija, sin nada que dependa
+   * de un destino que cambia. El rastreador de WhatsApp sigue el 308 hasta
+   * `/e/<slug>`, que es una página de este dominio con su propia tarjeta, así
+   * que la vista previa tampoco se pierde por el camino.
+   */
+  async redirects() {
+    return [{ source: "/p/:slug", destination: "/e/:slug", permanent: true }];
+  },
+
   async headers() {
     return [
       {
@@ -98,7 +114,7 @@ const nextConfig: NextConfig = {
         // publicar, y el destino real se anota un instante después. Una copia
         // en la CDN de esa primera respuesta (el respaldo al perfil) se
         // quedaría sirviéndola aunque el post ya esté anotado.
-        source: "/p/:slug",
+        source: "/e/:slug",
         headers: [{ key: "Cache-Control", value: "no-store" }],
       },
       {
