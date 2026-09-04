@@ -97,9 +97,16 @@ export function puedeCompartirConTexto(): boolean {
  *   hace que deje de reenviarse — y el reenvío es todo el valor de esto. Las
  *   redes crecen igual un paso después, porque `SocialCTA` está justo debajo de
  *   la calculadora a la que lleva.
- * - **Repite la cifra a propósito.** Si el destino descarta la imagen —iOS lo
- *   hace— el mensaje sigue sirviendo; y en un chat el texto se busca y se copia,
- *   cosa que una imagen no.
+ * - **Repite la cifra a propósito.** En un chat el texto se busca y se copia,
+ *   cosa que una imagen no, y si algún destino se quedara solo con una de las
+ *   dos piezas el mensaje sigue sirviendo.
+ *
+ *   Esa segunda mitad era el riesgo que se temía y **no se cumple donde más
+ *   importaba**: comprobado en un iPhone real, WhatsApp adjunta la imagen *y*
+ *   carga el texto. Se anotó porque lo contrario es lo que uno espera —el
+ *   selector entrega las dos cosas y cada app decide qué usar— y sin este dato
+ *   alguien acabaría reescribiendo esto para resolver un problema que no
+ *   existe.
  * - **Lleva fecha y hora.** Una cifra sin fecha reenviada tres semanas después
  *   es una tasa vieja servida como fresca, que es el único daño real que esta
  *   app puede causar. Se formatean con los mismos `formatDate`/`formatClock`
