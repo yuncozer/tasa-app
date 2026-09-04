@@ -10,7 +10,7 @@ import {
   sinCambios,
   textoParaCompartir,
 } from "@/lib/compartir";
-import type { ConversionResult } from "@/lib/types";
+import type { ConversionResult, RateKey } from "@/lib/types";
 
 /**
  * Comparte la conversión como **imagen con un pie de texto**, usando el
@@ -36,9 +36,12 @@ import type { ConversionResult } from "@/lib/types";
  */
 export function BotonCompartir({
   conversion,
+  destino,
   fetchedAt,
 }: {
   conversion: ConversionResult;
+  /** La moneda destacada en pantalla, para que lo compartido diga lo mismo. */
+  destino: RateKey;
   fetchedAt: string;
 }) {
   const puedeCompartir = useSyncExternalStore(sinCambios, haySelectorDeArchivos, noEnServidor);
@@ -55,7 +58,9 @@ export function BotonCompartir({
       // La imagen se pide al servidor en el momento de pulsar, no al cargar la
       // pantalla: son ~0,8 s de Satori y una lectura de tasas, y la inmensa
       // mayoría de las visitas no comparte nada.
-      const respuesta = await fetch(`/api/og/conversion?monto=${monto}&origen=${origen}`);
+      const respuesta = await fetch(
+        `/api/og/conversion?monto=${monto}&origen=${origen}&destino=${destino}`,
+      );
       if (!respuesta.ok) throw new Error(String(respuesta.status));
 
       const archivo = new File([await respuesta.blob()], "la-tasa.png", { type: "image/png" });
@@ -71,7 +76,7 @@ export function BotonCompartir({
       // que hacía ayer, con el dominio dibujado en el pie de la imagen como
       // red de seguridad.
       const texto = conTexto
-        ? textoParaCompartir({ conversion, fetchedAt, sitio: window.location.origin })
+        ? textoParaCompartir({ conversion, destino, fetchedAt, sitio: window.location.origin })
         : null;
 
       await navigator.share(texto ? { files: [archivo], text: texto } : { files: [archivo] });

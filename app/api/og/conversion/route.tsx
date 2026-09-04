@@ -1,6 +1,6 @@
 import { ImageResponse } from "next/og";
 import type { NextRequest } from "next/server";
-import { convert, isRateKey } from "@/lib/convert";
+import { convert, destinoPrincipal, isRateKey } from "@/lib/convert";
 import { formatAmount, formatClock, formatDate, formatRate } from "@/lib/format";
 import { techoDeImagenes } from "@/lib/og-limite";
 import {
@@ -109,22 +109,33 @@ function Fila({ etiqueta, valor, clave }: { etiqueta: string; valor: number | nu
 function ConversionImage({
   monto,
   origen,
+  destino,
   snapshot,
   icons,
 }: {
   monto: number;
   origen: RateKey;
+  destino: RateKey;
   snapshot: RatesSnapshot;
   icons: { instagram: string; browser: string };
 }) {
   const conversion = convert(monto, origen, snapshot);
-  const meta = rateMeta(origen);
-  const tasa = snapshot.rates[origen]?.bsPerUnit ?? null;
 
-  // El bolívar es el pivote y va destacado arriba, igual que en la
-  // calculadora; el resto queda debajo, en el orden de siempre.
-  const otras = RATE_ORDER.filter((key) => key !== origen && key !== "VES").slice(0, MAX_FILAS);
-  const bolivares = formatAmount(conversion.bs, "VES");
+  // Exactamente uno de los dos lados es el bolívar —o el origen, o el destino—
+  // así que la tasa que hizo la cuenta es siempre la del otro. Antes se
+  // describía la del origen a secas, y con bolívares de origen eso decía
+  // "Bolívar: 1 Bs = 1,00 Bs · Moneda base", que no explica nada.
+  const claveTasa = origen === "VES" ? destino : origen;
+  const meta = rateMeta(claveTasa);
+  const tasa = snapshot.rates[claveTasa]?.bsPerUnit ?? null;
+
+  // El destacado va arriba y el resto debajo, en el orden de siempre. Se
+  // excluyen los dos extremos: sin quitar el destino, su cifra saldría dos
+  // veces en la misma imagen.
+  const otras = RATE_ORDER.filter((key) => key !== origen && key !== destino).slice(0, MAX_FILAS);
+
+  const valor = destino === "VES" ? conversion.bs : conversion.results[destino];
+  const destacado = formatAmount(valor, destino);
 
   return (
     <div
@@ -145,26 +156,31 @@ function ConversionImage({
       <div style={{ display: "flex", gap: 28 }}>
         <div style={{ display: "flex", flexDirection: "column", width: 460, gap: 6, overflow: "hidden" }}>
           <span style={{ fontSize: 26, color: COLOR.muted }}>
-            {formatAmount(monto, origen)} {meta.shortLabel}
+            {formatAmount(monto, origen)} {rateMeta(origen).shortLabel}
           </span>
           <span
             style={{
-              fontSize: tamanoDelMonto(bolivares),
+              fontSize: tamanoDelMonto(destacado),
               fontWeight: 700,
               color: COLOR.accent,
               lineHeight: 1.05,
             }}
           >
-            {bolivares}
+            {destacado}
           </span>
-          <span style={{ fontSize: 32, color: COLOR.foreground }}>bolívares</span>
+          {/* "bolívares" en plural para el caso normal, que es como se lee
+              mejor; para cualquier otra moneda sirve su propia etiqueta. Mismo
+              criterio que el renglón destacado de la calculadora. */}
+          <span style={{ fontSize: 32, color: COLOR.foreground }}>
+            {destino === "VES" ? "bolívares" : rateMeta(destino).label}
+          </span>
           {/* La tasa usada, que es la mitad de lo que un número suelto no
               dice. Con la fuente al lado: quien recibe esto por WhatsApp
               puede contrastarlo sin preguntar de dónde salió. */}
           <span style={{ fontSize: 22, color: COLOR.muted, marginTop: 8 }}>
             {tasa === null
               ? "Tasa no disponible"
-              : `${meta.label}: 1 ${meta.symbol} = ${formatRate(tasa)} Bs · ${snapshot.rates[origen]?.source ?? ""}`}
+              : `${meta.label}: 1 ${meta.symbol} = ${formatRate(tasa)} Bs · ${snapshot.rates[claveTasa]?.source ?? ""}`}
           </span>
         </div>
 
@@ -201,10 +217,21 @@ export async function GET(request: NextRequest) {
     leerSvgComoDataUri("browser-icon.svg"),
   ]);
 
+  // `destino` es opcional y de conjunto cerrado, así que no cambia el criterio
+  // de no firmar esta ruta: sigue sin recibir un solo carácter de texto libre.
+  // Lo manda la calculadora cuando el usuario ha elegido otra moneda destacada
+  // — sin él, la imagen resumiría contra una distinta de la que se ve en
+  // pantalla, y las dos viajan en el mismo mensaje.
+  const pedido = request.nextUrl.searchParams.get("destino");
+  const conversion = convert(monto, origen, snapshot);
+  const destino =
+    isRateKey(pedido) && pedido !== origen ? pedido : destinoPrincipal(conversion);
+
   return new ImageResponse(
     <ConversionImage
       monto={monto}
       origen={origen}
+      destino={destino}
       snapshot={snapshot}
       icons={{ instagram: instagramIcon, browser: browserIcon }}
     />,

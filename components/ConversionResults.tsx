@@ -1,4 +1,7 @@
+"use client";
+
 import { Info } from "lucide-react";
+import { useState } from "react";
 import { BotonCompartir } from "@/components/BotonCompartir";
 import { BotonCopiar } from "@/components/BotonCopiar";
 import { Flag } from "@/components/Flag";
@@ -7,7 +10,7 @@ import { FLAGS } from "@/lib/flags";
 import { formatAmount, formatRate } from "@/lib/format";
 import { destinoPrincipal } from "@/lib/convert";
 import { RATE_ORDER, equivalenceHelp } from "@/lib/rates";
-import type { ConversionResult, RatesSnapshot } from "@/lib/types";
+import type { ConversionResult, RateKey, RatesSnapshot } from "@/lib/types";
 
 /**
  * Equivalentes del monto en todas las demás bases.
@@ -34,7 +37,24 @@ export function ConversionResults({
   conversion: ConversionResult;
   snapshot: RatesSnapshot;
 }) {
-  const destino = destinoPrincipal(conversion);
+  const [elegido, setElegido] = useState<RateKey | null>(null);
+
+  /**
+   * El destacado se **deriva**, no se sincroniza con un efecto: al cambiar de
+   * moneda de origen el selector deja de pintarse y esta expresión vuelve sola
+   * al valor por defecto, sin un `setState` dentro de un `useEffect` — el
+   * patrón que este proyecto evita en todas partes.
+   *
+   * Se comprueba también que la elegida siga teniendo precio: si su proveedor
+   * se cae mientras está seleccionada, se cae al de por defecto en vez de
+   * destacar un guion.
+   */
+  const seleccionable = conversion.from === "VES";
+  const destino =
+    seleccionable && elegido && conversion.results[elegido] !== null
+      ? elegido
+      : destinoPrincipal(conversion);
+
   const valorDestacado = destino === "VES" ? conversion.bs : conversion.results[destino];
   const metaDestino = snapshot.rates[destino];
 
@@ -67,7 +87,7 @@ export function ConversionResults({
             destino es un chat. La imagen se pide solo al pulsar. */}
         {valorDestacado !== null && (
           <div className="flex shrink-0 items-center gap-1">
-            <BotonCompartir conversion={conversion} fetchedAt={snapshot.fetchedAt} />
+            <BotonCompartir conversion={conversion} destino={destino} fetchedAt={snapshot.fetchedAt} />
             <BotonCopiar
               texto={formatAmount(valorDestacado, destino)}
               etiqueta={destino === "VES" ? "monto en bolívares" : `monto en ${metaDestino.label}`}
@@ -75,6 +95,43 @@ export function ConversionResults({
           </div>
         )}
       </div>
+
+      {/* Solo con bolívares de origen. Con cualquier otro, el destacado es el
+          bolívar y no hay nada que elegir: es el pivote de toda la app, y
+          hacerlo opcional ahí diluiría el modelo mental que sostiene el resto
+          de la pantalla. Aquí, en cambio, el valor por defecto es arbitrario
+          —el dólar BCV solo por ser el primero del orden— y quien tiene
+          bolívares puede querer verlos en Binance venta o en euros. */}
+      {seleccionable && (
+        <div className="flex flex-col gap-2">
+          <p className="text-xs font-semibold uppercase tracking-wide text-[color:var(--muted)]">
+            Ver en
+          </p>
+          <div role="group" aria-label="Moneda del resultado destacado" className="grid grid-cols-3 gap-2">
+            {RATE_ORDER.filter((key) => key !== "VES").map((key) => {
+              const rate = snapshot.rates[key];
+              const activa = key === destino;
+
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setElegido(key)}
+                  aria-pressed={activa}
+                  disabled={conversion.results[key] === null}
+                  className={`rounded-xl border px-2 py-2 text-sm font-semibold transition active:scale-95 disabled:opacity-40 ${
+                    activa
+                      ? "border-[color:var(--accent)] bg-[color:var(--accent)]/15 text-[color:var(--accent)]"
+                      : "border-[color:var(--border)] bg-[color:var(--surface)] text-[color:var(--muted)]"
+                  }`}
+                >
+                  {rate.shortLabel}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       <ul className="divide-y divide-[color:var(--border)] overflow-hidden rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface)]">
         {others.map((key) => {

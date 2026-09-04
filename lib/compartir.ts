@@ -119,12 +119,18 @@ export function puedeCompartirConTexto(): boolean {
  */
 export function textoParaCompartir(datos: {
   conversion: ConversionResult;
+  /**
+   * La moneda contra la que resumir. La manda la calculadora, que es quien
+   * sabe cuál está destacada en pantalla: si aquí se recalculara, el texto y
+   * lo que el usuario está viendo podrían decir cosas distintas.
+   */
+  destino?: RateKey;
   fetchedAt: string;
   sitio: string;
 }): string | null {
   const { conversion, fetchedAt, sitio } = datos;
 
-  const destino = destinoPrincipal(conversion);
+  const destino = datos.destino ?? destinoPrincipal(conversion);
 
   // Con todas las tasas caídas, `destinoPrincipal` cae al bolívar y el resumen
   // sería "X Bs = X Bs". Ahí se comparte solo la imagen, que sí sabe decir "no
