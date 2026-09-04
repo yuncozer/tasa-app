@@ -1,7 +1,8 @@
 "use client";
 
 import { formatAmount, formatClock, formatDate } from "@/lib/format";
-import { RATE_ORDER, rateMeta } from "@/lib/rates";
+import { destinoPrincipal } from "@/lib/convert";
+import { rateMeta } from "@/lib/rates";
 import type { ConversionResult, RateKey } from "@/lib/types";
 
 /**
@@ -123,8 +124,12 @@ export function textoParaCompartir(datos: {
 }): string | null {
   const { conversion, fetchedAt, sitio } = datos;
 
-  const destino = destinoDelResumen(conversion);
-  if (destino === undefined) return null;
+  const destino = destinoPrincipal(conversion);
+
+  // Con todas las tasas caídas, `destinoPrincipal` cae al bolívar y el resumen
+  // sería "X Bs = X Bs". Ahí se comparte solo la imagen, que sí sabe decir "no
+  // disponible" fila por fila.
+  if (destino === conversion.from) return null;
 
   const valor = destino === "VES" ? conversion.bs : conversion.results[destino];
   if (valor === null) return null;
@@ -139,25 +144,4 @@ export function textoParaCompartir(datos: {
     "🧮 Convierte cualquier monto:",
     `👉 ${sitio}`,
   ].join("\n");
-}
-
-/**
- * Contra qué moneda se resume la conversión en una sola línea.
- *
- * Casi siempre el bolívar, que es el pivote de toda la app y la cifra que la
- * pantalla destaca. La excepción es que el origen **ya sea** el bolívar: ahí
- * salía "80.739,00 Bs = 80.739,00 Bs", que no dice nada, y es un caso
- * alcanzable porque "Bs" está en el selector de monedas.
- *
- * En ese caso se toma la primera de `RATE_ORDER` con precio, que es exactamente
- * la primera fila que enseña la imagen: así el texto y la imagen que viajan en
- * el mismo mensaje no pueden resumir cosas distintas.
- *
- * `undefined` cuando no hay ninguna tasa disponible — quien llama comparte
- * entonces solo la imagen, que sí sabe decir "no disponible" fila por fila.
- */
-function destinoDelResumen(conversion: ConversionResult): RateKey | undefined {
-  if (conversion.from !== "VES") return conversion.bs === null ? undefined : "VES";
-
-  return RATE_ORDER.find((clave) => clave !== "VES" && conversion.results[clave] !== null);
 }

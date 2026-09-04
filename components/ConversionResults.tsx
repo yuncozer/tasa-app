@@ -5,14 +5,27 @@ import { Flag } from "@/components/Flag";
 import { Tooltip } from "@/components/Tooltip";
 import { FLAGS } from "@/lib/flags";
 import { formatAmount, formatRate } from "@/lib/format";
+import { destinoPrincipal } from "@/lib/convert";
 import { RATE_ORDER, equivalenceHelp } from "@/lib/rates";
 import type { ConversionResult, RatesSnapshot } from "@/lib/types";
 
 /**
  * Equivalentes del monto en todas las demás bases.
  *
- * La fila de bolívares va destacada porque es el pivote del cálculo: primero se
- * ve en cuántos Bs se convierte el monto y debajo qué se puede comprar con ellos.
+ * La primera fila va destacada porque es el pivote del cálculo: primero se ve en
+ * cuántos Bs se convierte el monto y debajo qué se puede comprar con ellos.
+ *
+ * **Salvo cuando el origen ya son bolívares**, y eso es lo que decide
+ * `destinoPrincipal()` (`lib/convert.ts`). Ahí el pivote es un no-op y el
+ * renglón de honor decía "80.739,00 Bs = 80.739,00 Bs": ocupaba el sitio más
+ * visible de la pantalla para no aportar nada, y encima el botón de copiar de
+ * esa fila copiaba lo que el usuario acababa de teclear. Se asciende la primera
+ * equivalencia con precio, que además **se retira de la lista** de abajo para no
+ * enseñar la misma cifra dos veces.
+ *
+ * La regla vive en `lib/convert.ts` y no aquí porque la comparten la pantalla,
+ * la imagen que se comparte y su pie de texto: los tres viajan juntos en el
+ * mismo mensaje y no pueden resumir cosas distintas.
  */
 export function ConversionResults({
   conversion,
@@ -21,7 +34,11 @@ export function ConversionResults({
   conversion: ConversionResult;
   snapshot: RatesSnapshot;
 }) {
-  const others = RATE_ORDER.filter((key) => key !== conversion.from && key !== "VES");
+  const destino = destinoPrincipal(conversion);
+  const valorDestacado = destino === "VES" ? conversion.bs : conversion.results[destino];
+  const metaDestino = snapshot.rates[destino];
+
+  const others = RATE_ORDER.filter((key) => key !== conversion.from && key !== destino);
 
   return (
     <section aria-labelledby="resultados-titulo" className="flex flex-col gap-2">
@@ -34,19 +51,27 @@ export function ConversionResults({
 
       <div className="flex items-center justify-between gap-2 rounded-2xl border border-[color:var(--accent)]/40 bg-[color:var(--accent)]/10 px-4 py-3">
         <div className="min-w-0">
-          <p className="text-xs text-[color:var(--muted)]">Son, en bolívares</p>
+          {/* "bolívares" en plural y en minúscula es como se lee mejor en el
+              caso normal; para cualquier otra moneda sirve su propia etiqueta,
+              la misma que usan las filas de abajo. */}
+          <p className="text-xs text-[color:var(--muted)]">
+            {destino === "VES" ? "Son, en bolívares" : `Son, en ${metaDestino.label}`}
+          </p>
           <p className="tabular text-2xl font-semibold text-[color:var(--accent)]">
-            {formatAmount(conversion.bs, "VES")}{" "}
-            <span className="text-base font-normal">Bs</span>
+            {formatAmount(valorDestacado, destino)}{" "}
+            <span className="text-base font-normal">{metaDestino.symbol}</span>
           </p>
         </div>
         {/* Compartir va junto a copiar, no en su lugar: copiar sirve cuando
             la cifra tiene que entrar en otra cuenta, y compartir cuando el
             destino es un chat. La imagen se pide solo al pulsar. */}
-        {conversion.bs !== null && (
+        {valorDestacado !== null && (
           <div className="flex shrink-0 items-center gap-1">
             <BotonCompartir conversion={conversion} fetchedAt={snapshot.fetchedAt} />
-            <BotonCopiar texto={formatAmount(conversion.bs, "VES")} etiqueta="monto en bolívares" />
+            <BotonCopiar
+              texto={formatAmount(valorDestacado, destino)}
+              etiqueta={destino === "VES" ? "monto en bolívares" : `monto en ${metaDestino.label}`}
+            />
           </div>
         )}
       </div>

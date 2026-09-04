@@ -28,6 +28,36 @@ export function convert(
   return { amount, from, bs, results };
 }
 
+/**
+ * Contra qué moneda se resume una conversión cuando hay que dar **una sola**
+ * cifra: el renglón destacado de la calculadora, y la línea del texto que
+ * acompaña a la imagen compartida.
+ *
+ * Casi siempre el bolívar, que es el pivote de toda la app y el paso que la
+ * pantalla destaca antes de abrir el abanico. La excepción es que el origen
+ * **ya sea** el bolívar: ahí la cuenta es un no-op y salía "80.739,00 Bs =
+ * 80.739,00 Bs", un renglón que ocupa el sitio de honor para no decir nada. Es
+ * un caso alcanzable, porque "Bs" está en el selector de monedas.
+ *
+ * En ese caso se asciende la primera de `RATE_ORDER` con precio — el dólar BCV
+ * salvo que esté caído—, que es también la primera fila que enseñan la lista de
+ * equivalencias y la imagen. Quien la consume tiene que **quitarla de la
+ * lista**: si no, la misma cifra saldría dos veces.
+ *
+ * Vive aquí y no en cada pantalla porque es exactamente la clase de regla que se
+ * desincroniza: la calculadora, la imagen y el texto que viajan en el mismo
+ * mensaje no pueden resumir cosas distintas.
+ *
+ * Si ninguna otra tasa tiene precio cae al bolívar, o sea a la tautología. Es el
+ * estado en que la app entera está caída y todas las filas dicen "no
+ * disponible": no vale la pena una rama más para adornarlo.
+ */
+export function destinoPrincipal(conversion: ConversionResult): RateKey {
+  if (conversion.from !== "VES") return "VES";
+
+  return RATE_ORDER.find((clave) => clave !== "VES" && conversion.results[clave] !== null) ?? "VES";
+}
+
 /** Comprueba que una cadena corresponde a una base conocida. */
 export function isRateKey(value: unknown): value is RateKey {
   return typeof value === "string" && (RATE_ORDER as string[]).includes(value);
