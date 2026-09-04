@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import Link from "next/link";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
+import { PendienteAlNavegar } from "@/components/admin/PendienteAlNavegar";
+import { Spinner } from "@/components/admin/Spinner";
 import { BotonCopiarTexto } from "@/components/BotonCopiarTexto";
 import { enlaceWhatsapp } from "@/lib/atajos";
 import { formatMensajeCanal } from "@/lib/canal-whatsapp";
@@ -30,6 +33,44 @@ async function leerPosts(): Promise<MediaReciente[] | null> {
 }
 
 /**
+ * El mensaje listo para copiar.
+ *
+ * Vive en su propio componente para poder colgarlo de un `<Suspense>`: armarlo
+ * dejó de ser dar formato a un texto. Desde que el enlace del canal pasa por un
+ * atajo propio, aquí se crea el slug del post y, la primera vez, se copia su
+ * miniatura a Cloudinary — uno o dos segundos en los que la pantalla no decía
+ * nada. Es idempotente: volver a abrir el mismo post reutiliza slug e imagen.
+ */
+async function MensajeParaCanal({ post }: { post: MediaReciente }) {
+  const mensaje = await formatMensajeCanal({
+    caption: post.caption,
+    permalinkPost: post.permalink,
+    imagenUrl: post.imagenUrl,
+  });
+
+  return <BotonCopiarTexto textoInicial={mensaje} enlaceCanal={enlaceWhatsapp()} />;
+}
+
+/**
+ * Lo que se ve mientras tanto. Dice **qué** está pasando y no solo que hay que
+ * esperar: la primera vez que se abre un post hay una subida de por medio, y un
+ * bloque gris sin explicación se lee como que algo se colgó.
+ */
+function EsqueletoMensaje() {
+  return (
+    <div className="flex flex-col gap-2 rounded-2xl border border-border-soft bg-surface px-4 py-4">
+      <p className="flex items-center gap-2 text-sm text-muted">
+        <Spinner className="size-4" />
+        Preparando el enlace del post…
+      </p>
+      <div className="h-3 w-4/5 animate-pulse rounded bg-surface-strong" />
+      <div className="h-3 w-3/5 animate-pulse rounded bg-surface-strong" />
+      <div className="h-3 w-2/3 animate-pulse rounded bg-surface-strong" />
+    </div>
+  );
+}
+
+/**
  * Sin API gratuita de Meta para publicar en un Canal de WhatsApp, el envío es
  * manual: esta página arma el mensaje y el admin lo copia y lo pega él mismo
  * en el canal. La lista de posts sale directo de la Graph API
@@ -47,19 +88,6 @@ export default async function AdminCanalPage({
   const { post } = await searchParams;
   const posts = await leerPosts();
   const seleccionado = posts?.find((item) => item.id === post) ?? null;
-
-  // El mensaje se arma antes del `return` y no dentro del JSX porque ya no es
-  // dar formato a un texto: `formatMensajeCanal` crea el atajo del post y, la
-  // primera vez, copia su miniatura a Cloudinary. Es idempotente —volver a
-  // abrir el mismo post reutiliza slug e imagen— pero conviene que se vea que
-  // aquí hay trabajo de servidor y no una plantilla.
-  const mensaje = seleccionado
-    ? await formatMensajeCanal({
-        caption: seleccionado.caption,
-        permalinkPost: seleccionado.permalink,
-        imagenUrl: seleccionado.imagenUrl,
-      })
-    : null;
 
   return (
     <>
@@ -83,7 +111,13 @@ export default async function AdminCanalPage({
           <Link href="/admin/canal" className="text-xs font-medium text-muted underline">
             ← Elegir otro post
           </Link>
-          <BotonCopiarTexto textoInicial={mensaje ?? ""} enlaceCanal={enlaceWhatsapp()} />
+          {/* La `key` es lo que lo hace suspender de nuevo al cambiar de post:
+              sin ella React reutilizaría el subárbol y dejaría en pantalla el
+              mensaje del anterior mientras se arma el nuevo — mismo motivo que
+              en `/admin/analiticas`. */}
+          <Suspense key={seleccionado.id} fallback={<EsqueletoMensaje />}>
+            <MensajeParaCanal post={seleccionado} />
+          </Suspense>
         </div>
       )}
 
@@ -93,10 +127,24 @@ export default async function AdminCanalPage({
             <Link
               key={item.id}
               href={`/admin/canal?post=${item.id}`}
+              // Sin prefetch a propósito, y es una precaución, no una
+              // corrección de algo observado: abrir este enlace **tiene
+              // efectos** —crea el slug del post y, la primera vez, sube su
+              // miniatura a Cloudinary—, y en producción Next prefetchea los
+              // enlaces al entrar en pantalla. Sin esto, abrir la lista podría
+              // preparar los veintitantos posts de la semana en vez de el que
+              // se elige. No se pudo comprobar en desarrollo porque ahí no hay
+              // prefetch; se deja puesto porque un destino con efectos no debe
+              // dispararse por mirarlo.
+              prefetch={false}
               className="flex flex-col gap-1 rounded-2xl border border-border-soft bg-surface px-4 py-3 transition active:scale-[0.98]"
             >
               <p className="text-xs font-medium text-muted">{formatRelative(item.timestamp)}</p>
               <p className="truncate text-sm">{primeraLinea(item.caption)}</p>
+              {/* Tiene que ir dentro del `<Link>`: `useLinkStatus` lee el
+                  estado del enlace que lo envuelve, así que en una lista se
+                  ilumina el que se tocó y no todos. */}
+              <PendienteAlNavegar />
             </Link>
           ))}
         </div>
