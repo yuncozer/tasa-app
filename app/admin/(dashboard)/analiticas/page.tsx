@@ -22,6 +22,7 @@ import { SelloDeHora } from "@/components/admin/SelloDeHora";
 import { ListaConteo } from "@/components/admin/ListaConteo";
 import { TarjetaMetrica } from "@/components/admin/TarjetaMetrica";
 import { leerAnaliticasWeb, type AnaliticasWeb } from "@/lib/analiticas-web";
+import { construirFichaAnunciante, LO_QUE_NO_SABEMOS, MINIMO_SESIONES } from "@/lib/ficha-anunciante";
 import { formatEntero, formatFechaCorta, formatPercent } from "@/lib/format";
 import { construirConsejos, type Consejo } from "@/lib/consejos-instagram";
 import { crecimientoSeguidores, type CrecimientoSeguidores } from "@/lib/historico-instagram";
@@ -91,7 +92,7 @@ const POR_DEFECTO = 30;
  */
 const MAX_DIAS_INSTAGRAM = 30;
 
-const VISTAS = ["calculadora", "enlaces", "instagram"] as const;
+const VISTAS = ["calculadora", "audiencia", "enlaces", "instagram"] as const;
 type Vista = (typeof VISTAS)[number];
 
 /** La calculadora primero: es el sitio propio, y lo de Instagram ya se ve en Instagram. */
@@ -114,6 +115,7 @@ function leerVista(valor: string | undefined): Vista {
 function Pestanas({ vista, dias }: { vista: Vista; dias: number }) {
   const etiquetas: Record<Vista, string> = {
     calculadora: "Calculadora",
+    audiencia: "Audiencia",
     enlaces: "Enlaces",
     instagram: "Instagram",
   };
@@ -520,6 +522,86 @@ function BloqueInstagram({
  * algo que esperar: si la página los resolviera antes de renderizar, el
  * esqueleto no llegaría a verse nunca y volveríamos a la pantalla en blanco.
  */
+/**
+ * La ficha con la que se cotiza un patrocinio.
+ *
+ * Va en su propia pestaña y no dentro de "Calculadora" porque no se lee para
+ * lo mismo: aquella responde "¿la app le sirve a alguien?" y esta "¿qué le
+ * digo a quien quiere pagar?". Son las mismas filas de `eventos_web` leídas
+ * con otra pregunta, y mezclarlas obligaría a traducir cada cifra al vuelo en
+ * mitad de una conversación.
+ *
+ * Cada cifra viene con **la cuenta que la sostiene** y con **qué significa**:
+ * un porcentaje suelto en una reunión es indefendible en cuanto alguien
+ * pregunta de dónde sale. Y la pantalla dice también lo que **no** se puede
+ * afirmar, que en una negociación vale tanto como lo que sí — prometer datos
+ * demográficos obligaría a empezar a guardarlos, y esta analítica es anónima
+ * por diseño.
+ */
+function BloqueAudiencia({ datos, dias }: { datos: AnaliticasWeb; dias: number }) {
+  const ficha = construirFichaAnunciante(datos);
+
+  return (
+    <Seccion titulo={`Ficha de audiencia · ${dias} días`}>
+      {!ficha.suficiente && (
+        <Aviso>
+          Con {formatEntero(ficha.sesiones)} sesiones en el período, estos porcentajes se mueven
+          demasiado con cada visita suelta como para sostenerlos delante de nadie: faltan{" "}
+          {formatEntero(ficha.faltan)} para el mínimo de {MINIMO_SESIONES}. Las cifras se muestran
+          igual, para seguir la evolución, pero no las lleves todavía a una conversación comercial.
+        </Aviso>
+      )}
+
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+        {ficha.cifras.map((cifra) => (
+          <div
+            key={cifra.clave}
+            className="flex h-full flex-col gap-2 rounded-2xl border border-border-soft bg-surface px-4 py-4"
+          >
+            <span className="text-xs font-semibold uppercase tracking-wide text-muted">
+              {cifra.etiqueta}
+            </span>
+            <span className="tabular text-2xl font-semibold text-foreground">
+              {cifra.clave === "alcance-diario" || cifra.clave === "salidas"
+                ? formatEntero(cifra.valor === null ? null : Math.round(cifra.valor))
+                : formatPercent(cifra.valor)}
+            </span>
+            <span className="text-xs leading-relaxed text-foreground">{cifra.lectura}</span>
+            <span className="mt-auto pt-1 text-[11px] leading-relaxed text-muted">
+              {cifra.soporte}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <ListaConteo
+          titulo="Con qué monedas convierte"
+          filas={datos.monedas}
+          etiquetar={(clave) => rateMeta(clave as RateKey)?.label ?? clave}
+          vacio="Todavía no hay conversiones en el período."
+        />
+        <ListaConteo
+          titulo="De dónde llega"
+          filas={datos.referentes}
+          vacio="Casi todo el tráfico llega sin referente, que es lo normal cuando el enlace se abre desde WhatsApp o desde la app instalada."
+        />
+      </div>
+
+      <div className="flex flex-col gap-2 rounded-2xl border border-border-soft bg-surface px-4 py-4">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">
+          Lo que esta audiencia no se puede afirmar
+        </h3>
+        <ul className="flex flex-col gap-1.5 text-xs leading-relaxed text-muted">
+          {LO_QUE_NO_SABEMOS.map((linea) => (
+            <li key={linea}>· {linea}</li>
+          ))}
+        </ul>
+      </div>
+    </Seccion>
+  );
+}
+
 async function DatosWeb({ dias, vista }: { dias: number; vista: Vista }) {
   const datos = await leerAnaliticasWeb(dias).catch((error: Error) => error);
 
@@ -532,11 +614,9 @@ async function DatosWeb({ dias, vista }: { dias: number; vista: Vista }) {
     );
   }
 
-  return vista === "enlaces" ? (
-    <BloqueEnlaces datos={datos} dias={dias} />
-  ) : (
-    <BloqueWeb datos={datos} dias={dias} />
-  );
+  if (vista === "enlaces") return <BloqueEnlaces datos={datos} dias={dias} />;
+  if (vista === "audiencia") return <BloqueAudiencia datos={datos} dias={dias} />;
+  return <BloqueWeb datos={datos} dias={dias} />;
 }
 
 async function DatosInstagram({ dias }: { dias: number }) {

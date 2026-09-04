@@ -214,6 +214,8 @@ export interface DiaAnalitica {
   fecha: string;
   visitas: number;
   sesiones: number;
+  /** Ver `sesionesSitio` en los totales: aquí, día a día. */
+  sesionesSitio: number;
   conversiones: number;
   atajos: number;
 }
@@ -224,12 +226,32 @@ export interface AnaliticasWeb {
   totales: {
     visitas: number;
     sesiones: number;
+    /**
+     * Sesiones de gente **usando la app**, sin los clics en atajos.
+     *
+     * `sesiones` no es el número de personas: `registrarAtajo()` inventa una
+     * sesión aleatoria por cada clic en `/hoy`, `/wa`, `/ig` o `/laparada`
+     * —ahí no hay pestaña con la que correlacionar nada— así que el total
+     * queda inflado con visitantes que precisamente se van del sitio. Medido:
+     * 558 sesiones contra 333 de sitio en el mismo mes. Para mirar el uso por
+     * dentro daba igual; para la cifra que se le enseña a un anunciante, no.
+     */
+    sesionesSitio: number;
     conversiones: number;
     copias: number;
     instalaciones: number;
     sesionesInstaladas: number;
     sesionesSinConexion: number;
     atajos: number;
+    /**
+     * Sesiones con al menos una conversión, y sesiones que copiaron o
+     * compartieron un monto. Son de nivel sesión —un `count(distinct sesion)`
+     * filtrado— así que no se pueden derivar aquí de las demás cifras: los
+     * calcula la función `analiticas_web` (migración `0019`), que es la que
+     * tiene la tabla delante.
+     */
+    sesionesQueConvierten: number;
+    sesionesQueSeLlevanLaCifra: number;
   };
   serie: DiaAnalitica[];
   tipos: Conteo[];
