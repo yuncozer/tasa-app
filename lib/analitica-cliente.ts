@@ -30,6 +30,7 @@ export type TipoEvento =
   | "visita"
   | "conversion"
   | "copiar"
+  | "compartir"
   | "pegar"
   | "actualizar"
   | "instalar"

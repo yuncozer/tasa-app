@@ -29,6 +29,7 @@ const TIPOS = new Set([
   "atajo",
   "conversion",
   "copiar",
+  "compartir",
   "pegar",
   "actualizar",
   "instalar",

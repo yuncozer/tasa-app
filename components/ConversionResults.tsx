@@ -1,4 +1,5 @@
 import { Info } from "lucide-react";
+import { BotonCompartir } from "@/components/BotonCompartir";
 import { BotonCopiar } from "@/components/BotonCopiar";
 import { Flag } from "@/components/Flag";
 import { Tooltip } from "@/components/Tooltip";
@@ -39,8 +40,14 @@ export function ConversionResults({
             <span className="text-base font-normal">Bs</span>
           </p>
         </div>
+        {/* Compartir va junto a copiar, no en su lugar: copiar sirve cuando
+            la cifra tiene que entrar en otra cuenta, y compartir cuando el
+            destino es un chat. La imagen se pide solo al pulsar. */}
         {conversion.bs !== null && (
-          <BotonCopiar texto={formatAmount(conversion.bs, "VES")} etiqueta="monto en bolívares" />
+          <div className="flex shrink-0 items-center gap-1">
+            <BotonCompartir monto={conversion.amount} origen={conversion.from} />
+            <BotonCopiar texto={formatAmount(conversion.bs, "VES")} etiqueta="monto en bolívares" />
+          </div>
         )}
       </div>
 

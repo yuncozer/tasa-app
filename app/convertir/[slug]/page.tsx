@@ -20,6 +20,7 @@ import {
 import { formatAmount, formatRate, formatRelative } from "@/lib/format";
 import { getRates } from "@/lib/rates";
 import { sitioPublico } from "@/lib/sitio";
+import type { RateKey } from "@/lib/types";
 
 /**
  * La respuesta a "cuánto son 100 dólares en bolívares hoy", en su propia URL.
@@ -65,6 +66,20 @@ import { sitioPublico } from "@/lib/sitio";
  * lista completa; lo que ya no hace falta es dársela a Next.
  */
 export const dynamic = "force-dynamic";
+
+/**
+ * La tasa con la que se compone la vista previa de una moneda.
+ *
+ * La imagen habla el vocabulario de la app —una `RateKey`— y el slug habla el
+ * del lector —una moneda, que puede tener varios precios—. Se elige la primera
+ * de cada moneda, que es la más citada y la misma que encabeza la página.
+ */
+function claveOg(origen: MonedaSeo): RateKey {
+  if (origen === "euros") return "EUR_BCV";
+  if (origen === "pesos") return "COP_OFICIAL";
+  if (origen === "bolivares") return "VES";
+  return "USD_BCV";
+}
 
 function pregunta({ monto, origen, destino }: Conversion): string {
   // El "hoy" no es relleno: es la palabra con la que se busca esto, y la que
@@ -120,6 +135,19 @@ export async function generateMetadata({
       description: `La conversión de hoy, con las tasas del BCV y de Binance P2P.`,
       url: `${sitioPublico()}/convertir/${slug}`,
       type: "website",
+      // La vista previa **es** la conversión, no una tarjeta genérica. Es la
+      // pieza que más lejos llega: cuando alguien pega este enlace en un chat,
+      // los que lo ven leen la cifra sin abrir nada. Mismo criterio que la
+      // imagen propia de `/hoy`, y por eso se compone con la misma plantilla
+      // que usa el botón de compartir — lo que se ve al compartir es lo mismo
+      // se comparta como se comparta.
+      images: [
+        {
+          url: `${sitioPublico()}/api/og/conversion?monto=${monto}&origen=${claveOg(origen)}`,
+          width: 1200,
+          height: 630,
+        },
+      ],
     },
   };
 }
