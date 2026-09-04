@@ -18,7 +18,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "La Tasa — Tasas y calculadora de la frontera",
+  title: "La Tasa — Cuánto vale tu dinero hoy",
   description:
     "Dólar BCV, dólar Binance P2P, euro BCV y peso colombiano en bolívares, con calculadora de conversiones cruzadas.",
   applicationName: "La Tasa",

@@ -9,7 +9,7 @@ import type { MetadataRoute } from "next";
  */
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "La Tasa — Tasas y calculadora de la frontera",
+    name: "La Tasa — Cuánto vale tu dinero hoy",
     short_name: "La Tasa",
     description:
       "Dólar BCV, dólar Binance P2P, euro BCV y peso colombiano en bolívares, con calculadora de conversiones cruzadas.",
