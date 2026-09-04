@@ -121,6 +121,21 @@ const nextConfig: NextConfig = {
         ],
       },
       {
+        // Las páginas de conversión son la puerta de entrada desde un buscador,
+        // así que son las que más tráfico frío pueden recibir de golpe. Leen el
+        // mismo snapshot que la portada y se comportan igual de dinámicas, así
+        // que llevan su misma cabecera: sin ella, cada visita desde un resultado
+        // de búsqueda despertaría una función para repetir una cuenta que no ha
+        // cambiado.
+        source: "/convertir/:slug",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=0, s-maxage=60, stale-while-revalidate=300",
+          },
+        ],
+      },
+      {
         // El historial sale de `historico_tasas`, que solo cambia cuando corre
         // el cron: dos veces al día. Sin esta cabecera cada visita —y cada
         // cambio de pestaña o de tasa, que son navegaciones nuevas— sería un
