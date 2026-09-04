@@ -45,7 +45,7 @@ export function ConversionResults({
             destino es un chat. La imagen se pide solo al pulsar. */}
         {conversion.bs !== null && (
           <div className="flex shrink-0 items-center gap-1">
-            <BotonCompartir monto={conversion.amount} origen={conversion.from} />
+            <BotonCompartir conversion={conversion} fetchedAt={snapshot.fetchedAt} />
             <BotonCopiar texto={formatAmount(conversion.bs, "VES")} etiqueta="monto en bolívares" />
           </div>
         )}

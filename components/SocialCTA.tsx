@@ -1,5 +1,5 @@
 import { MessageCircle } from "lucide-react";
-import { enlaceWhatsapp, perfilInstagram } from "@/lib/atajos";
+import { enlaceWhatsapp } from "@/lib/atajos";
 
 /**
  * Llamado a seguir la cuenta, entre la calculadora y el pie.
@@ -25,8 +25,14 @@ export function SocialCTA() {
       </p>
 
       <div className={`grid gap-2 ${whatsapp ? "grid-cols-2" : "grid-cols-1"}`}>
+        {/* Por `/ig` y no al perfil directo, igual que WhatsApp va por `/wa`:
+            esas rutas existen justamente para contar el clic (`registrarAtajo`),
+            y mientras este enlace apuntó a `instagram.com` no había forma de
+            saber si la app traía un solo seguidor. `/ig` acaba en el mismo
+            sitio —307 con `no-store`— y siempre resuelve, porque
+            `perfilInstagram()` tiene respaldo en el código. */}
         <a
-          href={perfilInstagram()}
+          href="/ig"
           target="_blank"
           rel="noopener noreferrer"
           className="flex items-center justify-center gap-2 rounded-xl border border-accent bg-accent/15 px-3 py-3 text-sm font-semibold text-accent transition active:scale-95"

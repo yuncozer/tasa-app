@@ -1,5 +1,9 @@
 "use client";
 
+import { formatAmount, formatClock, formatDate } from "@/lib/format";
+import { RATE_ORDER, rateMeta } from "@/lib/rates";
+import type { ConversionResult, RateKey } from "@/lib/types";
+
 /**
  * Si este navegador deja compartir **archivos** con el selector del sistema.
  *
@@ -21,27 +25,132 @@ export const sinCambios = () => () => {};
 export const noEnServidor = () => false;
 
 /**
- * El resultado se memoriza porque `getSnapshot` tiene que devolver siempre el
- * mismo valor mientras nada cambie, o React vuelve a renderizar sin fin —el
- * mismo cuidado que documenta `lib/preferencia-moneda.ts`—. Y la comprobación
+ * Los resultados se memorizan porque `getSnapshot` tiene que devolver siempre
+ * el mismo valor mientras nada cambie, o React vuelve a renderizar sin fin —el
+ * mismo cuidado que documenta `lib/preferencia-moneda.ts`—. Y cada comprobación
  * construye un `File`, que no es gratis.
  */
-let cache: boolean | undefined;
+let cacheArchivos: boolean | undefined;
+let cacheConTexto: boolean | undefined;
+
+function archivoDePrueba(): File {
+  return new File([new Uint8Array(1)], "prueba.png", { type: "image/png" });
+}
+
+function haySelector(): boolean {
+  return typeof navigator?.share === "function" && typeof navigator.canShare === "function";
+}
 
 export function haySelectorDeArchivos(): boolean {
-  if (cache !== undefined) return cache;
+  if (cacheArchivos !== undefined) return cacheArchivos;
 
   try {
-    if (typeof navigator?.share !== "function" || typeof navigator.canShare !== "function") {
-      cache = false;
-    } else {
-      const prueba = new File([new Uint8Array(1)], "prueba.png", { type: "image/png" });
-      cache = navigator.canShare({ files: [prueba] });
-    }
+    cacheArchivos = haySelector() && navigator.canShare({ files: [archivoDePrueba()] });
   } catch {
     // Safari en modos restringidos puede lanzar al construir el File.
-    cache = false;
+    cacheArchivos = false;
   }
 
-  return cache;
+  return cacheArchivos;
+}
+
+/**
+ * Si además del archivo acepta **texto en la misma llamada**.
+ *
+ * Se comprueba aparte de `haySelectorDeArchivos()` y no como una condición más
+ * dentro de ella: hay navegadores que aceptan archivos pero rechazan la
+ * combinación, y `canShare` solo responde por la carga exacta que se le pasa.
+ * Sin esta segunda comprobación, `share()` lanzaría justo al pulsar el botón en
+ * los navegadores donde hoy funciona.
+ *
+ * Que sean dos preguntas distintas es lo que permite degradar en vez de
+ * desaparecer: la **visibilidad** del botón la sigue decidiendo la primera, y
+ * esta solo decide si el mensaje lleva pie de texto o va solo con la imagen.
+ */
+export function puedeCompartirConTexto(): boolean {
+  if (cacheConTexto !== undefined) return cacheConTexto;
+
+  try {
+    cacheConTexto =
+      haySelector() && navigator.canShare({ files: [archivoDePrueba()], text: "prueba" });
+  } catch {
+    cacheConTexto = false;
+  }
+
+  return cacheConTexto;
+}
+
+/**
+ * El pie de texto que viaja junto a la imagen de una conversión.
+ *
+ * La imagen ya lleva el dominio y el `@latasa.online` dibujados en su pie
+ * (`Pie` en `lib/og-shared.tsx`), pero **eso no se puede pulsar**: quien recibe
+ * la cifra por WhatsApp no tiene forma de llegar a la app. Este texto es lo que
+ * convierte una imagen bonita en una visita.
+ *
+ * Tres decisiones:
+ *
+ * - **Un solo enlace, y es la calculadora.** Quien acaba de recibir "100 $ =
+ *   80.739 Bs" se pregunta "¿y 250?", y ese es el enlace que se pulsa. Una
+ *   invitación al canal pegada al favor que le hizo un amigo se lee como
+ *   publicidad; y dos enlaces convierten el mensaje en promoción, que es lo que
+ *   hace que deje de reenviarse — y el reenvío es todo el valor de esto. Las
+ *   redes crecen igual un paso después, porque `SocialCTA` está justo debajo de
+ *   la calculadora a la que lleva.
+ * - **Repite la cifra a propósito.** Si el destino descarta la imagen —iOS lo
+ *   hace— el mensaje sigue sirviendo; y en un chat el texto se busca y se copia,
+ *   cosa que una imagen no.
+ * - **Lleva fecha y hora.** Una cifra sin fecha reenviada tres semanas después
+ *   es una tasa vieja servida como fresca, que es el único daño real que esta
+ *   app puede causar. Se formatean con los mismos `formatDate`/`formatClock`
+ *   que usa la imagen, para que las dos digan lo mismo.
+ *
+ * El formato —emoji, etiqueta, salto de línea, `👉 ` y la URL absoluta— es el
+ * de `pieEnlaces()` en `lib/caption.ts`, que es como se ven ya los mensajes del
+ * canal.
+ */
+export function textoParaCompartir(datos: {
+  conversion: ConversionResult;
+  fetchedAt: string;
+  sitio: string;
+}): string | null {
+  const { conversion, fetchedAt, sitio } = datos;
+
+  const destino = destinoDelResumen(conversion);
+  if (destino === undefined) return null;
+
+  const valor = destino === "VES" ? conversion.bs : conversion.results[destino];
+  if (valor === null) return null;
+
+  const cifra = (monto: number, clave: RateKey) =>
+    `${formatAmount(monto, clave)} ${rateMeta(clave).shortLabel}`;
+
+  return [
+    `💱 ${cifra(conversion.amount, conversion.from)} = ${cifra(valor, destino)}`,
+    `🕒 Tasa del ${formatDate(fetchedAt)}, ${formatClock(fetchedAt)}`,
+    "",
+    "🧮 Convierte cualquier monto:",
+    `👉 ${sitio}`,
+  ].join("\n");
+}
+
+/**
+ * Contra qué moneda se resume la conversión en una sola línea.
+ *
+ * Casi siempre el bolívar, que es el pivote de toda la app y la cifra que la
+ * pantalla destaca. La excepción es que el origen **ya sea** el bolívar: ahí
+ * salía "80.739,00 Bs = 80.739,00 Bs", que no dice nada, y es un caso
+ * alcanzable porque "Bs" está en el selector de monedas.
+ *
+ * En ese caso se toma la primera de `RATE_ORDER` con precio, que es exactamente
+ * la primera fila que enseña la imagen: así el texto y la imagen que viajan en
+ * el mismo mensaje no pueden resumir cosas distintas.
+ *
+ * `undefined` cuando no hay ninguna tasa disponible — quien llama comparte
+ * entonces solo la imagen, que sí sabe decir "no disponible" fila por fila.
+ */
+function destinoDelResumen(conversion: ConversionResult): RateKey | undefined {
+  if (conversion.from !== "VES") return conversion.bs === null ? undefined : "VES";
+
+  return RATE_ORDER.find((clave) => clave !== "VES" && conversion.results[clave] !== null);
 }
