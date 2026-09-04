@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const pagina = await listarMedia({ tipo, cursor });
-    return apiJson(pagina, { cachear: false });
+    return apiJson(pagina);
   } catch (error) {
     return apiError("No se pudo listar la biblioteca de Cloudinary", error);
   }

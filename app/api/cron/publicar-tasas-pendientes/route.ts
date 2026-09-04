@@ -48,7 +48,7 @@ export async function GET(request: Request) {
 
   const pendiente = await reclamarPendiente().catch(() => null);
   if (!pendiente) {
-    return apiJson({ ok: true, estado: "nada_pendiente" }, { cachear: false });
+    return apiJson({ ok: true, estado: "nada_pendiente" });
   }
 
   if (pendiente.intentos === INTENTOS_PARA_AVISAR) {
@@ -61,14 +61,14 @@ export async function GET(request: Request) {
   const modo = (await leerAjustesDiaSeguro(pendiente.fecha))[pendiente.momento];
   if (modo === "apagado") {
     await marcarPublicada(pendiente.id).catch(() => {});
-    return apiJson({ ok: true, estado: "apagado" }, { cachear: false });
+    return apiJson({ ok: true, estado: "apagado" });
   }
 
   try {
     const snapshot = await getRates();
     if (!tasasBaseCompletas(snapshot)) {
       await liberarPendiente(pendiente.id);
-      return apiJson({ ok: true, estado: "sigue_incompleta" }, { cachear: false });
+      return apiJson({ ok: true, estado: "sigue_incompleta" });
     }
 
     // La misma guardia que aplicó el cron normal: si publicara aquí, el dato
@@ -76,12 +76,12 @@ export async function GET(request: Request) {
     // de nada. Sin avisar: el correo ya salió en el disparo que la detectó.
     if (await revisarCordura(snapshot)) {
       await liberarPendiente(pendiente.id);
-      return apiJson({ ok: true, estado: "salto_anomalo" }, { cachear: false });
+      return apiJson({ ok: true, estado: "salto_anomalo" });
     }
 
     const { mediaId, enlace } = await publicarTasasDelDia(siteUrl, pendiente.momento, modo);
     await marcarPublicada(pendiente.id);
-    return apiJson({ ok: true, estado: "publicada", mediaId, enlace }, { cachear: false });
+    return apiJson({ ok: true, estado: "publicada", mediaId, enlace });
   } catch (error) {
     // Error transitorio (Meta, Supabase, la propia red): se suelta la fila
     // para reintentar en 2 minutos, en vez de darla por perdida. El estado

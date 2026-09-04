@@ -2,30 +2,31 @@
  * Piezas comunes de la API REST: respuestas de error y política de caché.
  */
 
-/**
- * Caché en la CDN, no en el navegador.
- *
- * - `max-age=0`: el teléfono del usuario no guarda copia propia, así que una
- *   corrección nuestra nunca queda pegada en su dispositivo.
- * - `s-maxage=60`: la CDN sí guarda, y sirve la misma respuesta a todo el mundo
- *   durante un minuto. Así el BCV, Binance y datos.gov.co reciben como mucho una
- *   consulta por minuto, entre dos personas o entre dos mil: sin esto, cada
- *   instancia que Vercel levanta nace con la caché en memoria vacía y repite la
- *   ronda de llamadas.
- * - `stale-while-revalidate=300`: al vencer el minuto se entrega igualmente la
- *   copia anterior al instante y se refresca por detrás, de modo que nadie espera
- *   a que respondan las fuentes.
- */
-const CACHE_TASAS = "public, max-age=0, s-maxage=60, stale-while-revalidate=300";
-
-/** Lo contrario: nada de cachés, ni la del navegador ni la de la CDN. */
+/** Nada de cachés, ni la del navegador ni la de la CDN. */
 const SIN_CACHE = "no-store";
 
-/** Respuesta JSON que la CDN puede compartir entre usuarios. */
-export function apiJson(data: unknown, opciones?: { cachear?: boolean }): Response {
-  return Response.json(data, {
-    headers: { "Cache-Control": opciones?.cachear === false ? SIN_CACHE : CACHE_TASAS },
-  });
+/**
+ * Respuesta JSON de la API. **Nunca cacheada, y ese es el valor seguro.**
+ *
+ * Aquí vivía una cabecera de CDN (`s-maxage=60`) que compartía la respuesta
+ * entre todos los usuarios durante un minuto, y era lo correcto mientras las
+ * rutas de datos eran públicas: así el BCV, Binance y datos.gov.co recibían una
+ * consulta por minuto entre dos personas o entre dos mil.
+ *
+ * Dejó de serlo al ponerles clave (`lib/api-publica.ts`). Una CDN cachea por
+ * URL, no por cabecera, así que el primer 200 servido a quien sí tiene clave se
+ * habría entregado igual a quien no la tiene: la puerta se cerraba por delante
+ * y quedaba abierta por detrás. Y como las únicas cuatro llamadas que usaban
+ * esa rama son justo las que se cerraron, la opción entera se retiró en vez de
+ * quedarse como un valor por defecto peligroso para la siguiente ruta pública
+ * que alguien escriba.
+ *
+ * A los proveedores los sigue protegiendo `lib/cache.ts`, con sus cinco minutos
+ * en memoria — que es lo que de verdad hacía el trabajo, y ahora además solo lo
+ * pide quien tiene clave.
+ */
+export function apiJson(data: unknown): Response {
+  return Response.json(data, { headers: { "Cache-Control": SIN_CACHE } });
 }
 
 /**

@@ -30,7 +30,7 @@ export async function PATCH(request: NextRequest) {
 
   try {
     await guardarCamposParada({ lugar, compra, venta, caption });
-    return apiJson({ ok: true }, { cachear: false });
+    return apiJson({ ok: true });
   } catch (error) {
     return apiError("No se pudo guardar el borrador", error);
   }

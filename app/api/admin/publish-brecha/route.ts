@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
         ? await publishStory(urlAlertaBrecha("9:16", comparar))
         : await ejecutarPublicacion({ tipo: "brecha", caption: buildCaptionBrecha(alerta), comparar });
 
-    return apiJson({ ok: true, mediaId, destino }, { cachear: false });
+    return apiJson({ ok: true, mediaId, destino });
   } catch (error) {
     return apiError(
       destino === "historia" ? "No se pudo publicar la Historia" : "No se pudo publicar la alerta de brecha",

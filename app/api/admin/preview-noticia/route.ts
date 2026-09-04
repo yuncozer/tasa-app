@@ -34,7 +34,6 @@ export async function POST(request: NextRequest) {
         imageUrl,
         descargaUrl: urlDescargaImagen(imageUrl),
       },
-      { cachear: false },
     );
   } catch (error) {
     return apiError("No se pudo generar la vista previa del artículo", error);

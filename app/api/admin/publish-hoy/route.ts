@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const { mediaId, enlace } = await publicarTasasDelDia(siteUrl);
-    return apiJson({ ok: true, mediaId, enlace }, { cachear: false });
+    return apiJson({ ok: true, mediaId, enlace });
   } catch (error) {
     return apiError("No se pudo publicar el post de Instagram", error);
   }

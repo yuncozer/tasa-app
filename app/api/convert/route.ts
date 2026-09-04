@@ -1,4 +1,5 @@
 import { apiError } from "@/lib/api";
+import { claveApiValida } from "@/lib/api-publica";
 import { convert, isRateKey } from "@/lib/convert";
 import { getRates, RATE_ORDER } from "@/lib/rates";
 
@@ -10,6 +11,9 @@ import { getRates, RATE_ORDER } from "@/lib/rates";
  * responder al instante mientras se teclea.
  */
 export async function POST(request: Request) {
+  const sinClave = claveApiValida(request);
+  if (sinClave) return sinClave;
+
   let body: unknown;
   try {
     body = await request.json();

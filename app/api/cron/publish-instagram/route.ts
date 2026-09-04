@@ -85,7 +85,7 @@ export async function GET(request: NextRequest) {
     const modo = momento ? (await leerAjustesDiaSeguro(fechaDeHoy()))[momento] : "completo";
 
     if (modo === "apagado") {
-      return apiJson({ ok: true, estado: "apagado", momento }, { cachear: false });
+      return apiJson({ ok: true, estado: "apagado", momento });
     }
 
     if (momento) {
@@ -93,7 +93,7 @@ export async function GET(request: NextRequest) {
 
       if (!tasasBaseCompletas(snapshot)) {
         await registrarPendiente(fechaDeHoy(), momento);
-        return apiJson({ ok: true, estado: "pendiente" }, { cachear: false });
+        return apiJson({ ok: true, estado: "pendiente" });
       }
 
       // La otra mitad de la puerta: una tasa presente pero imposible (ver
@@ -109,15 +109,17 @@ export async function GET(request: NextRequest) {
           formatRate(anomalia.referencia),
           formatPercent(anomalia.variacion * 100),
         );
-        return apiJson(
-          { ok: true, estado: "pendiente", motivo: "salto_anomalo", clave: anomalia.clave },
-          { cachear: false },
-        );
+        return apiJson({
+          ok: true,
+          estado: "pendiente",
+          motivo: "salto_anomalo",
+          clave: anomalia.clave,
+        });
       }
     }
 
     const { mediaId, enlace } = await publicarTasasDelDia(siteUrl, momento, modo);
-    return apiJson({ ok: true, modo, mediaId, enlace }, { cachear: false });
+    return apiJson({ ok: true, modo, mediaId, enlace });
   } catch (error) {
     // El aviso va aquí y no dentro de `publicarTasasDelDia()`: lo que hay que
     // reportar es "el disparo de las 9:00 no publicó", y solo esta ruta sabe

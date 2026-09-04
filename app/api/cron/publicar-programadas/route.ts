@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
   }
 
   if (!programada) {
-    return apiJson({ ok: true, publicada: null }, { cachear: false });
+    return apiJson({ ok: true, publicada: null });
   }
 
   const resultado = await avanzarPublicacion(programada);
@@ -56,5 +56,5 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  return apiJson({ ok: true, id: programada.id, ...resultado }, { cachear: false });
+  return apiJson({ ok: true, id: programada.id, ...resultado });
 }

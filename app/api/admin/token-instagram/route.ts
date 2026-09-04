@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const resultado = await refrescarToken(true);
-    return apiJson({ ok: true, ...resultado }, { cachear: false });
+    return apiJson({ ok: true, ...resultado });
   } catch (error) {
     return apiError("No se pudo renovar el token de Instagram", error);
   }

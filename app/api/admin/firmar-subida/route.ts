@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    return apiJson(firmarSubidaDirecta(), { cachear: false });
+    return apiJson(firmarSubidaDirecta());
   } catch (error) {
     return apiError("No se pudo firmar la subida", error);
   }

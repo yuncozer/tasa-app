@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
       caption,
       ...leerMarcaVideo(body),
     });
-    return apiJson({ ok: true, mediaId }, { cachear: false });
+    return apiJson({ ok: true, mediaId });
   } catch (error) {
     return apiError("No se pudo publicar el video", error);
   }

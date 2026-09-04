@@ -40,7 +40,6 @@ export async function GET(request: Request) {
         ...resultado,
         avisar: resultado.diasRestantes !== null && resultado.diasRestantes <= DIAS_PARA_AVISAR,
       },
-      { cachear: false },
     );
   } catch (error) {
     // Es el aviso más importante de todos: si el refresco falla varios días

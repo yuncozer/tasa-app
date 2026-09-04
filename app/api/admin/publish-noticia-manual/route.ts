@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
       tipo: "manual",
       datos: { title, sourceHost, caption, imagenPublicId },
     });
-    return apiJson({ ok: true, mediaId }, { cachear: false });
+    return apiJson({ ok: true, mediaId });
   } catch (error) {
     return apiError("No se pudo publicar la noticia", error);
   }

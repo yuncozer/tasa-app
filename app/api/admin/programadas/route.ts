@@ -76,7 +76,7 @@ export async function PATCH(request: NextRequest) {
       // O ya salió, o el worker la reclamó mientras se editaba.
       return apiError("Esa publicación ya no se puede editar", undefined, 409);
     }
-    return apiJson({ ok: true }, { cachear: false });
+    return apiJson({ ok: true });
   } catch (error) {
     return apiError("No se pudo guardar la publicación", error);
   }
@@ -97,7 +97,7 @@ export async function DELETE(request: NextRequest) {
       // casos conviene perder la fila, que es el único rastro de qué pasó.
       return apiError("Esa publicación ya no se puede quitar de la cola", undefined, 409);
     }
-    return apiJson({ ok: true }, { cachear: false });
+    return apiJson({ ok: true });
   } catch (error) {
     return apiError("No se pudo quitar la publicación de la cola", error);
   }

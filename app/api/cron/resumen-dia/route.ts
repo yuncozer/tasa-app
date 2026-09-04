@@ -33,9 +33,9 @@ export async function GET(request: Request) {
 
   const resumen = await construirResumenDia();
   if (resumen.vacio) {
-    return apiJson({ ok: true, enviado: false, motivo: "sin_datos" }, { cachear: false });
+    return apiJson({ ok: true, enviado: false, motivo: "sin_datos" });
   }
 
   const enviado = await notificarResumenDia(resumen);
-  return apiJson({ ok: true, enviado }, { cachear: false });
+  return apiJson({ ok: true, enviado });
 }

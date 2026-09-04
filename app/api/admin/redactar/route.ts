@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
     // Que el modelo no haya respondido no es un fallo de esta petición: es la
     // degradación prevista. Se contesta 200 con `texto: null` y la interfaz dice
     // que se mantiene el texto de plantilla.
-    return apiJson({ texto, origen: texto === null ? "plantilla" : "ia" }, { cachear: false });
+    return apiJson({ texto, origen: texto === null ? "plantilla" : "ia" });
   } catch (error) {
     return apiError("No se pudo redactar el texto", error);
   }

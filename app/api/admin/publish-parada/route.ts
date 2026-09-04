@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
       // /laparada cae a su respaldo (el perfil) si esto falla.
     }
 
-    return apiJson({ ok: true, mediaId }, { cachear: false });
+    return apiJson({ ok: true, mediaId });
   } catch (error) {
     return apiError("No se pudo publicar el post de La Parada", error);
   }

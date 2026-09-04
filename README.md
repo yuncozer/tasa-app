@@ -56,17 +56,24 @@ mercado es la mejor aproximación verificable.
 
 ## API REST
 
-| Método | Ruta | Devuelve |
-| --- | --- | --- |
-| `GET` | `/api/rates` | Todas las tasas. `?refresh=1` pide una lectura nueva si la guardada ya tiene 20 s |
-| `GET` | `/api/rates/bcv` | Dólar y euro oficiales |
-| `GET` | `/api/rates/binance` | Mercado P2P en VES y en COP, con compra, venta y punto medio, para una operación de referencia |
-| `GET` | `/api/rates/cop` | TRM, precio P2P del peso y sus dos valores en Bs |
-| `POST` | `/api/convert` | Equivalencias de un monto |
-| `GET` | `/api/health` | Estado de cada proveedor (`200` sano, `207` degradado). Dice si responde y su degradación, nunca el error interno |
+**Las rutas de datos necesitan clave.** Se manda en la cabecera
+`x-api-key: <clave>`, y las válidas viven en `API_KEYS` separadas por comas.
+Sin ella responden `401` diciendo cómo pedir una. `/api/health` y
+`/api/eventos` siguen abiertas: la primera es un diagnóstico que no publica
+ninguna tasa, y la segunda la llama el navegador de cada visitante.
+
+| Método | Ruta | Clave | Devuelve |
+| --- | --- | --- | --- |
+| `GET` | `/api/rates` | sí | Todas las tasas. `?refresh=1` pide una lectura nueva si la guardada ya tiene 20 s |
+| `GET` | `/api/rates/bcv` | sí | Dólar y euro oficiales |
+| `GET` | `/api/rates/binance` | sí | Mercado P2P en VES y en COP, con compra, venta y punto medio, para una operación de referencia |
+| `GET` | `/api/rates/cop` | sí | TRM, precio P2P del peso y sus dos valores en Bs |
+| `POST` | `/api/convert` | sí | Equivalencias de un monto |
+| `GET` | `/api/health` | no | Estado de cada proveedor (`200` sano, `207` degradado). Dice si responde y su degradación, nunca el error interno |
 
 ```bash
 curl -X POST localhost:3000/api/convert \
+  -H "x-api-key: $API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"amount":100,"from":"USD_BCV"}'
 ```
@@ -121,6 +128,7 @@ ellas, el resto de la app funciona igual. Ver `.env.example`.
 | `PERFIL_INSTAGRAM_URL` | `instagram.com/latasa.online` | Destino de `/ig` |
 | `ENLACE_WHATSAPP` | — | Destino de `/wa`. Sin ella la ruta no existe |
 | `ADMIN_PASSWORD` | — | Contraseña de `/admin`. Secreto aparte de `CRON_SECRET` |
+| `API_KEYS` | — | Claves de la API de datos, separadas por comas. Sin ella nadie entra a `/api/rates` ni a `/api/convert` |
 | `SESSION_VERSION` | `1` | Subirla invalida de golpe todas las sesiones abiertas de `/admin`, sin cambiar la contraseña |
 | `FIRMA_IMAGENES_SECRET` | `CRON_SECRET` | Secreto con el que se firman los parámetros de `instagram-post-news`. Separado a propósito: rotar la firma no debería obligar a rotar el acceso a publicar |
 | `OPENROUTER_API_KEY` | — | Clave de OpenRouter. Sin ella no aparecen los botones de "Redactar con IA" (ver [Textos con IA](#textos-con-ia)) |

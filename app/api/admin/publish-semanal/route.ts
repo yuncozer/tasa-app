@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
   try {
     if (destino === "historia") {
       const { mediaId } = await publishStory(urlReporteSemanal("9:16"));
-      return apiJson({ ok: true, mediaId, destino }, { cachear: false });
+      return apiJson({ ok: true, mediaId, destino });
     }
 
     // Solo el feed necesita el reporte, y solo si el caption no viene escrito:
@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
       buildCaptionSemanal(await construirReporteSemanal(await getRates()), analisis ?? undefined);
 
     const { mediaId } = await ejecutarPublicacion({ tipo: "semanal", caption });
-    return apiJson({ ok: true, mediaId, destino }, { cachear: false });
+    return apiJson({ ok: true, mediaId, destino });
   } catch (error) {
     return apiError(
       destino === "historia" ? "No se pudo publicar la Historia" : "No se pudo publicar el reporte semanal",

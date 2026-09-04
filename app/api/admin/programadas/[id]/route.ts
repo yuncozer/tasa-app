@@ -28,7 +28,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     if (fila.estado !== "pendiente" && fila.estado !== "fallida") {
       return apiError("Esa publicación ya no se puede editar", undefined, 409);
     }
-    return apiJson({ id: fila.id, publicarEn: fila.publicar_en, payload: fila.payload }, { cachear: false });
+    return apiJson({ id: fila.id, publicarEn: fila.publicar_en, payload: fila.payload });
   } catch (error) {
     return apiError("No se pudo leer la publicación", error);
   }

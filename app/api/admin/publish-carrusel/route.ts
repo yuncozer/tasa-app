@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
       datos: { title: title || undefined, sourceHost, principal, elementos, proporcion },
       caption,
     });
-    return apiJson({ ok: true, mediaId }, { cachear: false });
+    return apiJson({ ok: true, mediaId });
   } catch (error) {
     return apiError("No se pudo publicar el carrusel", error);
   }

@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const { mediaId } = await publishNewsPost(url);
-    return apiJson({ ok: true, mediaId }, { cachear: false });
+    return apiJson({ ok: true, mediaId });
   } catch (error) {
     return apiError("No se pudo publicar el post de la noticia", error);
   }

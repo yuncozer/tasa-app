@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const { imageUrl } = previewManualNewsPost({ title, sourceHost, caption, imagenPublicId });
-    return apiJson({ title, sourceHost, caption, imageUrl, descargaUrl: urlDescargaImagen(imageUrl) }, { cachear: false });
+    return apiJson({ title, sourceHost, caption, imageUrl, descargaUrl: urlDescargaImagen(imageUrl) });
   } catch (error) {
     return apiError("No se pudo generar la vista previa", error);
   }

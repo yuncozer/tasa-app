@@ -45,12 +45,12 @@ export async function GET(request: Request) {
   try {
     const encontrado = await buscarArticuloParada();
     if (!encontrado) {
-      return apiJson({ ok: true, detectado: false }, { cachear: false });
+      return apiJson({ ok: true, detectado: false });
     }
 
     const pendiente = await leerParadaPendiente().catch(() => null);
     if (pendiente?.url === encontrado.url) {
-      return apiJson({ ok: true, detectado: false, url: encontrado.url }, { cachear: false });
+      return apiJson({ ok: true, detectado: false, url: encontrado.url });
     }
 
     const article = await fetchArticle(encontrado.url);
@@ -72,10 +72,7 @@ export async function GET(request: Request) {
     // el admin revisa es mejor que ningún borrador, y la pantalla avisa de
     // que no se pudo fechar. `false` sí bloquea: es la columna de otro día.
     if (esDeHoy === false) {
-      return apiJson(
-        { ok: true, detectado: false, motivo: "no_es_de_hoy", titulo: article.title },
-        { cachear: false },
-      );
+      return apiJson({ ok: true, detectado: false, motivo: "no_es_de_hoy", titulo: article.title });
     }
 
     const caption = buildParadaCaption(article);
@@ -94,7 +91,7 @@ export async function GET(request: Request) {
     // `notificar()` nunca lanza, así que aquí ya no hace falta envolverlo.
     await notificarParadaPendiente(article.title);
 
-    return apiJson({ ok: true, detectado: true, url: encontrado.url }, { cachear: false });
+    return apiJson({ ok: true, detectado: true, url: encontrado.url });
   } catch (error) {
     return apiError("No se pudo vigilar el artículo de La Parada", error);
   }

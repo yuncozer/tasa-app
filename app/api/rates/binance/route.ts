@@ -1,4 +1,5 @@
 import { apiError, apiJson } from "@/lib/api";
+import { claveApiValida } from "@/lib/api-publica";
 import { getRates } from "@/lib/rates";
 
 /**
@@ -7,7 +8,10 @@ import { getRates } from "@/lib/rates";
  * Devuelve las dos monedas: `ves` es el dólar paralelo venezolano y `cop` el
  * precio real del peso, que es la otra pata de la tasa de frontera.
  */
-export async function GET() {
+export async function GET(request: Request) {
+  const sinClave = claveApiValida(request);
+  if (sinClave) return sinClave;
+
   try {
     const snapshot = await getRates();
     if (!snapshot.binance.ves && !snapshot.binance.cop) {

@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
     }
 
     await guardarAjusteDia(fechaDeHoy(), momento, modo as ModoPublicacion);
-    return apiJson({ ok: true, momento, modo }, { cachear: false });
+    return apiJson({ ok: true, momento, modo });
   } catch (error) {
     return apiError("No se pudo guardar el ajuste", error);
   }

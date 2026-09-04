@@ -1847,6 +1847,51 @@ cosa acotada y **ninguna pretende ser autenticación** donde no puede haberla.
   sigue funcionando sin el privilegio porque a un disparador lo invoca el motor
   como su propietario—.
 
+### La API de datos está cerrada, y ahí hay algo que vender
+
+`/api/rates`, sus tres rutas por proveedor y `/api/convert` piden una clave
+(`x-api-key`, contra la lista de `API_KEYS`). Estuvieron abiertas y cacheadas en
+la CDN desde el principio: cualquiera podía montar una app encima de estas tasas
+sin que aquí se supiera, y sin que nadie pagara nada.
+
+**Es la única parte del proyecto pensada como producto**, y conviene tenerlo
+presente antes de "simplificar" el guardián:
+
+- **Lo gratis lo dan diez sitios; el histórico no.** La serie de
+  `historico_tasas` con **mañana y tarde separadas** —desde la migración `0005`,
+  agosto de 2026— no la tiene nadie más, y es lo que le sirve a un comercio de
+  la frontera, a un contador o a un ecommerce que necesita la tasa del día por
+  código. El acceso en vivo es el gancho; el histórico es el plan de pago.
+- **Dar de alta a un cliente es añadir su clave a `API_KEYS`.** No hay tabla ni
+  pantalla de administración a propósito: hoy no hay ni un cliente, y construir
+  la facturación antes del primer cobro es trabajo que se tira. Cuando haya
+  varios y haga falta saber quién consume cuánto, entonces sí toca la tabla —
+  y ese es el momento, no antes.
+- **El 401 dice cómo conseguir una clave**, y eso no es cortesía: quien llega
+  hasta ahí quería estos datos, o sea que es exactamente la persona a la que se
+  le podría vender el acceso. Un rechazo mudo convierte un cliente potencial en
+  alguien que se va a buscar otra fuente.
+- **Los rechazos se anotan en el log del servidor.** Es lo que permite responder
+  una pregunta que antes no tenía respuesta: si alguien estaba usando esto. Sin
+  ese registro, cerrar la API sería enterarse por un correo enfadado o no
+  enterarse nunca.
+
+**La cabecera de CDN se retiró con el cierre, y no es un descuido.** Una CDN
+cachea por URL y no por cabecera, así que el primer `200` servido a quien sí
+tiene clave se habría entregado igual a quien no la tiene: la puerta cerrada por
+delante y abierta por detrás. `apiJson` ya no admite la opción — a los
+proveedores los protege `lib/cache.ts` con sus cinco minutos en memoria, que es
+lo que de verdad hacía el trabajo.
+
+**Lo que sigue abierto, y por qué:**
+
+- **`/api/health`**: dice si un proveedor responde y con qué degradación, nunca
+  una tasa. Cerrarlo rompería cualquier monitor de disponibilidad apuntado ahí
+  sin proteger un solo dato.
+- **`/api/eventos`**: la llama el navegador de cada visitante, así que no puede
+  llevar clave. Su defensa es otra —conjunto cerrado y techo por IP—.
+- **Las rutas `/api/og/*`**: Meta tiene que poder descargarlas al publicar.
+
 ### El aviso legal se queda
 
 El pie declara que los datos son de terceros, que La Tasa no fija ni certifica

@@ -1,4 +1,5 @@
 import { apiError, apiJson } from "@/lib/api";
+import { claveApiValida } from "@/lib/api-publica";
 import { getRates } from "@/lib/rates";
 
 /**
@@ -7,7 +8,10 @@ import { getRates } from "@/lib/rates";
  * `trm` es el dólar oficial de Colombia y `copMercado` el del P2P; de ahí salen
  * los dos precios del peso en bolívares: el de papel y el de la frontera.
  */
-export async function GET() {
+export async function GET(request: Request) {
+  const sinClave = claveApiValida(request);
+  if (sinClave) return sinClave;
+
   try {
     const snapshot = await getRates();
     if (snapshot.trm === null && snapshot.copMercado === null) {

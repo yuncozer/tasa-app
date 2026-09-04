@@ -1,5 +1,6 @@
 import { getRates, pedirTasasFrescas } from "@/lib/rates";
 import { apiError, apiJson } from "@/lib/api";
+import { claveApiValida } from "@/lib/api-publica";
 import type { NextRequest } from "next/server";
 
 /**
@@ -14,13 +15,16 @@ import type { NextRequest } from "next/server";
  * que solo tira las tasas y solo si ya tienen unos segundos.
  */
 export async function GET(request: NextRequest) {
+  const sinClave = claveApiValida(request);
+  if (sinClave) return sinClave;
+
   try {
     const forzar = request.nextUrl.searchParams.get("refresh") === "1";
     if (forzar) pedirTasasFrescas();
 
     // Una petición que pide datos frescos a propósito no debe quedar guardada en
     // la CDN: si no, la siguiente recibiría lo mismo sin consultar nada.
-    return apiJson(await getRates(), { cachear: !forzar });
+    return apiJson(await getRates());
   } catch (error) {
     return apiError("No se pudieron obtener las tasas", error);
   }

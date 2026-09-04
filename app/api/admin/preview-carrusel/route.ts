@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
       elementos,
       proporcion,
     });
-    return apiJson({ elementos: resultado }, { cachear: false });
+    return apiJson({ elementos: resultado });
   } catch (error) {
     return apiError("No se pudo generar la vista previa del carrusel", error);
   }

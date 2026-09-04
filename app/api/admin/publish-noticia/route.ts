@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
       caption,
       imagenPublicId: imagenPropiaPublicId,
     });
-    return apiJson({ ok: true, mediaId }, { cachear: false });
+    return apiJson({ ok: true, mediaId });
   } catch (error) {
     return apiError("No se pudo publicar el post de la noticia", error);
   }

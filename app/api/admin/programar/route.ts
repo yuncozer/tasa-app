@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
   try {
     const congelado = await materializarParaProgramar(payload);
     const programada = await programarPublicacion(publicarEn.toISOString(), congelado);
-    return apiJson({ ok: true, id: programada.id }, { cachear: false });
+    return apiJson({ ok: true, id: programada.id });
   } catch (error) {
     return apiError("No se pudo programar la publicación", error);
   }

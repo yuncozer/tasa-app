@@ -35,9 +35,9 @@ export async function POST(request: NextRequest) {
     programada = (await reclamarPorId(id)) ?? (await reclamarEnProceso(id));
     if (!programada) {
       const actual = await leerProgramada(id);
-      if (actual?.estado === "publicada") return apiJson({ estado: "publicada" }, { cachear: false });
+      if (actual?.estado === "publicada") return apiJson({ estado: "publicada" });
       if (actual?.estado === "publicando") {
-        return apiJson({ estado: "en_proceso", fase: actual.fase }, { cachear: false });
+        return apiJson({ estado: "en_proceso", fase: actual.fase });
       }
       return apiError("Esa publicación ya no se puede publicar desde aquí", undefined, 409);
     }
@@ -46,5 +46,5 @@ export async function POST(request: NextRequest) {
   }
 
   const resultado = await avanzarPublicacion(programada);
-  return apiJson(resultado, { cachear: false });
+  return apiJson(resultado);
 }
