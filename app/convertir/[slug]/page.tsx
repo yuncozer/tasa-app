@@ -13,7 +13,6 @@ import {
   nombreMonto,
   parseSlug,
   slugDe,
-  todasLasConversiones,
   type Conversion,
   type FilaConversion,
   type MonedaSeo,
@@ -43,10 +42,29 @@ import { sitioPublico } from "@/lib/sitio";
  * ahí que el enlace a la portada esté arriba y abajo, y no escondido.
  */
 
-/** Las 72 páginas se conocen de antemano; cualquier otro slug es un 404. */
-export function generateStaticParams(): { slug: string }[] {
-  return todasLasConversiones().map((conversion) => ({ slug: slugDe(conversion) }));
-}
+/**
+ * Se renderiza en cada petición, como la portada, y **no se prerenderiza**.
+ *
+ * Aquí hubo un `generateStaticParams()` con las 72 rutas, que es lo que uno
+ * escribe por reflejo cuando la lista de páginas es finita y conocida. Estaba
+ * mal, y en producción se vio enseguida: Next las prerenderizó en el build, así
+ * que lo que servía a la gente eran las tasas del instante en que compiló
+ * Vercel. Binance falló durante ese build y las dos filas de Binance decían
+ * "Tasa no disponible" mientras `/api/rates` tenía 980 y 965.
+ *
+ * El daño potencial es peor que esa fila vacía: por el mismo camino la página
+ * podría haber servido un **número** viejo como si fuera el de hoy, que es lo
+ * único que esta app tiene prohibido hacer. Una página que dice "hoy" en el
+ * titular no puede salir de un artefacto de compilación.
+ *
+ * Quien evita golpear a los proveedores no es el prerender sino la cabecera
+ * de CDN de `next.config.ts` (`s-maxage=60`), exactamente igual que en la
+ * portada, más los cinco minutos de `lib/cache.ts`.
+ *
+ * `todasLasConversiones()` sigue existiendo para el sitemap, que sí quiere la
+ * lista completa; lo que ya no hace falta es dársela a Next.
+ */
+export const dynamic = "force-dynamic";
 
 function pregunta({ monto, origen, destino }: Conversion): string {
   // El "hoy" no es relleno: es la palabra con la que se busca esto, y la que
