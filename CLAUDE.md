@@ -1468,6 +1468,44 @@ veces al día, cuando el cron publica, el teléfono suena con las cifras dentro.
   `includeUncontrolled`— y ese fallo se traga: no puede impedir el foco, que es
   lo que de verdad se pidió.
 
+#### Rotar las claves VAPID sin tumbar las suscripciones
+
+VAPID es una **identidad**, no un secreto compartido: el navegador le entrega
+la clave pública al servidor push al suscribirse, y ese servicio la deja pegada
+a la suscripción. Firmar con otra clave devuelve **403** y el aviso no se
+entrega — no existe forma de decirle "actualiza la clave de esta suscripción".
+Por eso `.env.example` dice que estas claves no se rotan.
+
+No está implementado, y **no debe implementarse hasta que haga falta**: hoy
+apenas empiezan a entrar suscripciones, y escribir el mecanismo de rotación
+antes de tener a quien no romper es código que el día de la verdad nunca se ha
+ejecutado. Queda la receta, que es lo que de verdad se pierde si no se anota:
+
+- **El servidor acepta las dos claves durante la transición.** Se guarda el par
+  viejo en `VAPID_PRIVATE_KEY_ANTERIOR` (con su pública) y `avisarTasasDelDia()`
+  firma con el nuevo; ante un **403** reintenta ese envío con el viejo. No hace
+  falta migración ni columna: el 403 *es* la señal de que esa suscripción es de
+  las anteriores. Encaja con lo que el código ya hace — solo borra ante 404 y
+  410, así que un 403 deja la fila viva en vez de darla por muerta.
+- **El navegador se resuscribe solo, sin diálogo.** En `lib/avisos.ts`, al
+  cargar: si la clave con la que este dispositivo se suscribió no es la actual,
+  `unsubscribe()` + `subscribe()` con la nueva + alta y baja contra
+  `/api/push`. **No sale ningún permiso**: `Notification.permission` sigue en
+  `granted`, que es del sitio y no de la clave. Con cuál se suscribió se guarda
+  en `localStorage` al activar —con su `try/catch`, que Safari en privado lanza
+  al tocarlo—: `subscription.options.applicationServerKey` existe, pero su
+  soporte no es parejo entre navegadores y aquí no hace falta arriesgarlo.
+
+Las dos juntas son lo que hace que no se caiga nadie: la primera mantiene vivos
+a los que todavía no han abierto la app, y lo que los trae de vuelta a abrirla
+es el propio aviso que sigue llegando gracias a ella — **el aviso dispara su
+propia migración**. A las pocas semanas la clave vieja no la usa nadie y se
+retira la variable.
+
+**Lo que ninguna de las dos salva** es perder la privada vieja: sin ella no hay
+reintento posible y se cae todo el mundo a la vez. Esa defensa no es código —
+es tener el par guardado fuera de `.env.local`.
+
 ### La IA solo redacta prosa, y siempre con revisión humana
 
 Dos textos de `/admin` se pueden pedir a un modelo de OpenRouter (plan gratuito):
