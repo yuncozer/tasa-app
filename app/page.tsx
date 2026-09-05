@@ -6,6 +6,7 @@ import { Logo } from "@/components/Logo";
 import { OfflineNotice } from "@/components/OfflineNotice";
 import { ParadaCard } from "@/components/ParadaCard";
 import { RatePanel } from "@/components/RatePanel";
+import { AvisoTasas } from "@/components/AvisoTasas";
 import { SocialCTA } from "@/components/SocialCTA";
 import { paradaDelDia } from "@/lib/parada";
 import { getRates, pedirTasasFrescas } from "@/lib/rates";
@@ -64,6 +65,12 @@ export default async function Home({
       </Link>
 
       <Calculator snapshot={snapshot} />
+
+      {/* Debajo de la calculadora y antes del CTA de redes: quien acaba de
+          hacer una cuenta es el que puede querer que le avisen mañana, y
+          ofrecérselo antes de que haya usado la app sería pedirle algo sin
+          haberle dado nada. Se pinta solo donde el navegador puede recibirlos. */}
+      <AvisoTasas />
       <SocialCTA />
       <Footer fetchedAt={snapshot.fetchedAt} />
     </main>

@@ -1404,6 +1404,70 @@ Tres reglas:
   9:00 no publicó", y solo la ruta sabe de qué disparo se trata — la función
   la comparten también el botón manual y la cola de pendientes.
 
+### El aviso push es el único momento en que la app llama al usuario
+
+Hasta ahora todo el retorno dependía de que alguien abriera el icono o viera
+Instagram. Los avisos "ya están las tasas de hoy" (`lib/push.ts`,
+`app/api/push/route.ts`, `lib/avisos.ts`, `components/AvisoTasas.tsx`, más los
+manejadores `push` y `notificationclick` de `public/sw.js`) invierten eso: dos
+veces al día, cuando el cron publica, el teléfono suena con las cifras dentro.
+
+- **Un solo aviso, sin umbral y sin configuración**, y es una decisión, no una
+  primera versión a medias. Un umbral por persona ("avísame si el Binance pasa
+  de 900") obliga a guardar preferencias por dispositivo, y eso convierte una
+  tabla de entrega en un perfil. Además responde antes la pregunta que de
+  verdad decide si esto sirve: cuánta gente lo activa.
+- **Lo único que se guarda es la suscripción del navegador** (migración
+  `0021`): endpoint, `p256dh` y `auth`. El endpoint es inevitablemente un
+  identificador —sin él no hay a dónde entregar— pero es lo único que hay, y no
+  se cruza con `eventos_web`: la analítica anota `avisos`/`alta` y
+  `avisos`/`baja` sin nada del dispositivo, así que sigue sin poder saberse
+  quién está suscrito.
+- **El texto lo compone el servidor, nunca el service worker**
+  (`avisoDeTasas()`). Lleva la hora de la lectura por la regla dura de siempre:
+  una cifra sin la hora a la que se leyó es una tasa vieja servida como fresca.
+  Y usa `formatRate`/`formatClock`, los mismos que la imagen y el caption — las
+  tres piezas del mismo disparo no pueden decir cifras distintas. Son **dos
+  tasas y no las seis**: un cuerpo de notificación se corta a dos líneas, y el
+  resto está a un toque, que es justo a donde lleva el aviso.
+- **Un push sin cuerpo no muestra nada.** El navegador despierta al worker por
+  su cuenta, y sacar ahí una notificación vacía o inventada es peor que no
+  sacar ninguna.
+- **Lo dispara `publicarTasasDelDia()` y solo con `momento` explícito**, o sea
+  los dos crons y nunca el botón manual de `/admin/hoy` — mismo criterio que
+  `registrarSnapshot()`: ahí hay una persona probando, y una prueba no puede
+  sonar en el teléfono de todo el mundo. Va en su propio `try/catch` tragado,
+  como anotar el enlace: el post ya está en la cuenta, y un aviso que no sale
+  no puede convertir una publicación correcta en un error que invite a
+  reintentar.
+- **`avisarTasasDelDia()` nunca lanza**, y sin las claves VAPID no manda nada y
+  el cron publica igual — mismo criterio que `RESEND_API_KEY`. Envía en tandas
+  de 20 (mil sockets de golpe no caben en el minuto de la función) y **borra
+  sola** la suscripción que devuelva 404 o 410: esa ya no existe y guardarla
+  solo alarga cada envío futuro. Es la única limpieza que la tabla necesita.
+- **`/api/push` sí contesta errores**, al revés que `/api/eventos`. Allí quien
+  llama es un `sendBeacon` que no mira la respuesta y un 4xx solo sería un
+  oráculo; aquí hay alguien que acaba de pulsar un botón y espera ver si quedó
+  activado. Hereda las otras dos defensas —techo por IP y descarte de lo
+  cross-site— porque es la segunda ruta pública que escribe en Supabase.
+- **El permiso se pide al pulsar, nunca al abrir la pantalla**, igual que el
+  portapapeles: un diálogo que salta al entrar se rechaza por reflejo, y una
+  vez denegado no hay segunda oportunidad desde el código.
+- **El botón no se pinta donde el navegador no puede recibirlos**, que en
+  iPhone es cualquier pestaña de Safari — ahí iOS solo lo permite con la app
+  instalada. No se detecta por sistema operativo sino preguntando por
+  `PushManager`, que es lo que de verdad decide. Mismo criterio que "Pegar":
+  uno que nunca funciona es peor que ninguno.
+- **`AvisoTasas` usa un `useEffect`, y es la excepción justificada** a la regla
+  de `useSyncExternalStore`: saber si este dispositivo ya está suscrito no lo
+  dice `navigator` de forma síncrona, hay que preguntárselo al service worker y
+  eso es una promesa.
+- **Al tocar el aviso se reutiliza una ventana abierta** en vez de abrir otra:
+  en el teléfono, con la app instalada, dos instancias de lo mismo. `navigate()`
+  rechaza si la pestaña no la controla el worker —posible con
+  `includeUncontrolled`— y ese fallo se traga: no puede impedir el foco, que es
+  lo que de verdad se pidió.
+
 ### La IA solo redacta prosa, y siempre con revisión humana
 
 Dos textos de `/admin` se pueden pedir a un modelo de OpenRouter (plan gratuito):

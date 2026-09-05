@@ -136,6 +136,8 @@ ellas, el resto de la app funciona igual. Ver `.env.example`.
 | `RESEND_API_KEY` | — | Clave de Resend para los avisos por correo. Sin ella no se manda ninguno y todo lo demás sigue igual |
 | `RESEND_FROM` | `La Tasa <onboarding@resend.dev>` | Remitente de esos correos |
 | `NOTIFICAR_EMAIL` | — | A dónde llegan los avisos (borrador de La Parada, post que no salió, programada fallida, token que no se pudo renovar). Se sigue aceptando el nombre anterior `NOTIFICAR_PARADA_EMAIL` |
+| `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | — | Clave pública VAPID de los avisos push. Viaja al navegador a propósito |
+| `VAPID_PRIVATE_KEY` | — | Su pareja privada. Sin las dos no se manda ningún aviso y el post sale igual |
 
 ## Caché y actualización
 

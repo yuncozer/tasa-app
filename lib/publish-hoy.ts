@@ -3,6 +3,7 @@ import { buildCaption } from "@/lib/caption";
 import { guardarEnlace } from "@/lib/enlaces";
 import { registrarSnapshot } from "@/lib/historico";
 import { permalinkDeMedia, publishCarouselPost, publishStory } from "@/lib/instagram";
+import { avisarTasasDelDia, avisoDeTasas } from "@/lib/push";
 import { getRates } from "@/lib/rates";
 import { guardarSnapshotHoy } from "@/lib/snapshot-hoy";
 
@@ -128,6 +129,25 @@ export async function publicarTasasDelDia(
       await guardarEnlace("hoy", enlace);
     } catch {
       enlace = null;
+    }
+  }
+
+  // El aviso push, con las mismas cifras que acaban de publicarse.
+  //
+  // Va **solo con `momento` explícito**, o sea solo desde los dos crons y no
+  // desde el botón manual de `/admin/hoy` — mismo criterio que
+  // `registrarSnapshot()` unas líneas arriba. Ahí hay una persona que puede
+  // estar probando, y una prueba no puede sonar en el teléfono de todo el
+  // mundo.
+  //
+  // Y va en su propio `try/catch` tragado, como anotar el enlace y las
+  // Historias: el post ya está en la cuenta, y un aviso que no sale no puede
+  // convertir una publicación correcta en un error que invite a reintentar.
+  if (momento) {
+    try {
+      await avisarTasasDelDia(avisoDeTasas(snapshot, momento));
+    } catch {
+      // Sin aviso, el post ya publicado sigue en pie.
     }
   }
 

@@ -10,7 +10,7 @@
  * respuesta de `/api/` desde la caché, porque ahí sí pasaría por fresca.
  */
 
-const VERSION = "v9";
+const VERSION = "v10";
 const ATAJOS = ["/hoy", "/laparada", "/ig", "/wa"];
 const CACHE_PAGINA = `latasa-pagina-${VERSION}`;
 const CACHE_ESTATICOS = `latasa-estaticos-${VERSION}`;
@@ -196,4 +196,77 @@ self.addEventListener("fetch", (event) => {
   if (url.pathname.startsWith("/_next/static/") || /\.(png|svg|ico|webmanifest)$/.test(url.pathname)) {
     event.respondWith(estatico(request));
   }
+});
+
+/**
+ * El aviso "ya están las tasas de hoy".
+ *
+ * Llega del cron después de publicar, con las cifras dentro
+ * (`lib/push.ts`). Dos cosas que no son gratuitas:
+ *
+ * - **Sin datos no se muestra nada.** Un push sin cuerpo lo manda el navegador
+ *   al despertar el worker por su cuenta, y sacar ahí una notificación vacía o
+ *   inventada es peor que no sacar ninguna — la regla de siempre: no se
+ *   muestra lo que no se sabe.
+ * - **El cuerpo lleva la hora.** Lo compone el servidor, no este archivo: una
+ *   cifra sin la hora a la que se leyó es una tasa vieja servida como fresca,
+ *   que es el único daño real que esta app puede causar.
+ *
+ * `tag` fijo para que dos avisos del mismo día se sustituyan en vez de
+ * apilarse: son la misma información actualizada, y una bandeja con cuatro
+ * notificaciones iguales se silencia entera.
+ */
+self.addEventListener("push", (event) => {
+  if (!event.data) return;
+
+  let aviso;
+  try {
+    aviso = event.data.json();
+  } catch {
+    return;
+  }
+
+  if (!aviso || !aviso.titulo || !aviso.cuerpo) return;
+
+  event.waitUntil(
+    self.registration.showNotification(aviso.titulo, {
+      body: aviso.cuerpo,
+      icon: "/icon-192.png",
+      badge: "/icon-192.png",
+      tag: "tasas-del-dia",
+      renotify: true,
+      data: { ruta: typeof aviso.ruta === "string" ? aviso.ruta : "/" },
+    }),
+  );
+});
+
+/**
+ * Al tocar el aviso se abre la app.
+ *
+ * Si ya hay una pestaña de La Tasa abierta se **reutiliza** en vez de abrir
+ * otra: en el teléfono, con la app instalada, abrir una ventana nueva deja dos
+ * instancias de lo mismo. Solo se abre una si no había ninguna.
+ */
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const ruta = (event.notification.data && event.notification.data.ruta) || "/";
+
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(async (ventanas) => {
+      for (const ventana of ventanas) {
+        const suya = new URL(ventana.url);
+        if (suya.origin !== self.location.origin || !("focus" in ventana)) continue;
+
+        // `navigate()` rechaza cuando la pestaña no la controla este worker,
+        // que es justo lo que `includeUncontrolled` deja entrar: una abierta
+        // antes de que el worker tomara el control. Ese fallo no puede
+        // impedir el foco, que es lo que de verdad pide quien tocó el aviso.
+        if (suya.pathname !== ruta && "navigate" in ventana) {
+          await ventana.navigate(ruta).catch(() => {});
+        }
+        return ventana.focus();
+      }
+      return self.clients.openWindow(ruta);
+    }),
+  );
 });
