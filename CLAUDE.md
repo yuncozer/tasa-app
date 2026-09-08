@@ -1445,6 +1445,36 @@ veces al día, cuando el cron publica, el teléfono suena con las cifras dentro.
   de 20 (mil sockets de golpe no caben en el minuto de la función) y **borra
   sola** la suscripción que devuelva 404 o 410: esa ya no existe y guardarla
   solo alarga cada envío futuro. Es la única limpieza que la tabla necesita.
+- **Pero "nunca lanza" no es "nunca se entera nadie".** Tragar el error y
+  además tirar el recuento que devolvía dejó unos avisos que no salían
+  pasando días sin que se notara: la tabla tenía sus filas, el cron publicaba
+  y el fallo no dejaba rastro en ninguna parte. Ahora cada envío fallido que
+  **no** sea un 404/410 se registra con su código y con el cuerpo de la
+  respuesta —que es donde Apple y Google explican el motivo—, cada tanda deja
+  una línea de resumen, y el recuento viaja hasta la respuesta de los dos
+  crons que publican, así que un `enviados: 0` repetido se ve en el log de
+  cron-job.org. Sigue sin lanzar: se registra, no se propaga.
+- **El `sub` del JWT se extrae, no se interpola.** Es el `mailto:` que firma
+  cada envío, y aquí se armaba con `` `mailto:${NOTIFICAR_EMAIL ?? …}` ``.
+  Esa variable es la de los correos de `lib/notificar.ts`, donde vale tanto
+  `Nombre <a@b.com>` como una lista, y con `??` una variable declarada pero
+  **vacía** —justo como la trae `.env.example`— daba `mailto:` a secas;
+  `NOTIFICAR_PARADA_EMAIL`, que allí se sigue aceptando, aquí no se miraba.
+  Apple contesta **403 BadJwtToken** a las tres formas y no entrega nada.
+  `destinatarioVapid()` saca la dirección con una expresión regular y cae a
+  una del dominio si no hay ninguna utilizable: el `sub` no dice a quién llega
+  el aviso —solo a quién acudir si hay un problema con los envíos—, así que un
+  respaldo aquí no puede equivocarse de destinatario.
+- **Un aviso que no llega casi nunca es el código.** Las piezas se comprueban
+  de fuera hacia dentro y cada una tiene su síntoma: que la fila esté en
+  `suscripciones_push`; que la suscripción siga viva (firmar contra su
+  endpoint con un par cualquiera devuelve un error de clave si vive y **410
+  BadSubscription** si está muerta); que la pública que sirve el sitio sea la
+  misma con la que se suscribió el navegador (con la pública correcta y una
+  privada falsa el error pasa de `VapidPkHashMismatch` a `BadJwtToken`, y esa
+  diferencia es justo el diagnóstico); y por último que la privada de
+  producción sea la pareja de esa pública. Lo que no se puede comprobar desde
+  fuera es esa última, que es la que no sale del entorno.
 - **`/api/push` sí contesta errores**, al revés que `/api/eventos`. Allí quien
   llama es un `sendBeacon` que no mira la respuesta y un 4xx solo sería un
   oráculo; aquí hay alguien que acaba de pulsar un botón y espera ver si quedó

@@ -79,9 +79,11 @@ export async function GET(request: Request) {
       return apiJson({ ok: true, estado: "salto_anomalo" });
     }
 
-    const { mediaId, enlace } = await publicarTasasDelDia(siteUrl, pendiente.momento, modo);
+    const { mediaId, enlace, aviso } = await publicarTasasDelDia(siteUrl, pendiente.momento, modo);
     await marcarPublicada(pendiente.id);
-    return apiJson({ ok: true, estado: "publicada", mediaId, enlace });
+    // El recuento de avisos push, por lo mismo que en el cron de tasas: es la
+    // única señal visible de que salieron o no.
+    return apiJson({ ok: true, estado: "publicada", mediaId, enlace, aviso });
   } catch (error) {
     // Error transitorio (Meta, Supabase, la propia red): se suelta la fila
     // para reintentar en 2 minutos, en vez de darla por perdida. El estado

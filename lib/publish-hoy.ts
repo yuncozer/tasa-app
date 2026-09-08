@@ -3,7 +3,7 @@ import { buildCaption } from "@/lib/caption";
 import { guardarEnlace } from "@/lib/enlaces";
 import { registrarSnapshot } from "@/lib/historico";
 import { permalinkDeMedia, publishCarouselPost, publishStory } from "@/lib/instagram";
-import { avisarTasasDelDia, avisoDeTasas } from "@/lib/push";
+import { avisarTasasDelDia, avisoDeTasas, type ResultadoAviso } from "@/lib/push";
 import { getRates } from "@/lib/rates";
 import { guardarSnapshotHoy } from "@/lib/snapshot-hoy";
 
@@ -11,6 +11,15 @@ export interface ResultadoPublicacionHoy {
   /** `null` en modo `solo_historias`: ahí no hay post de feed que enlazar. */
   mediaId: string | null;
   enlace: string | null;
+  /**
+   * Cuántos avisos push salieron en este disparo. `null` sin `momento`, que es
+   * el botón manual de `/admin/hoy`: ahí no se avisa a nadie.
+   *
+   * Se devuelve para que la ruta del cron lo anote en su respuesta. Sin esto
+   * el recuento se calculaba y se tiraba, así que ni el log de cron-job.org ni
+   * nadie podía ver que llevaba días enviando cero.
+   */
+  aviso: ResultadoAviso | null;
 }
 
 /**
@@ -143,13 +152,14 @@ export async function publicarTasasDelDia(
   // Y va en su propio `try/catch` tragado, como anotar el enlace y las
   // Historias: el post ya está en la cuenta, y un aviso que no sale no puede
   // convertir una publicación correcta en un error que invite a reintentar.
+  let aviso: ResultadoAviso | null = null;
   if (momento) {
     try {
-      await avisarTasasDelDia(avisoDeTasas(snapshot, momento));
+      aviso = await avisarTasasDelDia(avisoDeTasas(snapshot, momento));
     } catch {
       // Sin aviso, el post ya publicado sigue en pie.
     }
   }
 
-  return { mediaId, enlace };
+  return { mediaId, enlace, aviso };
 }

@@ -118,8 +118,12 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const { mediaId, enlace } = await publicarTasasDelDia(siteUrl, momento, modo);
-    return apiJson({ ok: true, modo, mediaId, enlace });
+    const { mediaId, enlace, aviso } = await publicarTasasDelDia(siteUrl, momento, modo);
+    // `aviso` va en la respuesta para que el recuento de avisos push quede a
+    // la vista en el log de cron-job.org: un `enviados: 0` día tras día es lo
+    // único que delata que los avisos dejaron de salir, porque el post sí se
+    // publica y nada más lo nota.
+    return apiJson({ ok: true, modo, mediaId, enlace, aviso });
   } catch (error) {
     // El aviso va aquí y no dentro de `publicarTasasDelDia()`: lo que hay que
     // reportar es "el disparo de las 9:00 no publicó", y solo esta ruta sabe

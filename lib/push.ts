@@ -36,6 +36,18 @@ const TABLA = "suscripciones_push";
  */
 const POR_TANDA = 20;
 
+export interface ResultadoAviso {
+  enviados: number;
+  borrados: number;
+  /**
+   * Los que fallaron por algo que no es una suscripción muerta. Casi siempre
+   * es configuración —claves VAPID que no se corresponden con las que usó el
+   * navegador al suscribirse, o un `sub` inválido—, y el motivo exacto va al
+   * log del servidor.
+   */
+  fallidos: number;
+}
+
 export interface SuscripcionPush {
   endpoint: string;
   p256dh: string;
@@ -113,6 +125,34 @@ function vapid(): { publica: string; privada: string } | null {
   return publica && privada ? { publica, privada } : null;
 }
 
+/**
+ * El `sub` del JWT de VAPID: a quién acudir si un servidor push necesita
+ * avisar de un problema con estos envíos.
+ *
+ * Tiene que ser un `mailto:` **con una dirección detrás**. Aquí se reutilizaba
+ * `NOTIFICAR_EMAIL` con `??`, y eso rompía los avisos de tres formas, todas
+ * silenciosas: con la variable declarada pero vacía —que es justo como la
+ * trae `.env.example`— salía `mailto:` a secas; con el formato
+ * `Nombre <a@b.com>`, que es válido para Resend porque va en el campo `to` de
+ * un correo, salía un `mailto:` con un nombre dentro; y con
+ * `NOTIFICAR_PARADA_EMAIL` (la variable antigua, que `lib/notificar.ts` sigue
+ * aceptando) no salía nada. Apple contesta a cualquiera de las tres con
+ * **403 BadJwtToken** y no entrega el aviso.
+ *
+ * Por eso se extrae la dirección en vez de interpolar el valor crudo, y se
+ * cae a una del dominio si no hay ninguna utilizable: el `sub` no identifica
+ * al usuario ni cambia a quién llega el aviso, así que un respaldo aquí no
+ * puede equivocarse de destinatario — solo evita que un correo mal escrito
+ * deje sin avisos a todo el mundo.
+ */
+function destinatarioVapid(): string {
+  const declarado = process.env.NOTIFICAR_EMAIL || process.env.NOTIFICAR_PARADA_EMAIL || "";
+  // Vale tanto `a@b.com` como `Nombre <a@b.com>`, y se queda con el primero
+  // si hay una lista separada por comas.
+  const direccion = declarado.match(/[^\s<>,;]+@[^\s<>,;]+\.[^\s<>,;]+/)?.[0];
+  return `mailto:${direccion ?? "hola@latasa.online"}`;
+}
+
 export interface AvisoPush {
   titulo: string;
   cuerpo: string;
@@ -133,21 +173,26 @@ export interface AvisoPush {
  * limpió los datos, cambió de teléfono— y guardarla solo haría que cada envío
  * futuro tardara más. Es la única limpieza que esta tabla necesita.
  */
-export async function avisarTasasDelDia(aviso: AvisoPush): Promise<{ enviados: number; borrados: number }> {
+export async function avisarTasasDelDia(aviso: AvisoPush): Promise<ResultadoAviso> {
   const claves = vapid();
-  if (!claves) return { enviados: 0, borrados: 0 };
+  if (!claves) {
+    console.error("[push] sin claves VAPID configuradas: no se manda ningún aviso");
+    return { enviados: 0, borrados: 0, fallidos: 0 };
+  }
 
   let suscripciones: SuscripcionPush[];
   try {
     suscripciones = await listarSuscripciones();
-  } catch {
-    return { enviados: 0, borrados: 0 };
+  } catch (error) {
+    console.error("[push] no se pudo leer la lista de suscripciones:", error);
+    return { enviados: 0, borrados: 0, fallidos: 0 };
   }
 
-  webpush.setVapidDetails(`mailto:${process.env.NOTIFICAR_EMAIL ?? "hola@latasa.online"}`, claves.publica, claves.privada);
+  webpush.setVapidDetails(destinatarioVapid(), claves.publica, claves.privada);
 
   const carga = JSON.stringify(aviso);
   let enviados = 0;
+  let fallidos = 0;
   const caducadas: string[] = [];
 
   for (let i = 0; i < suscripciones.length; i += POR_TANDA) {
@@ -163,7 +208,24 @@ export async function avisarTasasDelDia(aviso: AvisoPush): Promise<{ enviados: n
           enviados += 1;
         } catch (error) {
           const codigo = (error as { statusCode?: number }).statusCode;
-          if (codigo === 404 || codigo === 410) caducadas.push(s.endpoint);
+          if (codigo === 404 || codigo === 410) {
+            caducadas.push(s.endpoint);
+            return;
+          }
+
+          // Todo lo demás **se registra**. Antes se tragaba en silencio, y esa
+          // es la razón por la que unos avisos que no salían pudieron pasar
+          // días sin que nadie lo notara: la tabla tenía sus filas, el cron
+          // publicaba, y el único rastro del fallo no existía en ninguna
+          // parte. Un 400/403 aquí es un problema de configuración (claves
+          // VAPID que no se corresponden, `sub` inválido) que se arregla en un
+          // minuto **si se sabe**, así que el cuerpo de la respuesta —donde
+          // Apple y Google explican el motivo— va al log.
+          fallidos += 1;
+          console.error(
+            `[push] ${codigo ?? "sin código"} al enviar a ${s.endpoint.slice(0, 40)}…:`,
+            (error as { body?: string }).body ?? (error as Error).message,
+          );
         }
       }),
     );
@@ -177,7 +239,11 @@ export async function avisarTasasDelDia(aviso: AvisoPush): Promise<{ enviados: n
     }
   }
 
-  return { enviados, borrados: caducadas.length };
+  console.log(
+    `[push] ${enviados} enviados, ${fallidos} fallidos, ${caducadas.length} caducados de ${suscripciones.length} suscripciones`,
+  );
+
+  return { enviados, borrados: caducadas.length, fallidos };
 }
 
 /**
