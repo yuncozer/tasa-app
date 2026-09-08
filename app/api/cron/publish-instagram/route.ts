@@ -5,7 +5,7 @@ import { esCronAutorizado } from "@/lib/cron-auth";
 import { revisarCordura } from "@/lib/cordura-tasas";
 import { formatPercent, formatRate } from "@/lib/format";
 import { notificarFalloPublicacion, notificarTasaAnomala } from "@/lib/notificar";
-import { publicarTasasDelDia } from "@/lib/publish-hoy";
+import { SnapshotNoCongelado, publicarTasasDelDia } from "@/lib/publish-hoy";
 import { getRates } from "@/lib/rates";
 import { fechaDeHoy, registrarPendiente, tasasBaseCompletas } from "@/lib/tasas-pendientes";
 
@@ -41,6 +41,12 @@ import { fechaDeHoy, registrarPendiente, tasasBaseCompletas } from "@/lib/tasas-
  * hasta que las cuatro estén completas. Ese gate solo aplica aquí, con
  * `momento` explícito: el botón manual de `/admin/hoy` publica con lo que
  * haya, porque ahí decide una persona mirando la pantalla.
+ *
+ * **Tampoco publica si no se pudo congelar el snapshot** (`SnapshotNoCongelado`
+ * desde `publicarTasasDelDia()`). Esa es la tercera puerta y se trata igual
+ * que las otras dos: a `tasas_pendientes` y 200 con `estado: "pendiente"`. La
+ * diferencia es que esta la lanza la propia función y aplica también al botón
+ * manual — ver la sección de `CLAUDE.md`.
  *
  * A diferencia del resto de las rutas de la API, esta sí exige autenticación:
  * publica en una cuenta real y no debe poder dispararla cualquiera que
@@ -121,6 +127,21 @@ export async function GET(request: NextRequest) {
     const { mediaId, enlace } = await publicarTasasDelDia(siteUrl, momento, modo);
     return apiJson({ ok: true, modo, mediaId, enlace });
   } catch (error) {
+    // No se pudo congelar el snapshot, así que no se publicó nada y Meta ni
+    // se enteró. Es la tercera puerta de esta ruta, junto a las tasas
+    // incompletas y el salto anómalo, y se trata igual que aquellas: a la
+    // cola, 200 con `estado: "pendiente"` y el cron de dos minutos lo
+    // reintenta entero. No es un fallo de la petición ni merece correo — la
+    // espera larga ya avisa sola en el intento 15, y un 504 suelto de
+    // Supabase se resuelve en el siguiente disparo.
+    //
+    // Sin `momento` no hay fila que encolar (una prueba manual contra esta
+    // ruta), así que ahí se reporta como el error que es.
+    if (error instanceof SnapshotNoCongelado && momento) {
+      await registrarPendiente(fechaDeHoy(), momento).catch(() => {});
+      return apiJson({ ok: true, estado: "pendiente", motivo: "snapshot_no_congelado" });
+    }
+
     // El aviso va aquí y no dentro de `publicarTasasDelDia()`: lo que hay que
     // reportar es "el disparo de las 9:00 no publicó", y solo esta ruta sabe
     // de qué disparo se trata. Como mucho son dos correos al día.

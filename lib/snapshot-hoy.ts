@@ -66,6 +66,25 @@ async function rest<T>(query: string, init: RequestInit & { prefer?: string } = 
 }
 
 /**
+ * Cuántas veces se intenta congelar el snapshot antes de rendirse, y cuánto
+ * se espera entre intentos.
+ *
+ * No es una precaución teórica: el 8 de septiembre de 2026 este `POST`
+ * respondió **504** a las 22:00:04 —un timeout puntual del gateway de
+ * Supabase, con el `registrarSnapshot()` de medio segundo antes en 200— y
+ * siete segundos después Meta descargó las imágenes leyendo todavía el
+ * snapshot de la mañana. El post de la tarde salió con la imagen diciendo
+ * "09:00 AM" y 967,46 Bs mientras el caption decía 970,00. Ese día hubo nueve
+ * 504 sueltos repartidos entre cuatro tablas del proyecto: es intermitencia
+ * del edge, y un segundo intento la cubre entera.
+ *
+ * Tres intentos con esperas cortas caben de sobra en el minuto de la función,
+ * que en ese punto todavía no ha empezado a hablar con Meta.
+ */
+const REINTENTOS = 3;
+const ESPERA_MS = 700;
+
+/**
  * Congela el snapshot que se acaba de publicar.
  *
  * Va **antes** de llamar a Meta, no después: los contenedores del carrusel
@@ -73,13 +92,35 @@ async function rest<T>(query: string, init: RequestInit & { prefer?: string } = 
  * fila ya tiene que apuntar al mismo snapshot que arma el caption — así la
  * primera descarga y cualquier visita posterior a `/hoy` ven exactamente lo
  * mismo.
+ *
+ * `actualizado_en` viaja **explícito** en el cuerpo. El `default now()` de la
+ * tabla solo corre en el `INSERT`, y como aquí siempre se choca contra la
+ * misma clave, el `ON CONFLICT DO UPDATE` de `merge-duplicates` escribe
+ * únicamente las columnas que se mandan: esa fecha se quedó congelada en el
+ * 21 de agosto de 2026 mientras el snapshot se sobreescribía dos veces al
+ * día. Es justo la columna que uno mira para saber si lo congelado
+ * corresponde al último disparo, así que tiene que decir la verdad.
+ *
+ * Lanza si tras los reintentos no se pudo escribir. Quien llama **no debe
+ * tragarse ese error**: sin esta fila al día, las imágenes del post salen con
+ * las cifras del disparo anterior.
  */
 export async function guardarSnapshotHoy(snapshot: RatesSnapshot): Promise<void> {
-  await rest<undefined>("", {
-    method: "POST",
-    prefer: "resolution=merge-duplicates,return=minimal",
-    body: JSON.stringify({ clave: CLAVE, snapshot }),
-  });
+  const fila = { clave: CLAVE, snapshot, actualizado_en: new Date().toISOString() };
+
+  for (let intento = 1; intento <= REINTENTOS; intento++) {
+    try {
+      await rest<undefined>("", {
+        method: "POST",
+        prefer: "resolution=merge-duplicates,return=minimal",
+        body: JSON.stringify(fila),
+      });
+      return;
+    } catch (error) {
+      if (intento === REINTENTOS) throw error;
+      await new Promise((resolve) => setTimeout(resolve, ESPERA_MS));
+    }
+  }
 }
 
 /** El snapshot congelado, o `null` si no se ha publicado ninguno todavía. */

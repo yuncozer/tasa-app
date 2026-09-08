@@ -7,6 +7,21 @@ import { avisarTasasDelDia, avisoDeTasas } from "@/lib/push";
 import { getRates } from "@/lib/rates";
 import { guardarSnapshotHoy } from "@/lib/snapshot-hoy";
 
+/**
+ * No se pudo congelar el snapshot en `snapshot_hoy`, así que no se publicó
+ * nada. Es un tipo aparte porque quien llama tiene que distinguirlo de un
+ * fallo al publicar: aquí no llegó a tocarse Meta, no hay nada a medias en la
+ * cuenta y el disparo se puede reintentar entero sin riesgo de duplicar el
+ * post. La ruta del cron lo trata como una espera más (`tasas_pendientes`),
+ * no como un error de la petición.
+ */
+export class SnapshotNoCongelado extends Error {
+  constructor(readonly causa: unknown) {
+    super("No se pudo congelar el snapshot del día, así que no se publicó");
+    this.name = "SnapshotNoCongelado";
+  }
+}
+
 export interface ResultadoPublicacionHoy {
   /** `null` en modo `solo_historias`: ahí no hay post de feed que enlazar. */
   mediaId: string | null;
@@ -70,12 +85,31 @@ export async function publicarTasasDelDia(
   }
 
   // Congela este snapshot como "lo último publicado", para que las rutas de
-  // imagen y `/hoy` sirvan siempre esta misma fotografía. Ver el comentario
-  // equivalente que tenía el cron: mismo motivo, error tragado a propósito.
+  // imagen y `/hoy` sirvan siempre esta misma fotografía.
+  //
+  // Y si no se puede congelar, **no se publica**. Este error se tragaba, con
+  // el argumento de que las imágenes caerían a las tasas en vivo; pero eso no
+  // es lo que pasa cuando ya hay una fila de un disparo anterior, que es el
+  // caso normal a partir de la segunda publicación del día: `snapshotDelDia()`
+  // encuentra la de la mañana y la sirve tan campante. El 8 de septiembre de
+  // 2026 este `POST` dio un 504 y el post de la tarde salió con la imagen
+  // diciendo "09:00 AM" y 967,46 Bs mientras el caption decía 970,00 — el
+  // mismo post afirmando dos cifras para la misma tasa, que es exactamente el
+  // fallo que `lib/snapshot-hoy.ts` existe para evitar.
+  //
+  // Se lanza **antes** de hablar con Meta, así que aquí todavía no hay nada
+  // irreversible: no publicar es gratis y se reintenta en dos minutos. Es el
+  // mismo criterio que ya gatea las tasas incompletas y el salto anómalo —
+  // una imagen vieja servida como fresca es el único daño real que esta app
+  // puede causar— y por eso, a diferencia de aquellas dos puertas, esta
+  // aplica **también al botón manual** de `/admin/hoy`: la excepción de "ahí
+  // hay una persona decidiendo" vale para publicar con una tasa que falta, no
+  // para publicar una imagen que contradice su propio caption, que no es algo
+  // que nadie esté eligiendo.
   try {
     await guardarSnapshotHoy(snapshot);
-  } catch {
-    // Sin snapshot congelado, las imágenes del post caen a las tasas en vivo.
+  } catch (error) {
+    throw new SnapshotNoCongelado(error);
   }
 
   const caption = buildCaption(snapshot, momento);

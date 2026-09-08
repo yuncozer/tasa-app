@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 import { COOKIE_SESION, esSesionValida } from "@/lib/admin-session";
 import { apiError, apiJson } from "@/lib/api";
-import { publicarTasasDelDia } from "@/lib/publish-hoy";
+import { SnapshotNoCongelado, publicarTasasDelDia } from "@/lib/publish-hoy";
 
 /**
  * Publica el carrusel diario de tasas fuera del horario del cron, desde el
@@ -33,6 +33,18 @@ export async function POST(request: NextRequest) {
     const { mediaId, enlace } = await publicarTasasDelDia(siteUrl);
     return apiJson({ ok: true, mediaId, enlace });
   } catch (error) {
+    // Aquí el gate del snapshot también aplica —la imagen saldría con las
+    // cifras del disparo anterior— pero el admin está mirando la pantalla, así
+    // que el mensaje dice qué pasó y que puede volver a pulsar: no se llegó a
+    // tocar Meta, así que reintentar no duplica nada. El genérico no serviría:
+    // `apiError` no manda el detalle en producción.
+    if (error instanceof SnapshotNoCongelado) {
+      return apiError(
+        "No se pudo guardar las tasas de este disparo, así que no se publicó nada (la imagen habría salido con las cifras del post anterior). Vuelve a intentarlo.",
+        error,
+      );
+    }
+
     return apiError("No se pudo publicar el post de Instagram", error);
   }
 }

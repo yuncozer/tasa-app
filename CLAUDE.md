@@ -519,6 +519,56 @@ corrige después: el post ya salió.
   pasar. Existe para atrapar un dato imposible, no para añadir un motivo nuevo
   por el que el post no salga.
 
+### Sin snapshot congelado tampoco se publica
+
+`tasasBaseCompletas()` cubre que falte una tasa y `lib/cordura-tasas.ts` que
+una sea imposible. La tercera puerta es que `guardarSnapshotHoy()` no consiga
+escribir: si esa fila no queda al día, `snapshotDelDia()` sirve **la del
+disparo anterior**, y el post sale con la imagen diciendo una cifra y el
+caption otra.
+
+Pasó el 8 de septiembre de 2026. El `POST` a `snapshot_hoy` respondió **504**
+a las 22:00:04 —un timeout suelto del gateway de Supabase; el
+`registrarSnapshot()` de medio segundo antes había ido en 200— y siete
+segundos más tarde Meta descargó las dos imágenes leyendo todavía el snapshot
+de las 9:00. El carrusel de la tarde salió con la imagen fechada "09:00 AM" y
+967,46 Bs mientras el caption decía 970,00. Ese día hubo nueve 504 sueltos
+repartidos entre cuatro tablas del proyecto: no es una tabla enferma, es
+intermitencia del edge.
+
+- **El error dejó de tragarse.** Estaba envuelto en un `try/catch` mudo con el
+  argumento de que las imágenes caerían a las tasas en vivo. Eso solo es
+  cierto con la tabla vacía; a partir de la segunda publicación del día
+  —o sea, siempre— hay una fila anterior y es esa la que se sirve. La
+  degradación no era a "un poco peor", era al fallo exacto que
+  `lib/snapshot-hoy.ts` existe para evitar.
+- **Se reintenta tres veces antes de rendirse** (`REINTENTOS`, esperas de
+  700 ms). Un 504 puntual se cura con el segundo intento, y en ese punto la
+  función todavía no ha hablado con Meta: no hay prisa que valga más que la
+  consistencia.
+- **Si aun así falla, se lanza `SnapshotNoCongelado` antes de tocar Meta.** Es
+  un tipo aparte justamente porque quien llama tiene que distinguirlo de un
+  fallo al publicar: aquí no hay nada a medias en la cuenta, así que
+  reintentar el disparo entero no puede duplicar el post. La ruta del cron lo
+  encola en `tasas_pendientes` y devuelve 200 con `estado: "pendiente"`, igual
+  que las otras dos puertas, y el cron de dos minutos lo reintenta solo. Sin
+  correo: la espera larga ya avisa sola en el intento 15, y avisar de un 504
+  que se arregla en dos minutos es el ruido que la regla de `lib/notificar.ts`
+  prohíbe.
+- **Esta puerta sí aplica al botón manual de `/admin/hoy`**, al contrario que
+  las otras dos. Aquella excepción —"ahí hay una persona mirando y
+  decidiendo"— vale para publicar con una tasa que falta, que es una decisión
+  editorial. Publicar una imagen que contradice su propio caption no lo es:
+  nadie está eligiendo eso. El botón devuelve un mensaje que dice qué pasó y
+  que se puede volver a pulsar.
+- **`actualizado_en` ahora viaja explícito en el cuerpo.** El `default now()`
+  solo corre en el `INSERT`, y como este upsert siempre choca contra la misma
+  clave, el `ON CONFLICT DO UPDATE` de `merge-duplicates` escribía únicamente
+  las columnas mandadas: esa fecha llevaba desde el 21 de agosto de 2026
+  clavada mientras el snapshot se sobreescribía dos veces al día. Es la
+  columna que uno mira para saber si lo congelado es del último disparo, así
+  que tiene que decir la verdad.
+
 ### El pie de tres enlaces es solo para WhatsApp; en Instagram se cierra con hashtags
 
 Existe un pie de tres enlaces —el post, la calculadora y el canal—
