@@ -10,7 +10,7 @@
  * respuesta de `/api/` desde la caché, porque ahí sí pasaría por fresca.
  */
 
-const VERSION = "v10";
+const VERSION = "v11";
 const ATAJOS = ["/hoy", "/laparada", "/ig", "/wa"];
 const CACHE_PAGINA = `latasa-pagina-${VERSION}`;
 const CACHE_ESTATICOS = `latasa-estaticos-${VERSION}`;
@@ -20,6 +20,23 @@ const PREFIJOS_VIEJOS = ["tasapp-", "latasa-"];
 
 /** Clave única para la portada: así `?actualizar=…` no llena la caché. */
 const CLAVE_PORTADA = "/";
+
+/**
+ * Cuánto se espera a la red antes de servir la copia guardada.
+ *
+ * Esto nació de un fallo que solo se ve con **señal débil**, no sin señal: sin
+ * conexión el `fetch` falla al instante y la copia sale enseguida, pero con
+ * mala cobertura no falla — se queda colgado. Y como el splash de la app vive
+ * dentro del HTML (`components/SplashOverlay.tsx` es un componente de React, no
+ * una imagen), hasta que ese HTML no llega no hay absolutamente nada que
+ * pintar: verificado en la calle, más de cinco segundos de pantalla negra antes
+ * de que la app diera señales de vida. Peor que estar sin cobertura.
+ *
+ * Dos segundos y medio es el techo de lo que alguien tolera mirando un teléfono
+ * negro. Pasado ese margen se sirve lo último guardado y la red sigue viva en
+ * segundo plano para dejar la copia al día.
+ */
+const ESPERA_RED_MS = 2500;
 
 /**
  * Bajo qué clave se guarda una navegación: **su ruta, sin la query**.
@@ -120,7 +137,9 @@ y a partir de entonces funcionará también sin señal.</p></div></body></html>`
 }
 
 /**
- * Red primero: si responde, se guarda copia; si no, se sirve la última buena.
+ * Red primero **pero con un techo de espera**: si contesta dentro del margen se
+ * sirve y se guarda copia; si tarda más —o falla— se sirve la última buena y la
+ * red termina en segundo plano.
  *
  * Sin conexión se busca primero la copia de **esa misma ruta** y solo después
  * se cae a la portada: así `/historial` offline muestra el historial que se vio
@@ -128,18 +147,47 @@ y a partir de entonces funcionará también sin señal.</p></div></body></html>`
  * de hacer pasar un dato viejo por fresco— y, sobre todo, abrir la app en `/`
  * sigue mostrando la calculadora aunque antes se haya visitado otra página.
  */
-async function navegacion(request) {
+async function navegacion(event) {
+  const { request } = event;
   const cache = await caches.open(CACHE_PAGINA);
   const clave = claveDeNavegacion(request);
 
-  try {
-    const respuesta = await fetch(request);
+  const red = fetch(request).then(async (respuesta) => {
     if (respuesta.ok) await cache.put(clave, respuesta.clone());
     return respuesta;
-  } catch {
-    const guardada = (await cache.match(clave)) ?? (await cache.match(CLAVE_PORTADA));
-    return guardada ?? paginaDeCortesia();
+  });
+
+  // La red sigue viva aunque ya se haya contestado con la copia: es lo que deja
+  // la caché al día para la próxima vez. Sin `waitUntil`, el navegador puede
+  // matar al worker en cuanto responde y esa actualización nunca ocurre.
+  event.waitUntil(red.catch(() => {}));
+
+  const guardada = (await cache.match(clave)) ?? (await cache.match(CLAVE_PORTADA));
+
+  // Sin copia no hay alternativa que esperar. Y con **query** tampoco se
+  // atajará: el botón "Actualizar tasas" navega a `?actualizar=<marca>`, o sea
+  // que quien llega así pidió datos nuevos a propósito — contestarle con lo
+  // guardado sería un botón que no hace nada.
+  if (!guardada || new URL(request.url).search) {
+    try {
+      return await red;
+    } catch {
+      return guardada ?? paginaDeCortesia();
+    }
   }
+
+  // Carrera: gana la red si contesta dentro del margen, y si no, la copia. Un
+  // fallo de red también resuelve a la copia, que es el caso de siempre.
+  const conMargen = new Promise((resolver) => {
+    const temporizador = setTimeout(() => resolver(null), ESPERA_RED_MS);
+    const cerrar = (valor) => {
+      clearTimeout(temporizador);
+      resolver(valor);
+    };
+    red.then(cerrar, () => cerrar(null));
+  });
+
+  return (await conMargen) ?? guardada;
 }
 
 /** Caché primero y revalidación en segundo plano: los estáticos son inmutables. */
@@ -189,7 +237,7 @@ self.addEventListener("fetch", (event) => {
   if (url.pathname === "/admin" || url.pathname.startsWith("/admin/")) return;
 
   if (request.mode === "navigate") {
-    event.respondWith(navegacion(request));
+    event.respondWith(navegacion(event));
     return;
   }
 

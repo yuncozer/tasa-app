@@ -261,6 +261,42 @@ Lo que hay que respetar:
 
 - **El service worker nunca cachea `/api/`**. Una tasa vieja servida como fresca
   es el único daño real que esta app puede causar.
+- **La navegación tiene un techo de espera, y el caso malo es la señal débil,
+  no la ausencia de señal.** Sin conexión el `fetch` falla al instante y la
+  copia sale enseguida; con mala cobertura no falla, se queda colgado. Y como
+  el splash vive **dentro** del HTML (`SplashOverlay` es un componente de
+  React, no una imagen), hasta que ese HTML no llega no hay nada que pintar:
+  medido, más de ocho segundos de pantalla negra antes de que la app diera
+  señales de vida — peor que estar sin cobertura. `ESPERA_RED_MS` (2,5 s) es el
+  margen: pasado eso se sirve lo último guardado y la red termina en segundo
+  plano bajo `waitUntil`, sin el cual el navegador puede matar al worker antes
+  de que la copia se actualice. Con el mismo documento tardando 8 s, la app
+  pasó de 8.199 ms a 2.619 ms. Sin copia guardada no hay atajo y se espera, que
+  es lo único que se puede hacer.
+- **Una navegación con query nunca se atajará.** El botón "Actualizar tasas"
+  lleva a `?actualizar=<marca>`: quien llega así pidió datos nuevos a
+  propósito, y contestarle con la copia sería un botón que no hace nada.
+- **Servir la copia con conexión obligó a cambiar el aviso de la portada.** Las
+  tarjetas dicen su antigüedad ("BCV · hace 5 horas") desde un componente de
+  servidor, así que ese texto se **congela** en el HTML guardado: una copia de
+  las 6 de la tarde sigue diciendo "hace un momento" a medianoche. Mientras la
+  franja de `OfflineNotice` dependía de `navigator.onLine` no salía ahí, y eso
+  es exactamente una tasa vieja servida como fresca. Ahora mira **el reloj y no
+  la conexión**: pasados 15 minutos desde el `fetchedAt` avisa igual, con
+  cobertura o sin ella. De paso tapa un hueco que ya existía y no tenía que ver
+  con el service worker — una pestaña abierta desde hace horas nunca vuelve a
+  pedir tasas, porque la página se renderiza en el servidor y no se refresca
+  sola. El instante se lee con `useSyncExternalStore` sobre un latido de 30 s y
+  vale `0` en el servidor: leer `Date.now()` dentro del render haría que
+  `getSnapshot` devolviera un valor distinto cada vez y React renderizaría sin
+  fin, y ese `0` es además lo que evita el desajuste de hidratación cuando la
+  página sale de la caché horas después.
+- **Al probar esto, vacía la caché del navegador.** Es el mismo aviso del
+  `stale-while-revalidate` de más abajo, con una vuelta más: el `fetch` interno
+  del worker acierta en la caché HTTP y contesta en 100 ms aunque la red esté
+  a ocho segundos, de modo que la prueba pasa sin haber probado nada. Y la
+  emulación de red de las herramientas de desarrollo **no alcanza al worker**,
+  que corre en otro target: hay que ralentizar el servidor de verdad.
 - La portada y las rutas API tienen **instancias de caché en memoria separadas**;
   en Vercel, además, cada función tiene la suya. Por eso el botón "Actualizar
   tasas" navega a `?actualizar=<marca>`: sin un parámetro que cambie, la página
