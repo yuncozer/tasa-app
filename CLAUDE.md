@@ -1259,6 +1259,21 @@ vive aquí.
   post duplicado en la cuenta real, que no se deshace. Por lo mismo,
   cron-job.org va **sin reintentos automáticos**: el reintento vive en la
   propia cola, que sí sabe por dónde iba.
+- **Leer la cola sí se reintenta una vez, y eso no contradice lo anterior.**
+  Aquello habla del reintento de *publicar*, que es irreversible; esto es la
+  lectura previa, que no cambia nada. La puerta de enlace de Supabase suelta
+  cada tanto una petición a los cinco segundos con un 504 aunque la consulta
+  vaya normalmente en menos de medio: medidas 26 de 1.444 lecturas en 24 horas,
+  todas clavadas en ~5.200 ms frente a una media de 425 — la misma
+  intermitencia del edge que dejó el post de la tarde del 8 de septiembre con
+  la imagen de la mañana. Sin reintento eso llegaba hasta el final: la ruta
+  devolvía 502, cron-job.org daba el disparo por fallido y el de dos minutos
+  después mandaba un correo de "ejecución correcta tras un fallo anterior".
+  Unas dos docenas de correos al día avisando de nada, con la cola vacía las
+  dos veces. `reclamarConReintento()` lo absorbe, y **no** contesta 200 ante un
+  fallo persistente: si Supabase se cae de verdad, ese rojo en cron-job.org es
+  la única señal de que la cola dejó de mirarse. El cron de tasas pendientes no
+  lo necesita: ya se traga su lectura fallida con `.catch(() => null)`.
 - **La publicación va por fases, y no de un tirón.** Un carrusel con video no
   cabe en una sola petición: Meta procesa cada contenedor de forma asíncrona y
   hay que sondearlo, lo que puede llevar minutos, mientras que una función de
