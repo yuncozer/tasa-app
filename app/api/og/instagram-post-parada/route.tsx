@@ -67,7 +67,16 @@ function Tarjeta({ etiqueta, valor }: { etiqueta: string; valor: string }) {
         <span style={{ fontSize: 22, fontWeight: 700, color: COLOR.accent, letterSpacing: 2 }}>{etiqueta}</span>
         <span style={{ fontSize: 18, color: COLOR.muted }}>Billete de 100$</span>
       </div>
-      <span style={{ fontSize: 46, fontWeight: 700, color: COLOR.accent }}>{valor}COP</span>
+      {/*
+       * "COP" va a la mitad del tamaño de la cifra: la unidad se sobreentiende
+       * y lo que el lector busca de un vistazo es el número. A la misma altura
+       * competían entre sí, y en una imagen que se mira de pasada eso cuesta
+       * la lectura. Se alinean por la base para que "COP" no flote.
+       */}
+      <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+        <span style={{ fontSize: 46, fontWeight: 700, color: COLOR.accent }}>{valor}</span>
+        <span style={{ fontSize: 23, fontWeight: 700, color: COLOR.accent }}>COP</span>
+      </div>
     </div>
   );
 }
