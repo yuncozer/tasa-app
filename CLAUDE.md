@@ -203,6 +203,27 @@ renderizar sin fin.
   separadores manda el último; si solo hay uno, es de miles **solo** con tres
   cifras detrás y algo distinto de cero delante. Esa última condición es la que
   salva `"0,2993"` —la tasa del peso frontera— de leerse como 2993.
+- **`navigator.share()` caduca con el gesto, y esa es la regla dura del botón
+  de compartir.** La activación transitoria que abre el toque dura unos 5 s en
+  Chrome y WebKit es más estricto, así que pedir la imagen al servidor
+  *dentro* del manejador y llamar a `share()` después solo funciona mientras el
+  render sea rápido. Verificado en un iPhone real: una invocación en frío tardó
+  ~4 s y **el selector no apareció**; encima `share()` lanza ahí un
+  `NotAllowedError` que caía en el mismo `catch` escrito para tragarse el
+  "cancelé el menú", así que no se veía ni el modal ni un aviso. El segundo
+  toque funcionó porque la función ya estaba caliente — de ahí que parezca
+  intermitente y no un fallo. Tres piezas lo resuelven y ninguna sirve sola:
+  el archivo **se guarda en cuanto se tiene**, de modo que con él en mano
+  `share()` se llama sin un solo `await` por delante, dentro del gesto; a quien
+  **ya compartió** se le adelanta la imagen en segundo plano cuando la cifra
+  lleva 1,2 s quieta, para que el toque la encuentre hecha; y si aun así se
+  pierde la activación, el botón queda en "toca de nuevo" en vez de volver al
+  estado normal como si nada, y ese segundo toque comparte al instante. No
+  adelantes la imagen para todo el mundo: sería un render de Satori por cada
+  cuenta de cada visitante, que es justo lo que evita pedirla al pulsar. Quien
+  ya compartió una vez es quien va a volver a hacerlo, así que el costo cae
+  donde se aprovecha — es la otra cara del destello, uno para el que no lo
+  conoce y este para el que sí.
 - **El botón de compartir avisa de que trabaja, y destella hasta que alguien
   lo descubre.** Entre el toque y el selector del sistema pasan los ~0,8 s de
   Satori más el viaje de la imagen, y lo único que cambiaba era la opacidad:
