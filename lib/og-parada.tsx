@@ -47,8 +47,8 @@ function Tarjeta({ etiqueta, valor }: { etiqueta: string; valor: string }) {
        * la lectura. Se alinean por la base para que "COP" no flote.
        */}
       <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
-        <span style={{ fontSize: 46, fontWeight: 700, color: COLOR.accent }}>{valor}</span>
-        <span style={{ fontSize: 23, fontWeight: 700, color: COLOR.accent }}>COP</span>
+        <span style={{ fontSize: 60, fontWeight: 700, color: COLOR.accent }}>{valor}</span>
+        <span style={{ fontSize: 30, fontWeight: 700, color: COLOR.accent }}>COP</span>
       </div>
     </div>
   );
