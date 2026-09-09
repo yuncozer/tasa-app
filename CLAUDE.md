@@ -1436,6 +1436,26 @@ antes de que salga nada.
   dentro del marco (no enterradas en un párrafo), con un aviso legal propio
   —"tasa informal... puede variar durante el día"— distinto del genérico de
   noticia.
+  El lienzo va en **4:5** (1080×1350) y no en cuadrado, y el alto de más es
+  todo para la foto: lo que se enmarca es la pizarra de la casa de cambio,
+  que es vertical, y en 1:1 el recorte se comía las filas de abajo. La
+  plantilla vive en `lib/og-parada.tsx` y no dentro del route para poder
+  dibujarla sin pasar por Supabase al iterar el diseño, mismo criterio que
+  `lib/og-cintillo.tsx`. En las cifras, **"COP" va a la mitad del tamaño del
+  número**: la unidad se sobreentiende y a igual tamaño le competía la mirada
+  a lo único que el lector se lleva de un vistazo.
+- **El titular se normaliza al dibujar, no al guardar**
+  (`normalizarTituloParada()` en `lib/parada.ts`). lanacionweb pega el día al
+  mes abreviado ("este 8Sept") y eso se lee como una palabra rara justo donde
+  va lo único que fecha la pieza. Se hace al render para que los borradores ya
+  detectados también salgan bien y para no perder el texto original, que es
+  contra lo que el admin contrasta el artículo. **Solo se expande lo que se
+  puede nombrar sin adivinar**: tres letras ya dicen un mes, pero un sufijo de
+  una sola letra ("27A") se deja tal cual, por lo mismo que `diaDelTitulo()`
+  no lo lee — esa "A" vale igual para abril que para agosto. Ese mismo formato
+  pegado, por cierto, dejaba a `diaDelTitulo()` sin fechar la columna: su
+  expresión regular esperaba una letra suelta seguida de un límite de palabra,
+  y "8Sept" no casaba con nada.
 - **`/admin/parada` guarda antes de mostrar.** El botón "Actualizar vista
   previa" hace un `PATCH` a `/api/admin/parada` (lugar/compra/venta/caption)
   y solo entonces refresca el `<img>` con un parámetro que cambia — mismo

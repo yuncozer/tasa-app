@@ -114,17 +114,67 @@ function desdeFila(fila: FilaParada): ParadaBorrador {
  * siempre con esta forma (verificado también con "Dólar en La Parada este
  * 26A").
  *
- * Solo se lee el **número**, no la letra del mes: "A" lo mismo vale para
- * abril que para agosto, y adivinarlo sería inventar. El número basta para lo
+ * Solo se lee el **número**, no el sufijo del mes: "A" lo mismo vale para
+ * abril que para agosto, y adivinarlo sería inventar. El sufijo no siempre
+ * es una letra suelta —se vio "8Sept", pegado al número y con cuatro
+ * caracteres—, así que la expresión regular acepta cualquier largo y no
+ * exige espacio: con `[a-zA-Z]?\b` un título así no casaba con nada y la
+ * columna se quedaba sin fechar. El número basta para lo
  * que hace falta —distinguir la columna de hoy de la de ayer— porque es una
  * columna diaria y lo que se compara siempre está a un día de distancia.
  */
 export function diaDelTitulo(titulo: string): number | null {
-  const match = /\beste\s+(\d{1,2})\s*[a-zA-Z]?\b/i.exec(titulo);
+  const match = /\beste\s*(\d{1,2})\s*[a-záéíóúA-ZÁÉÍÓÚ]*\.?/i.exec(titulo);
   if (!match) return null;
 
   const dia = Number(match[1]);
   return dia >= 1 && dia <= 31 ? dia : null;
+}
+
+/**
+ * Meses reconocibles por sus tres primeras letras. El portal abrevia a su
+ * gusto ("8Sept", "27A") y esto es lo único que se puede resolver sin
+ * inventar: tres letras ya nombran un mes sin ambigüedad, una sola no.
+ */
+const MESES: Record<string, string> = {
+  ene: "Enero",
+  feb: "Febrero",
+  mar: "Marzo",
+  abr: "Abril",
+  may: "Mayo",
+  jun: "Junio",
+  jul: "Julio",
+  ago: "Agosto",
+  sep: "Septiembre",
+  oct: "Octubre",
+  nov: "Noviembre",
+  dic: "Diciembre",
+};
+
+/**
+ * El titular del portal, con su fecha escrita en llano: "Dólar en La Parada
+ * este 8Sept" → "Dólar en La Parada este 8 de Septiembre".
+ *
+ * lanacionweb pega el día al mes abreviado y sin espacio, y eso en la imagen
+ * se lee como una palabra rara justo donde va lo único que fecha la pieza.
+ * Se normaliza **al dibujar** y no al guardar el borrador para que los
+ * borradores ya detectados también salgan bien, y para no perder nunca el
+ * texto original que el admin puede contrastar con el artículo.
+ *
+ * **Solo se expande lo que se puede nombrar sin adivinar.** Un sufijo de una
+ * sola letra ("27A") se deja tal cual: esa "A" vale igual para abril que
+ * para agosto — la misma razón por la que `diaDelTitulo()` no la lee — y
+ * escribir un mes que el portal no dijo sería inventarle una fecha a un dato
+ * de calle.
+ */
+export function normalizarTituloParada(titulo: string): string {
+  return titulo.replace(
+    /\b(\d{1,2})\s*([A-Za-zÁÉÍÓÚáéíóú]{3,10})\.?(?=\s|$)/,
+    (todo, dia: string, sufijo: string) => {
+      const mes = MESES[sufijo.slice(0, 3).toLowerCase()];
+      return mes ? `${dia} de ${mes}` : todo;
+    },
+  );
 }
 
 /**

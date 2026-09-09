@@ -34,7 +34,7 @@ export async function generateMetadata(): Promise<Metadata> {
       title: "Dólar en La Parada — La Tasa",
       description: "Cuánto se compra y se vende el dólar en el punto físico de La Parada.",
       url: destino,
-      images: siteUrl ? [{ url: `${siteUrl}/api/og/instagram-post-parada`, width: 1080, height: 1080 }] : undefined,
+      images: siteUrl ? [{ url: `${siteUrl}/api/og/instagram-post-parada`, width: 1080, height: 1350 }] : undefined,
     },
     twitter: { card: "summary_large_image" },
   };

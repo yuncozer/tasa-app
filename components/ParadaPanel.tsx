@@ -201,6 +201,7 @@ export function ParadaPanel({
         <ImagenConCarga
           src={`/api/og/instagram-post-parada?t=${marca}`}
           alt={`Vista previa del post: ${borrador.titulo}`}
+          aspecto="4:5"
           className="h-auto w-full rounded-2xl border border-border-soft"
         />
       )}

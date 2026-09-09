@@ -3,8 +3,9 @@
 import { useState } from "react";
 import { Spinner } from "@/components/admin/Spinner";
 
-const ASPECTO: Record<"1:1" | "9:16", string> = {
+const ASPECTO: Record<"1:1" | "4:5" | "9:16", string> = {
   "1:1": "aspect-square",
+  "4:5": "aspect-[4/5]",
   "9:16": "aspect-[9/16]",
 };
 
@@ -19,7 +20,7 @@ const ASPECTO: Record<"1:1" | "9:16", string> = {
  * mostrar".
  *
  * El contenedor lleva `className` (ancho, margen, borde, radio) y una
- * proporción fija (`aspecto`, 1:1 salvo que se indique 9:16); el `<img>`
+ * proporción fija (`aspecto`, 1:1 salvo que se indique 4:5 o 9:16); el `<img>`
  * llena ese hueco con `object-cover`. Así el esqueleto ocupa exactamente el
  * espacio final de la imagen — sin proporción no hay de qué tomar el alto
  * antes de que el navegador conozca el tamaño real— y no hay salto de
@@ -39,7 +40,7 @@ export function ImagenConCarga({
   src: string;
   alt: string;
   className?: string;
-  aspecto?: "1:1" | "9:16";
+  aspecto?: "1:1" | "4:5" | "9:16";
 }) {
   const [cargada, setCargada] = useState(false);
   const [fallo, setFallo] = useState(false);
