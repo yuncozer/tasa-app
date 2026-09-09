@@ -13,8 +13,15 @@
 const TIMEOUT_MS = 12_000;
 const CATEGORIA_URL = "https://lanacionweb.com/frontera/";
 
-/** Sin acento fijo a propósito: lanacionweb ha usado "Dólar" y podría escribir "Dolar" cualquier día. */
-const PATRON_TITULO = /d[oó]lar en la parada/i;
+/**
+ * Sin acento fijo a propósito: lanacionweb ha usado "Dólar" y podría escribir
+ * "Dolar" cualquier día. Y el conector tampoco es fijo: el 9 de septiembre de
+ * 2026 el portal pasó de "Dólar en La Parada" a "Dólar **de** La Parada" —los
+ * dos convivían en el listado ese día, la columna de ayer con "en" y la de hoy
+ * con "de"—, así que se acepta cualquiera de los dos e incluso ninguno. Lo que
+ * identifica la columna es el par "dólar … la parada", no la preposición.
+ */
+const PATRON_TITULO = /d[oó]lar\s+(?:en\s+|de\s+|del\s+)?la\s+parada/i;
 
 async function fetchListado(): Promise<string> {
   const response = await fetch(CATEGORIA_URL, {
@@ -43,13 +50,23 @@ async function fetchListado(): Promise<string> {
  *
  * Por eso ahora se miran **todos** los enlaces y se decide por la URL, que es
  * lo único estable entre los dos bloques: el slug de la columna siempre
- * empieza por `dolar-en-la-parada`. Un cambio de theme puede mover los
- * títulos de sitio otra vez, pero no cambia a dónde apunta el enlace.
+ * empieza por `dolar-`, el conector y `la-parada`. Un cambio de theme puede
+ * mover los títulos de sitio otra vez, pero no cambia a dónde apunta el
+ * enlace.
  */
 const ENLACE = /<a\b[^>]*href="(https?:\/\/lanacionweb\.com\/[^"?#]+)"([^>]*)>([\s\S]{0,300}?)<\/a>/gi;
 
-/** El slug de la columna diaria, que es la señal que no depende del marcado. */
-const SLUG_PARADA = /\/dolar-en-la-parada[^/]*\/?$/i;
+/**
+ * El slug de la columna diaria, que es la señal que no depende del marcado.
+ *
+ * El conector va opcional por lo mismo que en `PATRON_TITULO`: el slug sigue
+ * al titular, así que el cambio de "en" a "de" del 9 de septiembre de 2026
+ * llegó también aquí (`dolar-de-la-parada-este-9sept`) y dejó al cron sin
+ * detectar la columna del día. Se acota a un conector corto y conocido en vez
+ * de admitir cualquier palabra: `dolar-...-la-parada` con un hueco libre
+ * casaría con titulares que no son esta columna.
+ */
+const SLUG_PARADA = /\/dolar-(?:en-|de-|del-)?la-parada[^/]*\/?$/i;
 
 /** El texto del enlace, sin las etiquetas que el theme mete dentro. */
 function textoDelEnlace(atributos: string, interior: string): string {
