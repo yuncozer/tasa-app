@@ -34,6 +34,10 @@ export const metadata: Metadata = {
     title: "La Tasa Admin",
     statusBarStyle: "black-translucent",
   },
+  // Mismo motivo que en el layout raíz: Next ya solo emite el meta estándar y
+  // WebKit necesita el de Apple. El panel no tiene splash propio, pero sí debe
+  // declararse igual de instalable.
+  other: { "apple-mobile-web-app-capable": "yes" },
 };
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {

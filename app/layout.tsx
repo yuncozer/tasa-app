@@ -28,6 +28,23 @@ export const metadata: Metadata = {
     title: "La Tasa",
     statusBarStyle: "black-translucent",
   },
+  /**
+   * `capable` de arriba ya no basta: esta versión de Next lo traduce al meta
+   * **estándar** `mobile-web-app-capable` y deja de emitir el de Apple (está
+   * en su propia documentación, `node_modules/next/dist/docs/`). WebKit lee el
+   * suyo, y sin él **ignora los `apple-touch-startup-image`**: la app arranca
+   * en negro hasta que llega el HTML.
+   *
+   * Se vio en un video del arranque real: un segundo exacto de `#000000` puro
+   * entre el toque y el primer pintado. Negro puro y no `#0b1120` es la firma
+   * de que no se aplicó ninguna imagen nuestra — el fondo lo pone iOS, no
+   * nosotros.
+   *
+   * Que la app abra a pantalla completa no dice nada al respecto: eso lo
+   * concede el `display: standalone` del manifiesto desde iOS 15.4, por otra
+   * vía. Son dos cosas distintas y solo una se rompió al deprecarse el meta.
+   */
+  other: { "apple-mobile-web-app-capable": "yes" },
 };
 
 export const viewport: Viewport = {

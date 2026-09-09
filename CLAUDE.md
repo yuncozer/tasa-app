@@ -2963,6 +2963,21 @@ está en la lista. Vive en **dos sitios que tienen que coincidir**:
 `scripts/generar-iconos.mjs` (los archivos). Se añade el tamaño en las dos y se
 corre `npm run iconos`.
 
+**Y hace falta `apple-mobile-web-app-capable`, que Next ya no emite.** El
+layout declara `appleWebApp.capable: true`, pero esta versión lo traduce al
+meta **estándar** `mobile-web-app-capable` y deja de poner el de Apple —está en
+`node_modules/next/dist/docs/`, y es justo el tipo de deprecación que avisa la
+cabecera de este archivo—. WebKit lee el suyo, y sin él ignora los
+`apple-touch-startup-image` por completo. Se declara a mano con
+`other: { "apple-mobile-web-app-capable": "yes" }` en los dos layouts.
+
+Que la app abra a pantalla completa **no prueba que esto esté bien**: eso lo
+concede el `display: standalone` del manifiesto desde iOS 15.4, por otra vía.
+Son dos mecanismos distintos y solo uno se rompió. La señal de que el splash no
+se aplica es que el arranque sea **`#000000` puro** en vez de `#0b1120`: el
+negro lo pone iOS cuando no tiene imagen, y el azul solo puede venir de la
+nuestra.
+
 ### Tooltips
 
 Para los tooltips de ayuda se maneja un componente standar ubicado /components/Tooltip.tsx, el cual maneja la libreria react-tooltip
