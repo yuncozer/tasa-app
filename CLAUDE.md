@@ -2948,6 +2948,21 @@ Chromium ya está instalado en `/opt/pw-browsers`; no ejecutes `playwright insta
 Los de la PWA se generan del propio logo con `npm run iconos`. Los PNG se
 versionan, así que solo hay que regenerarlos si cambia el logo.
 
+**Y cuando sale un iPhone de un tamaño nuevo.** El splash nativo de iOS no se
+saca del manifiesto —eso es cosa de Android— sino de un
+`apple-touch-startup-image` por pantalla, y su media query es de coincidencia
+**exacta** (`device-width`, `device-height`, `-webkit-device-pixel-ratio`). Sin
+una entrada que case, iOS no muestra nada: la app arranca con la pantalla
+vacía hasta que llega el HTML, que es justo el hueco que el splash existe para
+tapar. Pasó con el iPhone 16 Pro Max (440×956 a 3x, o sea 1320×2868): la lista
+se cortaba en 430×932 y en ese teléfono el arranque era negro. El síntoma
+engaña —parece lentitud de red, y de hecho se confundió con eso— así que ante
+un "tarda en aparecer" en un modelo concreto, lo primero es mirar si su tamaño
+está en la lista. Vive en **dos sitios que tienen que coincidir**:
+`PANTALLAS_IOS` en `components/AppleSplashLinks.tsx` (los `<link>`) y la de
+`scripts/generar-iconos.mjs` (los archivos). Se añade el tamaño en las dos y se
+corre `npm run iconos`.
+
 ### Tooltips
 
 Para los tooltips de ayuda se maneja un componente standar ubicado /components/Tooltip.tsx, el cual maneja la libreria react-tooltip
