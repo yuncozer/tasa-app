@@ -1,14 +1,18 @@
 "use client";
 
-import { Share2 } from "lucide-react";
+import { Loader2, Share2 } from "lucide-react";
 import { useState, useSyncExternalStore } from "react";
 import { registrarEvento } from "@/lib/analitica-cliente";
 import {
+  compartioEnServidor,
   haySelectorDeArchivos,
+  marcarCompartido,
   noEnServidor,
   puedeCompartirConTexto,
   sinCambios,
+  suscribirCompartido,
   textoParaCompartir,
+  yaCompartio,
 } from "@/lib/compartir";
 import type { ConversionResult, RateKey } from "@/lib/types";
 
@@ -33,6 +37,22 @@ import type { ConversionResult, RateKey } from "@/lib/types";
  *
  * **No se pinta donde el navegador no comparte archivos** (ver `lib/compartir.ts`),
  * que es casi todo el escritorio. Mismo criterio que el botón "Pegar".
+ *
+ * **Dice que está trabajando.** Entre el toque y el selector del sistema pasan
+ * los ~0,8 s de Satori más el viaje de la imagen, y hasta ahora lo único que
+ * cambiaba era la opacidad del ícono: en un teléfono con señal intermitente
+ * eso se lee como que el toque no entró, y la reacción natural es volver a
+ * pulsar. El ícono se sustituye por uno que gira, que es la misma señal que ya
+ * usan los botones de `/admin` (`components/admin/Spinner.tsx`) — aquí no se
+ * reutiliza ese componente porque vive en el panel y esto es la app pública, y
+ * el ícono no es un añadido al lado del texto sino el botón entero.
+ *
+ * **Y destella hasta que alguien lo descubre.** Es un ícono pequeño y mudo al
+ * lado del de copiar, así que quien no sabe que existe no lo busca. El
+ * destello lo pone `.destello-compartir` en `globals.css`: tres fogonazos
+ * suaves, uno cada cinco segundos, y para. Se apaga para siempre en cuanto se
+ * comparte una vez (`yaCompartio()`), porque ya cumplió su función y lo que
+ * queda es ruido junto a la cifra que se está leyendo.
  */
 export function BotonCompartir({
   conversion,
@@ -46,6 +66,7 @@ export function BotonCompartir({
 }) {
   const puedeCompartir = useSyncExternalStore(sinCambios, haySelectorDeArchivos, noEnServidor);
   const conTexto = useSyncExternalStore(sinCambios, puedeCompartirConTexto, noEnServidor);
+  const conocido = useSyncExternalStore(suscribirCompartido, yaCompartio, compartioEnServidor);
   const [estado, setEstado] = useState<"listo" | "preparando">("listo");
 
   const { amount: monto, from: origen } = conversion;
@@ -81,6 +102,11 @@ export function BotonCompartir({
 
       await navigator.share(texto ? { files: [archivo], text: texto } : { files: [archivo] });
       registrarEvento("compartir", origen);
+      // Se marca **después** de que el selector resuelva, no al pulsar: si el
+      // usuario cancela, `share()` lanza y esto no corre, así que el destello
+      // sigue disponible para quien abrió el menú por curiosidad y se echó
+      // atrás sin llegar a mandar nada.
+      marcarCompartido();
     } catch {
       // Cancelar el selector lanza `AbortError`, que no es un fallo: es el
       // usuario cambiando de idea. Y si la imagen no se pudo generar, avisar
@@ -91,15 +117,31 @@ export function BotonCompartir({
     }
   };
 
+  const preparando = estado === "preparando";
+
   return (
     <button
+      // La `key` remonta el botón cuando cambia la cifra, y remontarlo es lo
+      // que reinicia la animación del destello: así vuelve a ofrecerse con
+      // cada cuenta nueva y no una sola vez por visita. Con cada tecla del
+      // monto esto se remonta, y de ahí que el fogonazo tarde 1,5 s en llegar
+      // (ver el comentario de `globals.css`): mientras se teclea no se
+      // enciende nada.
+      key={`${monto}-${destino}`}
       type="button"
       onClick={compartir}
-      disabled={estado === "preparando"}
-      aria-label="Compartir la conversión"
-      className="shrink-0 rounded-full p-1.5 text-[color:var(--muted)] transition active:scale-95 disabled:opacity-50"
+      disabled={preparando}
+      aria-busy={preparando}
+      aria-label={preparando ? "Preparando la imagen para compartir" : "Compartir la conversión"}
+      className={`shrink-0 rounded-full p-1.5 text-[color:var(--muted)] transition active:scale-95 disabled:opacity-50 ${
+        conocido || preparando ? "" : "destello-compartir"
+      }`}
     >
-      <Share2 aria-hidden="true" className="size-4 opacity-60" />
+      {preparando ? (
+        <Loader2 aria-hidden="true" className="size-4 animate-spin text-[color:var(--accent)]" />
+      ) : (
+        <Share2 aria-hidden="true" className="size-4 opacity-60" />
+      )}
     </button>
   );
 }

@@ -156,6 +156,20 @@ válidas; el nombre solo hace explícito cuál toca.
   ícono pequeño e inevitable —el `Info` de las ayudas— el ancla del tooltip amplía
   la zona con `after:absolute after:-inset-2`; reutiliza ese componente en vez de
   repetir el truco.
+- **Un botón que trabaja lo dice.** Si al pulsar algo hay una espera que el
+  usuario pueda notar, el control cambia de aspecto además de deshabilitarse: la
+  opacidad sola se lee como "no entró el toque" y la reacción es volver a
+  pulsar. Con texto, el patrón es "Publicando…" más el ícono girando
+  (`components/admin/Spinner.tsx`); en un botón que es solo un ícono, el ícono
+  se sustituye por `Loader2` con `animate-spin` (`components/BotonCompartir.tsx`).
+  Y siempre `aria-busy` con la etiqueta en presente.
+- **El destello para descubrir un control es la excepción, no un recurso.** Hoy
+  solo lo lleva el botón de compartir (`.destello-compartir` en `globals.css`),
+  y las reglas que lo hacen aceptable son tres: dura poco (tres fogonazos, uno
+  cada cinco segundos, y para), tarda 1,5 s en el primero para no encenderse
+  mientras se teclea, y se apaga para siempre en cuanto el control se usa una
+  vez. Sin las tres es un parpadeo compitiendo con la cifra que se está
+  leyendo. Se detiene con `prefers-reduced-motion`, igual que el splash.
 - **Ícono de ayuda**: siempre `size-3.5 opacity-60` dentro de un `<Tooltip>`. La
   ayuda cuelga de un ícono visible porque **nadie adivina que un texto suelto se
   toca**.

@@ -151,3 +151,74 @@ export function textoParaCompartir(datos: {
     `👉 ${sitio}`,
   ].join("\n");
 }
+
+/**
+ * Si este dispositivo ya compartió alguna vez.
+ *
+ * Lo usa el destello que llama la atención sobre el botón (ver
+ * `components/BotonCompartir.tsx`): existe para que alguien lo **descubra**,
+ * así que en cuanto lo ha usado deja de parpadear. Un aviso que sigue
+ * insistiendo después de cumplir su función se convierte en ruido que se
+ * ignora — la misma regla que ya gobierna los correos de `lib/notificar.ts`—,
+ * y aquí encima competiría con la cifra que el usuario está leyendo.
+ *
+ * Se guarda solo un `"1"`: no interesa cuántas veces ni cuándo, solo si ya
+ * pasó. Mismo criterio de mínimo que el resto del proyecto con el navegador.
+ *
+ * Va por dispositivo y no por sesión a propósito: quien ya lo descubrió ayer
+ * no necesita que se lo enseñen mañana. Sin `localStorage` —Safari privado— se
+ * comporta como si nunca hubiera compartido, o sea que el destello vuelve: es
+ * el lado inofensivo del error.
+ */
+const CLAVE_COMPARTIDO = "latasa:ya-compartio";
+
+let cacheCompartido: boolean | undefined;
+const oyentesCompartido = new Set<() => void>();
+
+/**
+ * La lectura se memoriza porque `getSnapshot` tiene que devolver siempre el
+ * mismo valor mientras nada cambie, o React vuelve a renderizar sin fin —el
+ * mismo cuidado que documenta `lib/preferencia-moneda.ts`—.
+ */
+export function yaCompartio(): boolean {
+  if (cacheCompartido !== undefined) return cacheCompartido;
+
+  try {
+    cacheCompartido = localStorage.getItem(CLAVE_COMPARTIDO) === "1";
+  } catch {
+    // Safari en navegación privada lanza al tocarlo, y esto se lee desde
+    // `getSnapshot`: una excepción aquí tumbaría el render.
+    cacheCompartido = false;
+  }
+
+  return cacheCompartido;
+}
+
+export function marcarCompartido(): void {
+  if (cacheCompartido === true) return;
+  cacheCompartido = true;
+
+  try {
+    localStorage.setItem(CLAVE_COMPARTIDO, "1");
+  } catch {
+    // Sin almacenamiento el destello volverá en la próxima visita; la de
+    // ahora ya deja de parpadear, que es lo que importa en este momento.
+  }
+
+  for (const oyente of oyentesCompartido) oyente();
+}
+
+export function suscribirCompartido(alCambiar: () => void): () => void {
+  oyentesCompartido.add(alCambiar);
+  return () => {
+    oyentesCompartido.delete(alCambiar);
+  };
+}
+
+/**
+ * En el servidor se dice que **sí** compartió, o sea "no destaques nada". El
+ * botón ni siquiera se pinta ahí —`haySelectorDeArchivos()` es falso sin
+ * `navigator`—, así que esto solo cierra la puerta a que un destello se cuele
+ * en el primer render antes de saber la verdad.
+ */
+export const compartioEnServidor = (): boolean => true;

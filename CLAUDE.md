@@ -203,6 +203,22 @@ renderizar sin fin.
   separadores manda el último; si solo hay uno, es de miles **solo** con tres
   cifras detrás y algo distinto de cero delante. Esa última condición es la que
   salva `"0,2993"` —la tasa del peso frontera— de leerse como 2993.
+- **El botón de compartir avisa de que trabaja, y destella hasta que alguien
+  lo descubre.** Entre el toque y el selector del sistema pasan los ~0,8 s de
+  Satori más el viaje de la imagen, y lo único que cambiaba era la opacidad:
+  eso en un teléfono con señal lenta se lee como que el toque no entró, y lo
+  siguiente es pulsar otra vez. Ahora el ícono se sustituye por uno girando.
+  Lo otro es que es un ícono pequeño y mudo al lado del de copiar, así que
+  quien no sabe que existe no lo busca: `.destello-compartir` da **tres**
+  fogonazos, uno cada cinco segundos, y para. El primero tarda 1,5 s a
+  propósito —el botón se remonta con cada tecla del monto, así que esa demora
+  hace de rebote sin un temporizador en JavaScript— y todo se apaga para
+  siempre en cuanto se comparte una vez (`yaCompartio()` en
+  `lib/compartir.ts`, un `"1"` en `localStorage`). Las tres condiciones son lo
+  que separa un destello de un parpadeo: infinito, o encendiéndose mientras se
+  teclea, competiría con la cifra que el usuario está leyendo. Se marca
+  **después** de que el selector resuelva, no al pulsar, para que cancelar no
+  cuente como descubierto.
 - **El teclado propio se queda**, aunque ahora también responda el físico: un
   `<input>` levantaría el teclado del sistema tapando los resultados, y la
   gracia es ver el monto y sus equivalentes a la vez.
