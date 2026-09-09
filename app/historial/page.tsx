@@ -58,6 +58,27 @@ const DIAS_POR_PAGINA = 7;
  */
 const MAX_DIAS_RANGO = 92;
 
+/**
+ * El campo de fecha, y por qué lleva tres utilidades que parecen de más.
+ *
+ * `min-w-0` es **la que de verdad arregla el desbordamiento**. Un
+ * `input type="date"` es un widget nativo: el navegador le calcula un ancho
+ * mínimo intrínseco a partir del texto de la fecha y de sus controles, y ese
+ * mínimo llega como `min-width: auto`, que en CSS **gana sobre `width`**. En
+ * Chromium ese mínimo cabe (medido: 324 px dentro de una tarjeta de 356) y no
+ * se nota nada; en un iPhone real pide más de lo que hay y la caja se sale por
+ * el borde derecho de la tarjeta, por mucho `w-full` que lleve. Anular ese
+ * mínimo es lo que deja mandar al 100 %.
+ *
+ * `max-w-full` es el tope duro por si algún navegador calcula el ancho por
+ * otra vía, y `appearance-none` desactiva el widget nativo —de donde sale ese
+ * tamaño— **solo por debajo de `sm:`**, que es donde ocurre el problema: en
+ * iOS estos campos no dibujan icono de calendario, así que ahí no se pierde
+ * nada, y en escritorio `sm:appearance-auto` lo devuelve con su icono.
+ */
+const CLASE_FECHA =
+  "tabular w-full min-w-0 max-w-full appearance-none rounded-xl border border-[color:var(--border)] bg-[color:var(--surface-strong)] px-3 py-2 text-sm text-[color:var(--foreground)] outline-none sm:appearance-auto";
+
 const FECHA_ISO = /^\d{4}-\d{2}-\d{2}$/;
 
 /** `true` solo si es un día real: `2026-02-31` cumple el patrón y no existe. */
@@ -411,7 +432,7 @@ function Controles({
             name="desde"
             defaultValue={rango.desde}
             max={hoy}
-            className="tabular w-full rounded-xl border border-[color:var(--border)] bg-[color:var(--surface-strong)] px-3 py-2 text-sm text-[color:var(--foreground)] outline-none"
+            className={CLASE_FECHA}
           />
         </label>
 
@@ -422,7 +443,7 @@ function Controles({
             name="hasta"
             defaultValue={rango.hasta}
             max={hoy}
-            className="tabular w-full rounded-xl border border-[color:var(--border)] bg-[color:var(--surface-strong)] px-3 py-2 text-sm text-[color:var(--foreground)] outline-none"
+            className={CLASE_FECHA}
           />
         </label>
 

@@ -1007,12 +1007,25 @@ los dos disparos del día (ver la sección anterior).
   futuro y ofrecer una pantalla vacía es peor que no ofrecer nada.
 - **El formulario es un `<form method="GET">` sin una línea de JavaScript**, y
   los campos son `<input type="date">` para que salga el selector nativo del
-  teléfono. **Cada uno se lleva su propia fila en el teléfono** y solo desde
-  `sm:` comparten línea: un `input type="date"` tiene un ancho intrínseco
-  mínimo que impone el navegador —el texto de la fecha más su icono— y que no
-  cede ante `width: 100%` ni ante la columna que lo contenga. En un iPhone real
-  se salía por el borde derecho de la tarjeta; a media fila el año se recortaba.
-  No se arregla apretándolo, se arregla dándole sitio. Con una sola de las dos fechas el tramo es **ese día**, que es lo
+  teléfono. **Y el campo lleva `min-w-0`, que es lo que de verdad
+  impide que se desborde.** Un `input type="date"` es un widget nativo: el
+  navegador le calcula un ancho mínimo intrínseco a partir del texto y de sus
+  controles, y ese mínimo llega como `min-width: auto`, que en CSS **gana sobre
+  `width`**. En Chromium ese mínimo cabe —medido: 324 px dentro de una tarjeta
+  de 356— y no se nota nada; en un iPhone real pide más de lo que hay y la caja
+  se sale por el borde derecho de la tarjeta por mucho `w-full` que lleve.
+  Costó dos intentos porque el síntoma se parece al de un campo apretado: darle
+  primero media fila y después la fila entera lo alivió pero no lo curó, ya que
+  el mínimo no depende del sitio disponible. Acompañan `max-w-full` como tope
+  duro y `appearance-none sm:appearance-auto`, que desactiva el widget nativo
+  —de donde sale ese tamaño— solo por debajo de `sm:`: en iOS estos campos no
+  dibujan icono de calendario, así que ahí no se pierde nada.
+
+  **Esto no se puede reproducir en Chromium**, porque su mínimo intrínseco es
+  más pequeño y nunca llega a desbordar; lo único comprobable en local es que
+  las utilidades se aplican (`min-width: 0px`, `max-width: 100%`, `appearance:
+  none` por debajo de `sm:`). Si algún día vuelve a pasar, la medida que lo
+  delata es el ancho del `<input>` contra el `clientWidth` de su tarjeta. Con una sola de las dos fechas el tramo es **ese día**, que es lo
   que pide quien busca "cómo estuvo el martes". Un tramo invertido se
   intercambia en vez de devolver una lista vacía —es un error de dedo— y uno
   imposible (`2026-02-31`) se descarta: hay que comprobarlo comparando la
