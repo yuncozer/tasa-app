@@ -1446,8 +1446,18 @@ antes de que salga nada.
   `title`—. El cron siguió "detectando" la columna de ayer, que sí estaba en
   un `<h3>`, mientras la de hoy llevaba horas publicada. Ahora se recorren
   **todos** los enlaces del listado en orden y se decide por la URL, cuyo slug
-  siempre empieza por `dolar-en-la-parada`: un cambio de theme puede mover los
-  títulos de sitio otra vez, pero no cambia a dónde apunta el enlace.
+  siempre empieza por `dolar-` seguido de `la-parada`: un cambio de theme puede
+  mover los títulos de sitio otra vez, pero no cambia a dónde apunta el enlace.
+- **Ni la preposición del título es fija.** El 9 de septiembre de 2026 el
+  portal pasó de "Dólar **en** La Parada" a "Dólar **de** La Parada", con su
+  slug detrás (`dolar-de-la-parada-este-9sept`), y como los dos patrones
+  —el del slug y el del título— exigían `en` literal, el cron dejó de
+  detectar la columna del día. Ese día convivían las dos formas en el
+  listado: la de ayer con `en` y la de hoy con `de`. Ahora el conector va
+  opcional (`en`, `de`, `del` o ninguno) en las dos expresiones: lo que
+  identifica la columna es el par "dólar … la parada". Se acota a esa lista
+  corta en vez de admitir cualquier palabra entre medias, que casaría con
+  titulares que no son esta columna.
 - **El cron detecta, nunca publica.** `app/api/cron/vigilar-parada/route.ts`
   revisa la categoría "Frontera" de lanacionweb.com (`lib/providers/parada.ts`,
   regex sobre el HTML del listado — el sitio no tiene API) cada pocos minutos,
