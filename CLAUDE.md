@@ -988,7 +988,41 @@ los dos disparos del día (ver la sección anterior).
 - **La vista y la tasa viajan por query string** (`?vista=` y `?clave=`), no en
   estado de cliente: la página ya se renderiza en el servidor y un enlace
   normal resuelve el caso sin JavaScript, mismo criterio que el `?actualizar=`
-  de la portada.
+  de la portada. `?desde=` y `?hasta=` se les sumaron después y siguen la misma
+  regla.
+- **Filtrar por fecha y pasar de página son la misma cosa: mover una ventana
+  de días** (`RangoHistorico` en `lib/historico.ts`). La lista traía un tope
+  fijo de sesenta lecturas y las pintaba todas, así que el scroll crecía con
+  los días hasta volverse impracticable. Paginar por número de fila no servía
+  aquí: las tres vistas agrupan distinto —una clave la de bolívares, cuatro la
+  de pesos, dos la de la brecha— de modo que un `offset` de filas no es un
+  offset de lecturas y cada vista habría necesitado su propia cuenta. Un tramo
+  de días corta igual para las tres, hace la URL compartible y convierte los
+  dos controles en uno.
+- **Siete días por defecto**, que son catorce lecturas: la unidad con la que se
+  piensa el tiempo aquí y lo que cabe en una pantalla de teléfono. "Antes" y
+  "Después" corren el tramo **del largo que tenga**, así que con el defecto se
+  va semana a semana y con un tramo elegido a mano, de ese mismo largo.
+  "Después" no se pinta cuando el tramo ya llega a hoy: no hay tasas del
+  futuro y ofrecer una pantalla vacía es peor que no ofrecer nada.
+- **El formulario es un `<form method="GET">` sin una línea de JavaScript**, y
+  los campos son `<input type="date">` para que salga el selector nativo del
+  teléfono. Con una sola de las dos fechas el tramo es **ese día**, que es lo
+  que pide quien busca "cómo estuvo el martes". Un tramo invertido se
+  intercambia en vez de devolver una lista vacía —es un error de dedo— y uno
+  imposible (`2026-02-31`) se descarta: hay que comprobarlo comparando la
+  fecha reconstruida contra la original, porque JavaScript la desborda a marzo
+  en vez de fallar. Un tramo mayor de 92 días se recorta por el extremo
+  antiguo, en silencio.
+- **`hoy` sale de `rangoDesdeQuery()` y no de un `Date.now()` en el render**:
+  el compilador de React rechaza llamar a algo impuro ahí, y de paso el tramo y
+  los atajos quedan resueltos contra el mismo instante.
+- **Los atajos ("7 días", "30 días") solo se marcan activos si el tramo es
+  exactamente el suyo y termina hoy.** Pintar "7 días" sobre una semana de
+  agosto sería mentir sobre lo que se está viendo.
+- **El sparkline dibuja lo que hay en la lista**, no el histórico entero: es el
+  resumen de lo que se tiene debajo, y una gráfica que no cuadra con la lista
+  que la acompaña es peor que ninguna.
 - **Lleva cabecera de CDN** (`s-maxage=600` en `next.config.ts`, junto a la de
   la portada y por el mismo motivo). `lib/historico.ts` consulta con
   `no-store`, lo que vuelve dinámica la página, así que sin esa cabecera cada

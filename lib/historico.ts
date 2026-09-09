@@ -93,6 +93,48 @@ async function rest<T>(query: string, init: RequestInit & { prefer?: string } = 
   return (texto ? JSON.parse(texto) : undefined) as T;
 }
 
+/**
+ * Un tramo de días, inclusivo por los dos extremos, en fechas "YYYY-MM-DD" de
+ * Caracas — las mismas con las que se archiva.
+ *
+ * `/historial` lo usa **para las dos cosas a la vez**: filtrar por fecha y
+ * pasar de página. Paginar por número de fila no serviría aquí, porque las
+ * tres vistas agrupan distinto —una clave la de bolívares, cuatro la de pesos,
+ * dos la de la brecha— así que un `offset` de filas no es un offset de
+ * lecturas y cada vista necesitaría su propia cuenta. Un tramo de días corta
+ * igual para las tres.
+ */
+export interface RangoHistorico {
+  desde: string;
+  hasta: string;
+}
+
+/** Los dos disparos del cron, que es el techo de lecturas que puede tener un día. */
+const LECTURAS_POR_DIA = 2;
+
+/** Cuántos días cubre el tramo, contando los dos extremos. */
+export function diasDelRango({ desde, hasta }: RangoHistorico): number {
+  const dias = Math.round((Date.parse(`${hasta}T00:00:00Z`) - Date.parse(`${desde}T00:00:00Z`)) / DIA_MS) + 1;
+  return Number.isFinite(dias) ? Math.max(1, dias) : 1;
+}
+
+/**
+ * El filtro de PostgREST del tramo, o vacío si no hay tramo. Mismo par de
+ * comparadores que ya usa `leerComparativa()`.
+ */
+function filtroDelRango(rango?: RangoHistorico): string {
+  return rango ? `&fecha=gte.${rango.desde}&fecha=lte.${rango.hasta}` : "";
+}
+
+/**
+ * Cuántas filas pedir. Con un tramo se deriva de él —hay un techo conocido de
+ * lecturas por día, así que no hace falta contar nada antes— y sin tramo manda
+ * el límite que pase quien llama, que es como funcionaba antes.
+ */
+function limiteDe(limite: number, rango: RangoHistorico | undefined, claves: number): number {
+  return (rango ? diasDelRango(rango) * LECTURAS_POR_DIA : limite) * claves;
+}
+
 /** Suma (o resta) días a una fecha "YYYY-MM-DD" sin tocar zonas horarias. */
 export function desplazarDia(fecha: string, dias: number): string {
   const [anio, mes, dia] = fecha.split("-").map(Number);
@@ -174,12 +216,17 @@ export async function momentosArchivados(fecha: string): Promise<Momento[]> {
     .filter((momento): momento is Momento => momento === "manana" || momento === "tarde");
 }
 
-export async function listarHistorico(clave: ClaveHistorico, limite: number = 60): Promise<PuntoHistorico[]> {
+export async function listarHistorico(
+  clave: ClaveHistorico,
+  limite: number = 60,
+  rango?: RangoHistorico,
+): Promise<PuntoHistorico[]> {
   const filas = await rest<FilaHistorico[]>(
     `?clave=eq.${encodeURIComponent(clave)}` +
+      filtroDelRango(rango) +
       "&select=clave,fecha,momento,valor" +
       "&order=fecha.desc,momento.desc" +
-      `&limit=${limite}`,
+      `&limit=${limiteDe(limite, rango, 1)}`,
     { method: "GET" },
   );
 
@@ -229,12 +276,16 @@ export interface FilaHistoricoPesos {
  * orden en que hay que mostrar los grupos, y un `Map` conserva el orden de
  * inserción: no hace falta reordenar después de agrupar.
  */
-export async function listarHistoricoPesos(limite: number = 30): Promise<FilaHistoricoPesos[]> {
+export async function listarHistoricoPesos(
+  limite: number = 30,
+  rango?: RangoHistorico,
+): Promise<FilaHistoricoPesos[]> {
   const filas = await rest<FilaHistorico[]>(
     `?clave=in.(${CLAVES_PESOS.map(encodeURIComponent).join(",")})` +
+      filtroDelRango(rango) +
       "&select=clave,fecha,momento,valor" +
       "&order=fecha.desc,momento.desc" +
-      `&limit=${limite * CLAVES_PESOS.length}`,
+      `&limit=${limiteDe(limite, rango, CLAVES_PESOS.length)}`,
     { method: "GET" },
   );
 
@@ -265,7 +316,9 @@ export async function listarHistoricoPesos(limite: number = 30): Promise<FilaHis
       vesPromedio: cop_frontera ? 1 / cop_frontera : null,
     });
 
-    if (resultado.length >= limite) break;
+    // El tope de grupos sale del tramo cuando lo hay: con el `limite` por
+    // defecto, pedir dos meses se habría cortado en seco a la mitad.
+    if (resultado.length >= (rango ? diasDelRango(rango) * LECTURAS_POR_DIA : limite)) break;
   }
 
   return resultado;
@@ -295,12 +348,16 @@ export interface FilaHistoricoBrecha {
  * solo viaje y se agrupan por `(fecha, momento)` en vez de dos llamadas a
  * `listarHistorico()` que podrían traer ventanas de fechas distintas.
  */
-export async function listarHistoricoBrecha(limite: number = 60): Promise<FilaHistoricoBrecha[]> {
+export async function listarHistoricoBrecha(
+  limite: number = 60,
+  rango?: RangoHistorico,
+): Promise<FilaHistoricoBrecha[]> {
   const filas = await rest<FilaHistorico[]>(
     `?clave=in.(${CLAVES_BRECHA.map(encodeURIComponent).join(",")})` +
+      filtroDelRango(rango) +
       "&select=clave,fecha,momento,valor" +
       "&order=fecha.desc,momento.desc" +
-      `&limit=${limite * CLAVES_BRECHA.length}`,
+      `&limit=${limiteDe(limite, rango, CLAVES_BRECHA.length)}`,
     { method: "GET" },
   );
 
@@ -327,7 +384,9 @@ export async function listarHistoricoBrecha(limite: number = 60): Promise<FilaHi
       brecha: calcularBrecha(valores.USD_BCV ?? null, valores.USD_BINANCE_SELL ?? null),
     });
 
-    if (resultado.length >= limite) break;
+    // El tope de grupos sale del tramo cuando lo hay: con el `limite` por
+    // defecto, pedir dos meses se habría cortado en seco a la mitad.
+    if (resultado.length >= (rango ? diasDelRango(rango) * LECTURAS_POR_DIA : limite)) break;
   }
 
   return resultado;
