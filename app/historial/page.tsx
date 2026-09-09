@@ -229,6 +229,8 @@ async function HistorialBolivares({ clave, rango }: { clave: RateKey; rango: Ran
             <Sparkline
               valores={puntos.map((punto) => punto.valor).reverse()}
               etiqueta={rateMeta(clave).label}
+              desde={puntos[puntos.length - 1].fecha}
+              hasta={puntos[0].fecha}
             />
           </div>
 
@@ -390,10 +392,15 @@ function Controles({
         </p>
       </div>
 
-      {/* En el teléfono el botón baja a su propia fila: en línea con los dos
-          campos les robaba ancho y el año quedaba recortado ("09/09/202…"),
-          porque un `input type="date"` no encoge su texto. */}
-      <form method="GET" action="/historial" className="grid grid-cols-2 gap-2 sm:flex sm:items-end">
+      {/* En el teléfono cada campo se lleva su propia fila. Un
+          `input type="date"` tiene un **ancho intrínseco mínimo** que impone el
+          navegador —el texto de la fecha más su icono de calendario— y que no
+          cede ante `width: 100%` ni ante la columna que lo contiene: en un
+          iPhone real, con los dos en fila, el segundo se salía por el borde
+          derecho de la tarjeta. A media fila el año se recortaba y a fila
+          entera se desbordaba, así que lo que se les da es sitio de sobra.
+          Desde `sm:` vuelven a la misma línea, donde sí caben. */}
+      <form method="GET" action="/historial" className="flex flex-col gap-2 sm:flex-row sm:items-end">
         <input type="hidden" name="vista" value={vista} />
         {vista === "bs" ? <input type="hidden" name="clave" value={clave} /> : null}
 
@@ -421,7 +428,7 @@ function Controles({
 
         <button
           type="submit"
-          className="col-span-2 shrink-0 rounded-xl border border-[color:var(--accent)] bg-[color:var(--accent)]/15 px-4 py-2 text-sm font-semibold text-[color:var(--accent)] transition active:scale-95 sm:col-auto"
+          className="w-full shrink-0 rounded-xl border border-[color:var(--accent)] bg-[color:var(--accent)]/15 px-4 py-2 text-sm font-semibold text-[color:var(--accent)] transition active:scale-95 sm:w-auto"
         >
           Ver
         </button>

@@ -1007,7 +1007,12 @@ los dos disparos del día (ver la sección anterior).
   futuro y ofrecer una pantalla vacía es peor que no ofrecer nada.
 - **El formulario es un `<form method="GET">` sin una línea de JavaScript**, y
   los campos son `<input type="date">` para que salga el selector nativo del
-  teléfono. Con una sola de las dos fechas el tramo es **ese día**, que es lo
+  teléfono. **Cada uno se lleva su propia fila en el teléfono** y solo desde
+  `sm:` comparten línea: un `input type="date"` tiene un ancho intrínseco
+  mínimo que impone el navegador —el texto de la fecha más su icono— y que no
+  cede ante `width: 100%` ni ante la columna que lo contenga. En un iPhone real
+  se salía por el borde derecho de la tarjeta; a media fila el año se recortaba.
+  No se arregla apretándolo, se arregla dándole sitio. Con una sola de las dos fechas el tramo es **ese día**, que es lo
   que pide quien busca "cómo estuvo el martes". Un tramo invertido se
   intercambia en vez de devolver una lista vacía —es un error de dedo— y uno
   imposible (`2026-02-31`) se descarta: hay que comprobarlo comparando la
@@ -1023,6 +1028,19 @@ los dos disparos del día (ver la sección anterior).
 - **El sparkline dibuja lo que hay en la lista**, no el histórico entero: es el
   resumen de lo que se tiene debajo, y una gráfica que no cuadra con la lista
   que la acompaña es peor que ninguna.
+- **Y lleva cuatro referencias, ni una más.** Fue una raya pelada durante un
+  tiempo, con el argumento de que era un indicio de forma y no un gráfico de
+  análisis. El argumento se cae en cuanto alguien la mira: sin una sola cifra
+  alrededor no dice de qué es, entre qué valores se mueve ni hacia qué lado
+  avanza el tiempo — ni siquiera si la subida que se ve es de un bolívar o de
+  cincuenta. Ahora lleva la serie y su unidad arriba, el máximo y el mínimo a
+  la izquierda y las fechas de los extremos debajo. Rejilla, marcas
+  intermedias o un valor por punto serían duplicar la lista que va justo
+  debajo. Las dos cifras de la izquierda marcan el **borde del trazo** y no dos
+  puntos concretos —la línea se normaliza entre el mínimo y el máximo del
+  tramo—, y con una serie plana se enseña una sola centrada en vez de repetir
+  el mismo número dos veces. Van fuera del SVG a propósito: el lienzo se estira
+  con `preserveAspectRatio="none"` y un texto dentro saldría deformado con él.
 - **Lleva cabecera de CDN** (`s-maxage=600` en `next.config.ts`, junto a la de
   la portada y por el mismo motivo). `lib/historico.ts` consulta con
   `no-store`, lo que vuelve dinámica la página, así que sin esa cabecera cada
