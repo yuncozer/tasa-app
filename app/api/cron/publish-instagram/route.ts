@@ -4,7 +4,11 @@ import { apiError, apiJson } from "@/lib/api";
 import { esCronAutorizado } from "@/lib/cron-auth";
 import { revisarCordura } from "@/lib/cordura-tasas";
 import { formatPercent, formatRate } from "@/lib/format";
-import { notificarFalloPublicacion, notificarTasaAnomala } from "@/lib/notificar";
+import {
+  notificarFalloPublicacion,
+  notificarHistoriasFallidas,
+  notificarTasaAnomala,
+} from "@/lib/notificar";
 import { SnapshotNoCongelado, publicarTasasDelDia } from "@/lib/publish-hoy";
 import { getRates } from "@/lib/rates";
 import { fechaDeHoy, registrarPendiente, tasasBaseCompletas } from "@/lib/tasas-pendientes";
@@ -124,8 +128,24 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const { mediaId, enlace } = await publicarTasasDelDia(siteUrl, momento, modo);
-    return apiJson({ ok: true, modo, mediaId, enlace });
+    const { mediaId, enlace, historiasFallidas } = await publicarTasasDelDia(
+      siteUrl,
+      momento,
+      modo,
+    );
+
+    // El carrusel ya salió, así que esto no es un fallo de la petición: se
+    // contesta 200 igual. Pero una Historia que no sale dura veinticuatro
+    // horas sin salir, y hasta ahora se perdía en silencio —el 10 de
+    // septiembre de 2026 salió una sola de las dos de las 9:00 y no quedó ni
+    // una línea de log—, así que se avisa para poder subirla a mano el mismo
+    // día. Como los reintentos ya se gastaron dentro, es un correo por
+    // disparo y no uno por intento.
+    if (historiasFallidas.length > 0) {
+      await notificarHistoriasFallidas(momento, historiasFallidas);
+    }
+
+    return apiJson({ ok: true, modo, mediaId, enlace, historiasFallidas });
   } catch (error) {
     // No se pudo congelar el snapshot, así que no se publicó nada y Meta ni
     // se enteró. Es la tercera puerta de esta ruta, junto a las tasas

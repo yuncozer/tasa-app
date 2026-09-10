@@ -142,6 +142,33 @@ export function notificarFalloPublicacion(
 }
 
 /**
+ * Salió el carrusel pero se quedó fuera alguna de sus dos Historias.
+ *
+ * No es un fallo de la publicación —el post está en la cuenta y ahí sigue— y
+ * por eso `publicarTasasDelDia()` se traga el error en vez de lanzarlo. Pero
+ * tampoco puede quedarse en nada: una Historia dura 24 horas, así que si nadie
+ * se entera hoy, ya no hay nada que hacer mañana. El aviso dice cuál faltó
+ * para poder subirla a mano.
+ *
+ * Es un correo como mucho por disparo, no uno por intento: los reintentos ya
+ * se gastaron dentro antes de llegar aquí.
+ */
+export function notificarHistoriasFallidas(
+  momento: "manana" | "tarde" | undefined,
+  etiquetas: string[],
+): Promise<boolean> {
+  const cual = momento === "manana" ? "de la mañana" : momento === "tarde" ? "de la tarde" : "";
+  const enlace = enlaceAdmin("/admin/hoy");
+  const lista = etiquetas.join(" y ");
+  const cuantas = etiquetas.length > 1 ? "las Historias" : "la Historia";
+  return notificar(
+    `No salió ${cuantas} en ${lista}`,
+    `<p>El carrusel de tasas ${cual} se publicó bien, pero ${cuantas} en ${lista} no llegó a salir tras dos intentos.</p>` +
+      `<p>El motivo queda en el log del servidor. La imagen vertical se puede volver a publicar desde <a href="${enlace}">${enlace}</a>.</p>`,
+  );
+}
+
+/**
  * El post del día lleva demasiado rato esperando a que respondan las fuentes.
  *
  * No es un fallo —el reintento cada dos minutos sigue en marcha— pero pasada

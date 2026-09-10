@@ -433,6 +433,20 @@ mismo orden en que se deslizan: bolívares primero, pesos después.
   tiene `mediaId` — el mismo criterio que anotar el enlace de `/hoy`: el post
   ya está en la cuenta, y un fallo en la Historia no puede convertir una
   publicación exitosa en un error.
+- **Pero tragarse el error no es tragárselo en silencio.** Durante un tiempo
+  el `catch` no dejaba ni una línea de log, y el 10 de septiembre de 2026 salió
+  **una sola** de las dos Historias de las 9:00 sin que quedara rastro de cuál
+  ni de por qué. Ahora cada una se intenta **dos veces** (`publicarHistoria()`
+  en `lib/publish-hoy.ts`, con el error registrado en cada intento) y, si aun
+  así no sale, viaja en `historiasFallidas` del resultado para que la ruta del
+  cron mande el correo (`notificarHistoriasFallidas`). El reintento es lo más
+  barato que arregla el caso normal —una Historia son dos viajes a Meta, y lo
+  que la tumba suele ser un tropiezo suelto de ese camino— y solo se gasta
+  cuando el primero ya falló, así que cabe de sobra en el `maxDuration = 60`.
+  El aviso va **en la ruta y no dentro de la función**, mismo criterio que el
+  fallo de publicación: solo la ruta sabe de qué disparo se trata. Y avisar sí
+  hace falta aquí aunque el post haya salido bien: una Historia dura 24 horas,
+  así que si nadie se entera hoy, mañana ya no hay nada que subir a mano.
 - **La imagen es la misma URL del carrusel, con `?proporcion=9:16`.**
   `app/api/og/instagram-post` y `app/api/og/instagram-post-pesos` generan las
   dos proporciones desde la misma plantilla —mismo patrón que

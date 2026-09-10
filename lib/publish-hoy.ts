@@ -26,6 +26,51 @@ export interface ResultadoPublicacionHoy {
   /** `null` en modo `solo_historias`: ahí no hay post de feed que enlazar. */
   mediaId: string | null;
   enlace: string | null;
+  /**
+   * Qué Historias no llegaron a salir ("bolívares", "pesos"), vacío si todas
+   * salieron o si el modo no las pedía.
+   *
+   * Existe porque el fallo de una Historia era **invisible**: cada llamada iba
+   * en su `try/catch` tragado sin una sola línea de log, así que el 10 de
+   * septiembre de 2026 salió una sola de las dos del disparo de las 9:00 y no
+   * quedó rastro de cuál ni de por qué. Tragarse el error sigue siendo lo
+   * correcto —el carrusel ya está en la cuenta y eso es lo irreversible— pero
+   * tragárselo *en silencio* no: quien llama tiene que poder avisar, que es
+   * justo lo que permite publicar a mano la que faltó desde `/admin/hoy`.
+   */
+  historiasFallidas: string[];
+}
+
+/** Cuántas veces se intenta cada Historia antes de darla por perdida. */
+const INTENTOS_HISTORIA = 2;
+
+/**
+ * Publica una Historia, con un reintento, y **nunca lanza**: devuelve si salió.
+ *
+ * El reintento es lo más barato que arregla el caso normal. Una Historia son
+ * dos viajes a Meta —crear el contenedor, que es cuando descarga la imagen que
+ * renderizamos al vuelo, y publicarlo—, así que lo que la tumba suele ser un
+ * tropiezo suelto de ese camino, no un problema con la pieza; y el segundo
+ * intento cabe de sobra en el `maxDuration = 60` de la ruta porque solo ocurre
+ * cuando el primero ya falló.
+ *
+ * El error se registra siempre. No hay pantalla que lo muestre ni fila donde
+ * quede, así que el log del servidor es el único sitio donde puede aparecer el
+ * motivo real cuando alguien va a mirar por qué faltó una Historia.
+ */
+async function publicarHistoria(url: string, etiqueta: string): Promise<boolean> {
+  for (let intento = 1; intento <= INTENTOS_HISTORIA; intento++) {
+    try {
+      await publishStory(url);
+      return true;
+    } catch (error) {
+      console.error(
+        `[historias] Falló la Historia en ${etiqueta} (intento ${intento} de ${INTENTOS_HISTORIA})`,
+        error,
+      );
+    }
+  }
+  return false;
 }
 
 /**
@@ -44,13 +89,12 @@ export interface ResultadoPublicacionHoy {
  * incluye su propio título ("Tasas de hoy…") en `?proporcion=9:16`, así que
  * no hace falta redactar nada nuevo para ellas.
  *
- * Solo se publican en el disparo de la mañana (`momento === "manana"`) o en
- * el botón manual de `/admin/hoy` (sin `momento`). El de la tarde
- * (`momento === "tarde"`) se queda solo con el carrusel: dos Historias
- * idénticas en formato el mismo día saturan quien mira el timeline, y la de
- * la mañana ya cumplió el propósito de avisar que hay tasas nuevas. La
- * excepción es el modo `solo_historias`, donde son lo único que se publica y
- * por tanto salen a cualquier hora.
+ * Que salgan o no lo decide el **modo** (`piezasDe()`), no la hora: la rutina
+ * de la semana vive en `modoPorDefecto()` como lo que es, una costumbre de la
+ * cuenta y no una ley del código. Cada una se intenta dos veces y, si aun así
+ * no sale, se anota en `historiasFallidas` en vez de perderse: el carrusel ya
+ * está publicado y eso es lo irreversible, pero quien llama tiene que poder
+ * avisar de la que faltó.
  *
  * Sin `momento` no se archiva en `historico_tasas` (`registrarSnapshot` solo
  * corre si se pasa) y el caption sale con "Actualización del día" en vez de
@@ -140,16 +184,18 @@ export async function publicarTasasDelDia(
   // de la mañana" escrita aquí dentro; ahora esa regla vive en
   // `modoPorDefecto()` como lo que es —una rutina de la cuenta, no una ley
   // del código— y aquí solo se obedece lo que se pidió para este disparo.
+  const historiasFallidas: string[] = [];
   if (historias) {
-    try {
-      await publishStory(`${siteUrl}/api/og/instagram-post?proporcion=9:16`);
-    } catch {
-      // Sin Historia en bolívares, el carrusel de feed ya publicado sigue en pie.
+    // En serie y no con `Promise.all`: cada una hace que Meta se descargue una
+    // imagen que se renderiza al vuelo, y en paralelo se sumarían los dos
+    // renders sobre la misma función. El orden es el del carrusel.
+    if (!(await publicarHistoria(`${siteUrl}/api/og/instagram-post?proporcion=9:16`, "bolívares"))) {
+      historiasFallidas.push("bolívares");
     }
-    try {
-      await publishStory(`${siteUrl}/api/og/instagram-post-pesos?proporcion=9:16`);
-    } catch {
-      // Sin Historia en pesos, el carrusel de feed ya publicado sigue en pie.
+    if (
+      !(await publicarHistoria(`${siteUrl}/api/og/instagram-post-pesos?proporcion=9:16`, "pesos"))
+    ) {
+      historiasFallidas.push("pesos");
     }
   }
 
@@ -185,5 +231,5 @@ export async function publicarTasasDelDia(
     }
   }
 
-  return { mediaId, enlace };
+  return { mediaId, enlace, historiasFallidas };
 }
