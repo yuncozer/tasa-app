@@ -48,7 +48,28 @@ export async function GET(request: Request) {
       return apiJson({ ok: true, detectado: false });
     }
 
-    const pendiente = await leerParadaPendiente().catch(() => null);
+    // La lectura del borrador guardado **no se traga**. Estaba en un
+    // `.catch(() => null)`, y con eso un 504 suelto de la puerta de enlace de
+    // Supabase —la misma intermitencia del edge que ya obligó a
+    // `reclamarConReintento()`— se leía como "todavía no hay borrador": el
+    // cron seguía de largo y `guardarParadaPendiente()` pisaba la fila,
+    // devolviendo `compra`/`venta` a `null`. O sea, borraba las cifras que el
+    // admin acababa de confirmar a mano, sin que nadie se enterara hasta ver
+    // la vista previa rota. Pasó el 11 de septiembre de 2026: la fila se
+    // reescribió a las 23:00 con la misma URL que ya tenía.
+    //
+    // Ante un fallo de lectura no se opina: se sale sin escribir y el disparo
+    // siguiente lo reintenta solo. Misma regla de "sin dato no se inventa un
+    // dato" que rige el resto del proyecto, y el lado seguro del error es no
+    // tocar lo que una persona ya revisó.
+    let pendiente;
+    try {
+      pendiente = await leerParadaPendiente();
+    } catch (error) {
+      console.error("[vigilar-parada] No se pudo leer el borrador guardado:", error);
+      return apiJson({ ok: true, detectado: false, motivo: "no_se_pudo_leer_el_borrador" });
+    }
+
     if (pendiente?.url === encontrado.url) {
       return apiJson({ ok: true, detectado: false, url: encontrado.url });
     }

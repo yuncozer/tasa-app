@@ -1534,6 +1534,33 @@ antes de que salga nada.
   razón por la que un cambio de copy o de plantilla **no se nota en un
   borrador ya guardado**: hay que volver a guardar (o esperar al próximo
   artículo que detecte el cron) para que se refleje.
+- **Lo publicado vive en su propia fila, aparte del borrador.** `parada_pendiente`
+  tiene dos filas y la clave es la PK, así que no hizo falta migración:
+  `parada` es el buzón que el cron sobreescribe y `parada_publicada` la copia
+  congelada de lo último que salió. Existen separadas porque son dos preguntas
+  con vidas distintas — "qué hay que revisar" y "qué está viendo la gente" — y
+  mientras compartieron fila, detectar la columna de mañana borraba la de hoy:
+  `compra`/`venta` volvían a `null` y con eso desaparecía la tarjeta de la
+  portada y, peor, `/api/og/instagram-post-parada` devolvía **404**, así que
+  `/laparada` se pegaba en WhatsApp sin imagen aunque siguiera llevando bien al
+  post anterior. No era un caso raro: pasaba todos los días entre la detección
+  y la confirmación (verificado en producción el 11 de septiembre de 2026).
+  `leerParadaPublicada()` es lo que leen la ruta OG y `paradaDelDia()`; su
+  respaldo a la fila pendiente —solo si ya está marcada publicada— cubre la
+  transición hasta la primera publicación con este código.
+- **Y se congela antes de hablar con Meta**, en `/api/admin/publish-parada`:
+  esa descarga la sirve la ruta OG, que lee justamente esa fila, así que
+  guardarla después dejaría a Meta pidiendo una imagen que todavía no existe.
+  En ese punto no se ha tocado la cuenta real, de modo que un fallo ahí aborta
+  limpio — al contrario que `marcarParadaPublicada()`, que va en un `catch`
+  tragado porque ocurre cuando el post ya salió.
+- **El cron no sobreescribe el borrador si no pudo leerlo.** La comparación
+  contra la URL guardada vivía tras un `.catch(() => null)`, y un 504 suelto
+  del edge de Supabase se leía entonces como "no hay borrador": el cron
+  guardaba encima y devolvía `compra`/`venta` a `null`, borrando las cifras que
+  el admin acababa de confirmar a mano. Ahora un fallo de lectura sale sin
+  escribir y el disparo siguiente reintenta — "sin dato no se inventa un dato",
+  y el lado seguro del error es no tocar lo que una persona ya revisó.
 - **`/laparada` es `/hoy`, calcado.** Mismo motivo, misma solución: página con
   `<meta refresh>` y Open Graph propio (no una redirección 307) para que el
   rastreador de WhatsApp se quede con la tarjeta en vez de toparse con el muro

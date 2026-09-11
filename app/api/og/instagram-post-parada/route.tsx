@@ -3,7 +3,7 @@ import { techoDeImagenes } from "@/lib/og-limite";
 import sharp from "sharp";
 import { leerFontBuffer, leerSvgComoDataUri } from "@/lib/og-shared";
 import { PortadaParada, TAMANO_PARADA } from "@/lib/og-parada";
-import { leerParadaPendiente } from "@/lib/parada";
+import { leerParadaPublicada } from "@/lib/parada";
 
 /**
  * Imagen dedicada de "Dólar en La Parada": a diferencia del marco genérico
@@ -16,9 +16,14 @@ import { leerParadaPendiente } from "@/lib/parada";
  * nada.
  *
  * Sirve dos peticiones: la de Meta al publicar, y la de `/laparada` cada vez
- * que alguien abre esa vista previa después. Como el borrador se sobrescribe
- * con el siguiente artículo que detecte el cron, esta imagen siempre
- * refleja "lo último publicado" — igual que `/hoy`.
+ * que alguien abre esa vista previa después. Por eso lee
+ * `leerParadaPublicada()` y no el borrador pendiente: aquella fila es un
+ * buzón que el cron sobreescribe al detectar la columna del día siguiente,
+ * dejando compra/venta en blanco hasta que el admin las confirma, y mientras
+ * tanto esta ruta devolvía 404 — o sea, el enlace de `/laparada` se pegaba en
+ * WhatsApp sin imagen todos los días, aunque siguiera llevando bien al post
+ * anterior. Con la fila aparte la vista previa siempre muestra el post que
+ * este enlace de verdad abre, igual que `/hoy`.
  */
 export const runtime = "nodejs";
 
@@ -48,9 +53,9 @@ export async function GET(request: Request) {
   const techo = techoDeImagenes(request);
   if (techo) return techo;
 
-  const borrador = await leerParadaPendiente();
+  const borrador = await leerParadaPublicada();
   if (!borrador || borrador.compra === null || borrador.venta === null) {
-    return new Response("Todavía no hay un borrador de La Parada con compra y venta confirmadas", { status: 404 });
+    return new Response("Todavía no se ha publicado ningún post de La Parada con compra y venta", { status: 404 });
   }
 
   let imageDataUri: string;

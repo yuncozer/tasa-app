@@ -3,7 +3,13 @@ import { COOKIE_SESION, esSesionValida } from "@/lib/admin-session";
 import { apiError, apiJson } from "@/lib/api";
 import { guardarEnlace } from "@/lib/enlaces";
 import { permalinkDeMedia, publishDailyPost } from "@/lib/instagram";
-import { guardarCamposParada, leerParadaPendiente, marcarParadaPublicada, LUGAR_PARADA_DEFECTO } from "@/lib/parada";
+import {
+  guardarCamposParada,
+  guardarParadaPublicada,
+  leerParadaPendiente,
+  marcarParadaPublicada,
+  LUGAR_PARADA_DEFECTO,
+} from "@/lib/parada";
 
 /**
  * Publica el borrador de "Dólar en La Parada" que detectó
@@ -52,8 +58,13 @@ export async function POST(request: NextRequest) {
 
   try {
     // Se guarda antes de pedirle la imagen a Meta: esa ruta lee estos mismos
-    // campos de Supabase, sin recibir nada por query string.
+    // campos de Supabase, sin recibir nada por query string. Y se congela
+    // además como "lo último publicado" en su fila aparte, que es la que lee
+    // la imagen: si se hiciera después, Meta descargaría una vista previa que
+    // todavía no existe. Nada de esto ha tocado aún la cuenta real, así que
+    // un fallo aquí aborta limpio en vez de dejar algo a medias.
     await guardarCamposParada({ lugar, compra, venta, caption });
+    await guardarParadaPublicada({ ...pendiente, lugar, compra, venta, caption });
 
     const imageUrl = `${siteUrl.replace(/\/$/, "")}/api/og/instagram-post-parada`;
     const { mediaId } = await publishDailyPost(imageUrl, caption);

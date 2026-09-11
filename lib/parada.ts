@@ -17,6 +17,26 @@ import { diaColombiaISO } from "@/lib/format";
 const TIMEOUT_MS = 10_000;
 const TABLA = "parada_pendiente";
 const CLAVE = "parada";
+/**
+ * La copia de lo **último que se publicó** de esta serie, en una segunda fila
+ * de la misma tabla (la clave es la PK, así que no hace falta migración).
+ *
+ * Existe porque la fila `parada` es un buzón que el cron **sobreescribe** en
+ * cuanto detecta la columna del día siguiente, dejando `compra`/`venta` otra
+ * vez en blanco hasta que el admin las confirma. Todo lo que mira "el último
+ * post de La Parada" —la tarjeta de la portada y, sobre todo, la imagen de
+ * vista previa de `/laparada`— se quedaba sin datos en esa ventana: la
+ * tarjeta desaparecía y la vista previa devolvía 404, así que WhatsApp
+ * pintaba el enlace sin imagen aunque `/laparada` siguiera llevando
+ * correctamente al post anterior. Verificado en producción el 11 de
+ * septiembre de 2026, y no era un caso raro: pasaba todos los días entre la
+ * detección y la confirmación.
+ *
+ * Separar las dos filas es lo que arregla el fondo: una dice "lo que hay que
+ * revisar" y la otra "lo que la gente está viendo", que son dos preguntas
+ * distintas y con vidas distintas.
+ */
+const CLAVE_PUBLICADA = "parada_publicada";
 
 /** Lugar por defecto del badge de ubicación, con el mismo texto que el resto del proyecto usa para esta fuente. */
 export const LUGAR_PARADA_DEFECTO = "La Parada, Villa del Rosario";
@@ -214,10 +234,34 @@ export function diaDeLaColumna(
   return { dia: null, esDeHoy: null };
 }
 
+async function leerFila(clave: string): Promise<ParadaBorrador | null> {
+  const filas = await rest<FilaParada[]>(`?clave=eq.${clave}&select=*&limit=1`, { method: "GET" });
+  return filas[0] ? desdeFila(filas[0]) : null;
+}
+
 /** El borrador guardado ahora mismo, o `null` si el cron todavía no ha detectado ninguno. */
 export async function leerParadaPendiente(): Promise<ParadaBorrador | null> {
-  const filas = await rest<FilaParada[]>(`?clave=eq.${CLAVE}&select=*&limit=1`, { method: "GET" });
-  return filas[0] ? desdeFila(filas[0]) : null;
+  return leerFila(CLAVE);
+}
+
+/**
+ * Lo último que se publicó de esta serie, que es lo que ve el público: la
+ * tarjeta de la portada y la imagen de vista previa de `/laparada`. Nunca un
+ * borrador a medio revisar, y —a diferencia de leer la fila pendiente— no se
+ * queda en nada cuando el cron detecta la columna del día siguiente.
+ *
+ * El respaldo a la fila pendiente cubre la transición: hasta la primera
+ * publicación con este código no existe la fila `parada_publicada`, y sin él
+ * la portada y la vista previa se quedarían vacías justamente por arreglar
+ * esto. Solo sirve la pendiente si ya está marcada como publicada, que es
+ * exactamente el comportamiento anterior.
+ */
+export async function leerParadaPublicada(): Promise<ParadaBorrador | null> {
+  const publicada = await leerFila(CLAVE_PUBLICADA);
+  if (publicada) return publicada;
+
+  const pendiente = await leerFila(CLAVE);
+  return pendiente?.publicado ? pendiente : null;
 }
 
 /**
@@ -280,6 +324,37 @@ export async function guardarCamposParada(campos: {
   });
 }
 
+/**
+ * Congela el borrador ya confirmado como "lo último publicado", en la fila
+ * aparte que lee todo lo que mira el público.
+ *
+ * Lo llama `/api/admin/publish-parada` **antes** de pedirle la imagen a Meta,
+ * y a propósito: esa descarga la sirve `/api/og/instagram-post-parada`, que
+ * lee justamente esta fila. Guardarla después dejaría a Meta descargando una
+ * imagen que todavía no existe. En ese punto no se ha tocado la cuenta real,
+ * así que un fallo aquí aborta sin nada a medias — por eso no va en un
+ * `try/catch` tragado, al contrario que `marcarParadaPublicada()`.
+ */
+export async function guardarParadaPublicada(borrador: ParadaBorrador): Promise<void> {
+  await rest<undefined>("", {
+    method: "POST",
+    prefer: "resolution=merge-duplicates,return=minimal",
+    body: JSON.stringify({
+      clave: CLAVE_PUBLICADA,
+      url: borrador.url,
+      titulo: borrador.titulo,
+      imagen_url: borrador.imagenUrl,
+      caption: borrador.caption,
+      lugar: borrador.lugar,
+      compra: borrador.compra,
+      venta: borrador.venta,
+      publicado: true,
+      detectado_en: borrador.detectadoEn,
+      fecha_articulo: borrador.fechaArticulo,
+    }),
+  });
+}
+
 /** Marca el borrador actual como ya publicado, para que `/admin/parada` deje de ofrecerlo. */
 export async function marcarParadaPublicada(): Promise<void> {
   await rest<undefined>(`?clave=eq.${CLAVE}`, {
@@ -297,7 +372,9 @@ export async function marcarParadaPublicada(): Promise<void> {
  * `/admin/parada` puede tener cifras que el admin todavía está corrigiendo, y
  * la portada no es el lugar para mostrar un número sin confirmar — mismo
  * criterio que ya rige el resto del proyecto ("revisión humana antes de que
- * se vea al público").
+ * se vea al público"). Sale de `leerParadaPublicada()` y no de la fila
+ * pendiente justamente para que detectar la columna de mañana no borre la
+ * tarjeta de hoy.
  *
  * Va detrás de `withCache`, con el mismo TTL que `getRates()`: sin esto,
  * cada visita a la portada sería una consulta a Supabase por visitante, la
@@ -306,8 +383,8 @@ export async function marcarParadaPublicada(): Promise<void> {
 export async function paradaDelDia(): Promise<ParadaBorrador | null> {
   try {
     return await withCache("parada-del-dia", 5 * 60 * 1000, async () => {
-      const borrador = await leerParadaPendiente();
-      if (!borrador?.publicado || !borrador.compra || !borrador.venta) return null;
+      const borrador = await leerParadaPublicada();
+      if (!borrador?.compra || !borrador.venta) return null;
       return borrador;
     });
   } catch {
