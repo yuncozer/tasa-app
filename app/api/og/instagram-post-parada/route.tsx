@@ -3,7 +3,7 @@ import { techoDeImagenes } from "@/lib/og-limite";
 import sharp from "sharp";
 import { leerFontBuffer, leerSvgComoDataUri } from "@/lib/og-shared";
 import { PortadaParada, TAMANO_PARADA } from "@/lib/og-parada";
-import { leerParadaPublicada } from "@/lib/parada";
+import { leerParadaPendiente, leerParadaPublicada } from "@/lib/parada";
 
 /**
  * Imagen dedicada de "Dólar en La Parada": a diferencia del marco genérico
@@ -24,6 +24,14 @@ import { leerParadaPublicada } from "@/lib/parada";
  * WhatsApp sin imagen todos los días, aunque siguiera llevando bien al post
  * anterior. Con la fila aparte la vista previa siempre muestra el post que
  * este enlace de verdad abre, igual que `/hoy`.
+ *
+ * `?borrador=1` es la excepción, y la pide **solo `/admin/parada`**: ahí se
+ * revisa lo que todavía no ha salido, que es justo lo contrario de lo que
+ * mira el público. Separar las dos filas sin separar también las dos
+ * peticiones dejó esa pantalla con "No se pudo cargar la imagen" — el panel
+ * pedía lo publicado, que con un borrador sin publicar no existe. No
+ * contradice la falta de firma: es un valor de un conjunto cerrado, no texto
+ * libre, y lo que dibuja sale igualmente de Supabase y no de la URL.
  */
 export const runtime = "nodejs";
 
@@ -53,9 +61,15 @@ export async function GET(request: Request) {
   const techo = techoDeImagenes(request);
   if (techo) return techo;
 
-  const borrador = await leerParadaPublicada();
+  const esBorrador = new URL(request.url).searchParams.get("borrador") === "1";
+  const borrador = esBorrador ? await leerParadaPendiente() : await leerParadaPublicada();
   if (!borrador || borrador.compra === null || borrador.venta === null) {
-    return new Response("Todavía no se ha publicado ningún post de La Parada con compra y venta", { status: 404 });
+    return new Response(
+      esBorrador
+        ? "Todavía no hay un borrador de La Parada con compra y venta confirmadas"
+        : "Todavía no se ha publicado ningún post de La Parada con compra y venta",
+      { status: 404 },
+    );
   }
 
   let imageDataUri: string;

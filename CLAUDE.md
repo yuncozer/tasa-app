@@ -1548,6 +1548,15 @@ antes de que salga nada.
   `leerParadaPublicada()` es lo que leen la ruta OG y `paradaDelDia()`; su
   respaldo a la fila pendiente —solo si ya está marcada publicada— cubre la
   transición hasta la primera publicación con este código.
+- **La vista previa de `/admin/parada` pide `?borrador=1`**, que es la única
+  petición que lee la fila pendiente. Separar las dos filas sin separar
+  también las dos peticiones dejó esa pantalla en "No se pudo cargar la
+  imagen": el panel pedía lo publicado y con un borrador sin publicar eso no
+  existe. Son dos preguntas opuestas —el panel revisa lo que **todavía no**
+  salió y el público ve lo que **ya** salió—, así que la ruta las distingue
+  en vez de adivinar. No contradice su falta de firma: es un valor de un
+  conjunto cerrado, igual que `proporcion` o `comparar`, y lo que dibuja sigue
+  saliendo de Supabase y no de la URL.
 - **Y se congela antes de hablar con Meta**, en `/api/admin/publish-parada`:
   esa descarga la sirve la ruta OG, que lee justamente esa fila, así que
   guardarla después dejaría a Meta pidiendo una imagen que todavía no existe.
