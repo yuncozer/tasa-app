@@ -26,7 +26,14 @@ import { anotarEnlacePost, leerPublicacionPayload, prepararPublicacion } from "@
  * hora programada dejaría de ser lo que se probó a mano.
  */
 
-/** Cuánto trabaja como mucho una llamada, para responder antes de los 30 s de cron-job.org. */
+/**
+ * Cuánto trabaja como mucho una llamada, para responder antes de los 30 s de
+ * cron-job.org. Quien llama puede recortarlo: el cron gasta parte de esos 30 s
+ * reintentando la lectura de la cola cuando la puerta de enlace de Supabase
+ * suelta un 504, y ese tiempo también cuenta — sumar 20 s fijos por detrás
+ * sería salirse del tope por el otro lado y provocar el fallo que el reintento
+ * existe para evitar.
+ */
 const PRESUPUESTO_MS = 20_000;
 
 /** Espera entre sondeos dentro de una misma llamada. */
@@ -50,8 +57,11 @@ export const TEXTO_FASE: Record<FaseProgramada, string> = {
   publicando_meta: "Publicando…",
 };
 
-export async function avanzarPublicacion(programada: Programada): Promise<ResultadoAvance> {
-  const hasta = Date.now() + PRESUPUESTO_MS;
+export async function avanzarPublicacion(
+  programada: Programada,
+  presupuestoMs: number = PRESUPUESTO_MS,
+): Promise<ResultadoAvance> {
+  const hasta = Date.now() + Math.min(presupuestoMs, PRESUPUESTO_MS);
 
   // Se valida aunque venga de nuestra propia tabla: pudo guardarse con una
   // versión anterior del código.

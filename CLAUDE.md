@@ -1288,6 +1288,27 @@ vive aquí.
   fallo persistente: si Supabase se cae de verdad, ese rojo en cron-job.org es
   la única señal de que la cola dejó de mirarse. El cron de tasas pendientes no
   lo necesita: ya se traga su lectura fallida con `.catch(() => null)`.
+- **Y un solo reintento dejó de bastar, así que ahora se reintenta por tiempo y
+  no por número.** Medido el 12 de septiembre de 2026 sobre los logs del
+  proyecto: **355 de 1.905** lecturas de `publicaciones_programadas` en 504, un
+  18,6 % frente al 1,8 % de cuando se escribió lo de arriba — con un escalón
+  limpio, del 5 % al 22 % entre las 22:00 y las 23:00 UTC del día 11, y estable
+  dieciocho horas. No es la consulta ni la base: los logs de Postgres de esas
+  horas no tienen ni un error ni una consulta lenta, solo checkpoints. Con dos
+  intentos a esa tasa fallan los dos un 4,8 % de las veces, o sea unos 35 de los
+  720 disparos diarios — que es exactamente la treintena de correos de "correcto
+  tras un fallo anterior" que llegaron en un día. Reintentar **mientras quede
+  presupuesto** en vez de un número fijo de veces es lo que se adapta solo si
+  esto empeora o se calma.
+- **El tope de 30 s de cron-job.org se reparte, no se suma.** Tres intentos de
+  lectura son hasta 17 s, y encima los 20 s fijos del worker se pasaban del tope
+  por el otro lado: el disparo habría fallado igual, solo que por lento en vez
+  de por 504. Por eso `TOPE_RESPUESTA_MS` (25 s) se parte entre leer la cola
+  (`TOPE_LECTURA_MS`, 18 s) y avanzar, y `avanzarPublicacion()` acepta el
+  presupuesto que le quede. Es generoso con la lectura porque el caso normal es
+  la cola vacía —ahí no hay nada que avanzar—, y cuando sí hay fila lo que sobre
+  alcanza para una fase, que es todo lo que hace falta: la fila recuerda por
+  dónde iba.
 - **La publicación va por fases, y no de un tirón.** Un carrusel con video no
   cabe en una sola petición: Meta procesa cada contenedor de forma asíncrona y
   hay que sondearlo, lo que puede llevar minutos, mientras que una función de
