@@ -67,10 +67,17 @@ async function leerToken(): Promise<
   { diasRestantes: number | null; refrescadoEn: string | null; aviso: string | null } | null
 > {
   try {
-    const { diasRestantes, refrescadoEn } = await estadoToken();
+    const { origen, diasRestantes, refrescadoEn } = await estadoToken();
 
     const aviso =
-      diasRestantes === null
+      // "No se pudo leer" y "no hay fila" se veían igual, y el primero es
+      // mucho más frecuente que el segundo: con la intermitencia actual de
+      // Supabase, el panel anunciaba que el token no estaba registrado sobre
+      // una fila con 58 días por delante, e invitaba a renovarlo — que es
+      // justo lo que no hay que hacer sin poder leer lo guardado.
+      origen === "desconocido"
+        ? "No se pudo consultar el token de Instagram en este momento. La publicación no depende de esta lectura; volvé a cargar la página en un minuto."
+        : diasRestantes === null
         ? "El token de Instagram todavía no está registrado: se publica con el del entorno y no hay forma de saber cuándo caduca. Renuévalo una vez para empezar a contar."
         : diasRestantes <= 0
           ? "El token de Instagram caducó. Nada se publicará hasta renovarlo."

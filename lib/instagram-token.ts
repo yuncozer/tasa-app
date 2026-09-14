@@ -43,6 +43,19 @@ const DIA_MS = 24 * 60 * 60 * 1000;
 const TTL_CACHE_MS = 5 * 60 * 1000;
 
 /**
+ * Cuántas veces se intenta leer la fila antes de darla por ilegible, y cuánto
+ * se espera entre intentos.
+ *
+ * La puerta de enlace de Supabase falla de forma intermitente —medido el 14 de
+ * septiembre de 2026, 6 de 17 lecturas de esta tabla en 504 o 502— y aquí una
+ * lectura fallida no es un inconveniente: es lo que hace creer al panel que el
+ * token no está registrado y lo que llevaba al cron a refrescar el token
+ * equivocado. Mismo criterio que la lectura de la cola de programadas.
+ */
+const INTENTOS_LECTURA = 3;
+const ESPERA_LECTURA_MS = 600;
+
+/**
  * A partir de cuántos días restantes se renueva.
  *
  * Veinte deja tres semanas de margen: aunque el cron diario falle varios días
@@ -61,9 +74,20 @@ interface FilaToken {
 }
 
 export interface EstadoToken {
-  /** De dónde salió el token con el que se está publicando. */
-  origen: "tabla" | "entorno";
-  /** `null` cuando nunca se ha refrescado: sin fila no hay forma de saberlo. */
+  /**
+   * De dónde salió el token con el que se está publicando.
+   *
+   * `desconocido` **no** es lo mismo que `entorno`, y confundirlos costó caro:
+   * aquel dice "no se pudo leer la tabla" y este "la tabla está vacía". Con
+   * los dos colapsados en un `diasRestantes: null`, un 504 de Supabase hacía
+   * que el panel anunciara "el token todavía no está registrado" sobre una
+   * fila perfectamente sana, y —peor— que el cron forzara un refresco del
+   * token del **entorno**, que es la semilla vieja y no el que se viene
+   * renovando. Verificado el 14 de septiembre de 2026: la tabla decía 58 días
+   * restantes mientras el panel pedía registrarlo.
+   */
+  origen: "tabla" | "entorno" | "desconocido";
+  /** `null` cuando nunca se ha refrescado o cuando no se pudo leer: mirar `origen`. */
   diasRestantes: number | null;
   expiraEn: string | null;
   refrescadoEn: string | null;
@@ -104,8 +128,22 @@ async function rest<T>(query: string, init: RequestInit & { prefer?: string } = 
 }
 
 async function leerFila(): Promise<FilaToken | null> {
-  const filas = await rest<FilaToken[]>(`?clave=eq.${CLAVE}&select=token,expira_en,refrescado_en`);
-  return filas?.[0] ?? null;
+  let ultimo: unknown;
+
+  for (let intento = 1; intento <= INTENTOS_LECTURA; intento += 1) {
+    try {
+      const filas = await rest<FilaToken[]>(`?clave=eq.${CLAVE}&select=token,expira_en,refrescado_en`);
+      return filas?.[0] ?? null;
+    } catch (error) {
+      ultimo = error;
+      console.error(`[instagram-token] lectura fallida (intento ${intento})`, error);
+      if (intento < INTENTOS_LECTURA) {
+        await new Promise((resolve) => setTimeout(resolve, ESPERA_LECTURA_MS));
+      }
+    }
+  }
+
+  throw ultimo;
 }
 
 /** La fila, memorizada unos minutos: una publicación la pide varias veces. */
@@ -143,7 +181,15 @@ function diasHasta(iso: string): number {
  * e invita a refrescarlo una primera vez.
  */
 export async function estadoToken(): Promise<EstadoToken> {
-  const fila = await leerFilaCacheada().catch(() => null);
+  let fila: FilaToken | null;
+  try {
+    fila = await leerFilaCacheada();
+  } catch {
+    // No se pudo leer: se dice así. Publicar sigue funcionando con el token
+    // del entorno (`tokenActual()`), pero nadie puede afirmar desde aquí que
+    // la tabla esté vacía.
+    return { origen: "desconocido", diasRestantes: null, expiraEn: null, refrescadoEn: null };
+  }
 
   if (!fila) {
     return { origen: "entorno", diasRestantes: null, expiraEn: null, refrescadoEn: null };
@@ -183,6 +229,18 @@ export interface ResultadoRefresco {
  */
 export async function refrescarToken(forzar = false): Promise<ResultadoRefresco> {
   const estado = await estadoToken();
+
+  // Sin poder leer la fila no se refresca, **ni siquiera forzando**. Aquí
+  // `tokenActual()` caería al `IG_ACCESS_TOKEN` del entorno, que es la semilla
+  // original y no el token que se viene renovando desde hace meses: Meta lo
+  // rechaza si ya caducó —y si lo aceptara sería peor, porque guardaría
+  // encima de la fila buena un token derivado del viejo—. Un fallo de lectura
+  // no puede convertirse en una escritura a ciegas sobre una credencial.
+  if (estado.origen === "desconocido") {
+    throw new Error(
+      "No se pudo leer el token guardado en Supabase, así que no se refresca: hacerlo usaría el token del entorno y reemplazaría el que está en uso. Volvé a intentarlo en un momento.",
+    );
+  }
 
   if (!forzar && estado.diasRestantes !== null && estado.diasRestantes > DIAS_PARA_REFRESCAR) {
     return {

@@ -31,7 +31,13 @@ export async function GET(request: Request) {
   try {
     // La primera vez no hay fila y por tanto no hay fecha con la que decidir:
     // se fuerza para inicializar la tabla. A partir de ahí manda el umbral.
-    const sinRegistrar = (await estadoToken()).diasRestantes === null;
+    //
+    // Se exige `origen === "entorno"`, no un `diasRestantes` nulo: ese también
+    // vale `null` cuando la lectura falló, y forzar ahí llamaría a Meta con el
+    // token del entorno —la semilla vieja— para escribir el resultado encima
+    // de la fila que sí se viene renovando. `refrescarToken()` ya lo rechaza
+    // por su cuenta; esto evita además pedírselo.
+    const sinRegistrar = (await estadoToken()).origen === "entorno";
     const resultado = await refrescarToken(sinRegistrar);
 
     return apiJson(

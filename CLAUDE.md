@@ -1642,6 +1642,26 @@ caducidad obliga a guardar el resultado del refresco, y de ahí la tabla
 - **El panel solo habla cuando hay algo que hacer**: con el token sano, `/admin`
   no dice nada; por debajo de 10 días —o sin registrar, o ya caducado— aparece
   la franja ámbar. Mismo criterio que las insignias de las tarjetas.
+- **"No se pudo leer la tabla" y "la tabla está vacía" son estados distintos, y
+  confundirlos era el peor fallo de este módulo.** Los dos devolvían
+  `diasRestantes: null`, así que un 504 de Supabase —6 de 17 lecturas de esta
+  tabla el 14 de septiembre de 2026— hacía que el panel anunciara "el token
+  todavía no está registrado" sobre una fila con 58 días por delante, e
+  invitara a renovarlo. Y renovar ahí es lo peor que se puede hacer:
+  `tokenActual()` cae al `IG_ACCESS_TOKEN` del entorno, que es la **semilla
+  vieja** y no el token que se viene renovando desde hace meses, de modo que
+  Meta lo rechaza —y si lo aceptara sería peor, porque guardaría encima de la
+  fila buena un token derivado del viejo—. De ahí el tercer valor de `origen`,
+  `desconocido`: `refrescarToken()` lanza antes de tocar Meta **aunque se
+  fuerce**, el cron exige `origen === "entorno"` para inicializar, y el panel
+  dice que no se pudo consultar en vez de pedir un registro que no hace falta.
+  Un fallo de lectura no puede convertirse en una escritura a ciegas sobre una
+  credencial — la misma regla que impide al cron de La Parada pisar el borrador
+  que no pudo leer.
+- **La lectura de la fila se reintenta tres veces** (`INTENTOS_LECTURA`), por
+  lo mismo que la cola de programadas: a la tasa de fallo actual, un intento
+  único convierte la intermitencia de la puerta de enlace en un estado
+  inventado.
 - **La cuenta atrás va siempre, el aviso solo cuando toca.** Con el token sano
   el pie de `/admin` muestra una línea gris con los días que quedan y cuándo se
   renovó: "¿cuánto le queda?" es una pregunta legítima aunque la respuesta sea
