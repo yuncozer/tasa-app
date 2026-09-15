@@ -1832,9 +1832,9 @@ es tener el par guardado fuera de `.env.local`.
 
 ### La IA solo redacta prosa, y siempre con revisión humana
 
-Dos textos de `/admin` se pueden pedir a un modelo de OpenRouter (plan gratuito):
-el caption de un post de noticia y el párrafo de análisis del reporte semanal.
-Todo lo demás sigue saliendo de las plantillas de `lib/caption.ts`.
+Tres textos de `/admin` se pueden pedir a un modelo gratuito: el caption de un
+post de noticia y los párrafos de análisis del reporte semanal y de la alerta de
+brecha. Todo lo demás sigue saliendo de las plantillas de `lib/caption.ts`.
 
 - **La IA no toca ni una cifra.** Los números los calculan `convert()`,
   `lib/pesos.ts` y `lib/semanal.ts`, y el modelo solo escribe alrededor. Es la
@@ -1902,6 +1902,25 @@ Todo lo demás sigue saliendo de las plantillas de `lib/caption.ts`.
   `buildCaptionSemanal`— porque el panel tiene que enseñar el caption exacto
   mientras se escribe, y con la inserción en dos sitios la vista previa y lo
   publicado podrían colocarlo en lugares distintos.
+- **El análisis de la alerta de brecha entra por el mismo hueco y con la misma
+  función.** `conAnalisis()` (antes `conAnalisisSemanal`) la comparten las dos
+  plantillas: las dos cierran con `LINEA_CALCULADORA`, así que el sitio del
+  párrafo es el mismo y dos funciones separadas solo podrían desincronizarse —
+  mismo criterio que `calcularBrecha()`, que también sirve a las dos. Del
+  navegador viaja únicamente `analisis`, que `/api/admin/publish-brecha` vuelve
+  a sanear como hace el semanal; las cifras y el titular se siguen recomponiendo
+  en el servidor.
+
+  **El prompt cambia con la variante.** Con "solo hoy" no hay movimiento del que
+  hablar, y pedirle contexto de una semana que nadie consultó es invitarle a
+  inventarse una tendencia: `redactarAnalisisBrecha()` le prohíbe mencionarla.
+  Por lo mismo el botón se remonta al cambiar de variante (su `key`), para que
+  un "Redactado con IA" de la otra no quede colgando debajo.
+
+  **El caption de la brecha sigue sin poder reescribirse entero**, al contrario
+  que el del semanal. Lo que hay que poder ajustar aquí es el contexto, no las
+  líneas que nombran las dos tasas — y el titular lo sigue decidiendo la
+  dirección, que es la regla dura de esta pieza.
 - **El caption de noticia no marca la vista previa como desactualizada.** A
   diferencia del título y la fuente, no entra en la imagen firmada, así que
   cambiarlo no cambia lo que se publicaría.

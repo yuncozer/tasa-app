@@ -1,7 +1,8 @@
 import type { NextRequest } from "next/server";
 import { COOKIE_SESION, esSesionValida } from "@/lib/admin-session";
+import { construirAlertaBrecha } from "@/lib/alerta-brecha";
 import { apiError, apiJson } from "@/lib/api";
-import { redactarAnalisisSemanal, redactarCaptionNoticia } from "@/lib/ia-textos";
+import { redactarAnalisisBrecha, redactarAnalisisSemanal, redactarCaptionNoticia } from "@/lib/ia-textos";
 import { getRates } from "@/lib/rates";
 import { construirReporteSemanal } from "@/lib/semanal";
 
@@ -9,9 +10,10 @@ import { construirReporteSemanal } from "@/lib/semanal";
  * El único punto de entrada de la IA en toda la aplicación: redacta un texto y
  * lo devuelve para que el admin lo revise. **No publica nada.**
  *
- * Una sola ruta para los dos casos —caption de noticia y análisis semanal—
- * porque comparten guard, saneado y forma de respuesta; el discriminante `tipo`
- * es el mismo patrón que ya usa `PublicacionPayload`.
+ * Una sola ruta para los tres casos —caption de noticia y los análisis del
+ * semanal y de la alerta de brecha— porque comparten guard, saneado y forma de
+ * respuesta; el discriminante `tipo` es el mismo patrón que ya usa
+ * `PublicacionPayload`.
  *
  * Protegida por la cookie de sesión como el resto de `/api/admin`: la clave de
  * OpenRouter, igual que `CRON_SECRET`, nunca llega al navegador.
@@ -37,6 +39,13 @@ export async function POST(request: NextRequest) {
       // vigentes y no sobre lo que quedó en una pestaña abierta.
       const reporte = await construirReporteSemanal(await getRates());
       texto = await redactarAnalisisSemanal(reporte);
+    } else if (body?.tipo === "brecha") {
+      // Igual que el semanal: las cifras se recomponen aquí y no llegan del
+      // navegador. `comparar` decide la variante, con el mismo default que
+      // `/api/admin/publish-brecha` — el prompt cambia entre las dos, porque en
+      // "solo hoy" no hay movimiento del que hablar.
+      const alerta = await construirAlertaBrecha(await getRates(), { comparar: body?.comparar !== false });
+      texto = await redactarAnalisisBrecha(alerta);
     } else if (body?.tipo === "noticia") {
       const title = typeof body?.title === "string" ? body.title.trim() : "";
       const sourceHost = typeof body?.sourceHost === "string" ? body.sourceHost.trim() : "";

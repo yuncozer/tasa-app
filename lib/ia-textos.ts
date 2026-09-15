@@ -1,14 +1,16 @@
+import type { AlertaBrecha } from "@/lib/alerta-brecha";
 import { HASHTAGS_NOTICIA } from "@/lib/caption";
 import { redactar, sanearTextoIa } from "@/lib/ia";
 import type { ReporteSemanal } from "@/lib/semanal";
 
 /**
- * Los dos textos que la IA sabe redactar en este proyecto, con sus
- * instrucciones.
+ * Los tres textos que la IA sabe redactar en este proyecto, con sus
+ * instrucciones: el caption de una noticia y los párrafos de contexto del
+ * reporte semanal y de la alerta de brecha.
  *
  * Viven aparte del cliente (`lib/ia.ts`) por el mismo motivo que `lib/semanal.ts`
  * vive aparte de la ruta que dibuja su imagen: esto es criterio editorial y se va
- * a tocar mucho más que el transporte. Los dos devuelven `null` cuando el modelo
+ * a tocar mucho más que el transporte. Todos devuelven `null` cuando el modelo
  * no responde o cuando lo que devuelve no sirve, y quien los llama cae entonces a
  * la plantilla de `lib/caption.ts`.
  */
@@ -123,6 +125,52 @@ export async function redactarAnalisisSemanal(reporte: ReporteSemanal): Promise<
       "Devuelve solo el párrafo, sin titular y sin encabezados.",
     ].join(" "),
     usuario: [`Semana: ${reporte.rangoTexto}`, `Datos: ${JSON.stringify(filas)}`].join("\n"),
+    maxTokens: 300,
+  });
+
+  return texto === null ? null : sanearTextoIa(texto, MAX_ANALISIS);
+}
+
+/**
+ * Párrafo de contexto para la alerta de brecha, el botón "Redactar análisis con
+ * IA" de `/admin/brecha`.
+ *
+ * Es el tercer texto que la IA sabe redactar y sigue exactamente las mismas
+ * reglas que los dos anteriores: prosa alrededor de cifras que ya están
+ * calculadas, detrás de un botón, con una persona que lo lee antes de que salga.
+ * La brecha la calcula `calcularBrecha()` y el titular lo decide la dirección
+ * (`titularDe()` en `lib/alerta-brecha.ts`) — el modelo no toca ninguno de los
+ * dos, que es justo lo que impide publicar un "aumenta" encima de unas cifras
+ * que dicen lo contrario.
+ *
+ * Se le pasa `comparada` porque el prompt no puede ser el mismo en las dos
+ * variantes: con "solo hoy" no hay movimiento del que hablar, y pedirle
+ * contexto de una semana que nadie consultó es invitarle a inventarse una
+ * tendencia.
+ */
+export async function redactarAnalisisBrecha(alerta: AlertaBrecha): Promise<string | null> {
+  const comparando = alerta.comparada && alerta.direccion !== "desconocida";
+
+  const texto = await redactar({
+    sistema: [
+      VOZ,
+      "Redactas dos o tres frases de contexto para un post sobre la brecha entre el dólar oficial del BCV y el dólar de Binance.",
+      "La brecha es cuánto se paga de más fuera de la tasa oficial.",
+      "No repitas las cifras: ya aparecen en la imagen y en el resto del caption.",
+      "Explica qué significa esa distancia para quien compra o vende en la frontera.",
+      "Una brecha que crece significa que el bolívar se consigue más caro fuera del BCV: no lo presentes como algo positivo.",
+      "Los «puntos porcentuales» son la diferencia entre dos porcentajes, no un cambio relativo.",
+      comparando
+        ? "Puedes mencionar la dirección del movimiento de esta semana, sin exagerarla."
+        : "Este post habla solo del nivel de hoy: no menciones ninguna semana anterior ni afirmes que subió o bajó.",
+      "Devuelve solo el párrafo, sin titular y sin encabezados.",
+    ].join(" "),
+    usuario: [
+      `Brecha de hoy: ${alerta.brechaTexto}`,
+      comparando
+        ? `Hace una semana: ${alerta.brechaAntesTexto}. Dirección: ${alerta.direccion}. Variación: ${alerta.variacion} puntos porcentuales.`
+        : "Sin comparación con la semana anterior.",
+    ].join("\n"),
     maxTokens: 300,
   });
 

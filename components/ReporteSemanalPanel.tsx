@@ -4,7 +4,7 @@ import { useState } from "react";
 import { ImagenConCarga } from "@/components/admin/ImagenConCarga";
 import { Spinner } from "@/components/admin/Spinner";
 import { BotonRedactarIa } from "@/components/BotonRedactarIa";
-import { conAnalisisSemanal } from "@/lib/caption";
+import { conAnalisis } from "@/lib/caption";
 
 /**
  * Panel del reporte semanal: se mira y se publica, al feed o como Historia.
@@ -84,8 +84,10 @@ export function ReporteSemanalPanel({
    * servidor al publicar, así que lo que se lee aquí y lo que sale son lo
    * mismo, con el párrafo en el mismo sitio.
    */
-  const propuesto = conAnalisisSemanal(caption, analisis);
-  const conAnalisis = captionEditado ?? propuesto;
+  const propuesto = conAnalisis(caption, analisis);
+  // `captionFinal` y no `conAnalisis`: ese nombre es ahora el de la función
+  // compartida con la alerta de brecha.
+  const captionFinal = captionEditado ?? propuesto;
   const base = "/api/og/instagram-semanal";
   const refresco = marca ? `&t=${marca}` : "";
   const cuadrada = `${base}?proporcion=1:1${refresco}`;
@@ -253,7 +255,7 @@ export function ReporteSemanalPanel({
         </div>
         <textarea
           id="caption"
-          value={conAnalisis}
+          value={captionFinal}
           onChange={(e) => setCaptionEditado(e.target.value)}
           rows={12}
           className="whitespace-pre-wrap rounded-2xl border border-border-soft bg-surface px-4 py-3 text-xs leading-relaxed text-foreground outline-none"

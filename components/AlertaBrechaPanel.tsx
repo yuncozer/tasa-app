@@ -3,14 +3,23 @@
 import { useState } from "react";
 import { ImagenConCarga } from "@/components/admin/ImagenConCarga";
 import { Spinner } from "@/components/admin/Spinner";
+import { BotonRedactarIa } from "@/components/BotonRedactarIa";
+import { conAnalisis } from "@/lib/caption";
 
 /**
  * Panel de la alerta de brecha: se mira y se publica, como el reporte semanal.
  *
- * No tiene campos. Las cifras salen del snapshot y del histórico, y el titular
- * lo decide la dirección del movimiento (`lib/alerta-brecha.ts`): dejarlo
- * editable permitiría publicar un "se abrió la brecha" sobre unas cifras que
- * dicen lo contrario, que es justo el daño que esta pieza puede causar.
+ * Las cifras no se editan: salen del snapshot y del histórico, y el titular lo
+ * decide la dirección del movimiento (`lib/alerta-brecha.ts`) — dejarlo editable
+ * permitiría publicar un "se abrió la brecha" sobre unas cifras que dicen lo
+ * contrario, que es justo el daño que esta pieza puede causar.
+ *
+ * El único campo es el **análisis**, un párrafo de contexto opcional que se
+ * escribe o se le pide a la IA, igual que en el reporte semanal. Es prosa
+ * alrededor de cifras ya calculadas, que es lo único que la IA hace en este
+ * proyecto: no toca la brecha ni el titular. El caption sigue sin poder
+ * reescribirse entero aquí —a diferencia del semanal— porque lo que hay que
+ * poder ajustar es el contexto, no las líneas que nombran las dos tasas.
  *
  * Lo único que se decide aquí es **cuándo** se publica, que es la razón de que
  * no haya cron: sale cuando el admin ve que el movimiento merece contarse.
@@ -44,6 +53,7 @@ export function AlertaBrechaPanel({
   publicable,
   caption,
   captionSimple,
+  iaDisponible,
 }: {
   titular: string;
   /** El titular de la variante sin comparación, que no dice si subió o bajó. */
@@ -58,6 +68,8 @@ export function AlertaBrechaPanel({
   caption: string;
   /** El caption de la variante sin comparación: no menciona la semana pasada. */
   captionSimple: string;
+  /** Si hay algún proveedor de IA configurado. Sin él, el análisis se escribe a mano. */
+  iaDisponible: boolean;
 }) {
   /**
    * Cambia la URL de las dos imágenes para forzar que el navegador vuelva a
@@ -74,6 +86,7 @@ export function AlertaBrechaPanel({
    */
   const [comparar, setComparar] = useState(true);
   const [marca, setMarca] = useState("");
+  const [analisis, setAnalisis] = useState("");
   const [feed, setFeed] = useState<Estado>({ paso: "inicial" });
   const [historia, setHistoria] = useState<Estado>({ paso: "inicial" });
 
@@ -105,10 +118,12 @@ export function AlertaBrechaPanel({
       const response = await fetch("/api/admin/publish-brecha", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        // Solo el destino. Las cifras y el caption los recompone el servidor con
-        // las tasas vigentes, que es lo que impide publicar un número viejo de
-        // una pestaña que lleva horas abierta.
-        body: JSON.stringify({ destino, comparar }),
+        // Las cifras y el caption los recompone el servidor con las tasas
+        // vigentes, que es lo que impide publicar un número viejo de una
+        // pestaña que lleva horas abierta. Lo único que viaja es el análisis,
+        // que es texto y no se puede recomponer allá. La Historia no lo lleva:
+        // Meta ignora el caption en `STORIES`.
+        body: JSON.stringify({ destino, comparar, analisis: analisis.trim() || undefined }),
       });
       if (!response.ok) {
         setEstado({ paso: "error", mensaje: await leerError(response) });
@@ -242,11 +257,40 @@ export function AlertaBrechaPanel({
       </section>
 
       <section className="flex flex-col gap-2">
+        <label htmlFor="analisis" className="text-sm font-semibold uppercase tracking-wide text-muted">
+          Análisis (opcional)
+        </label>
+        <textarea
+          id="analisis"
+          value={analisis}
+          onChange={(e) => setAnalisis(e.target.value)}
+          rows={4}
+          placeholder="Dos o tres frases de contexto. Se publica debajo de las cifras."
+          className="whitespace-pre-wrap rounded-xl border border-border-soft bg-surface-strong px-4 py-3 text-sm text-foreground outline-none"
+        />
+        {iaDisponible && (
+          /* La `key` obliga a remontar el botón al cambiar de variante: el
+             prompt no es el mismo, y un "Redactado con IA" de la otra colgando
+             debajo diría que ese texto se pidió para esta. */
+          <BotonRedactarIa
+            key={String(comparar)}
+            etiqueta="Redactar análisis con IA"
+            cuerpo={() => ({ tipo: "brecha", comparar })}
+            onTexto={setAnalisis}
+            deshabilitado={publicando || !publicable}
+          />
+        )}
+        <p className="text-xs leading-relaxed text-muted">
+          Solo sale en el post del feed: la Historia no lleva caption.
+        </p>
+      </section>
+
+      <section className="flex flex-col gap-2">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">Caption</h2>
         {/* `whitespace-pre-wrap` sobre un `<p>` y no un `<pre>`: aquel heredaría
             la mono del navegador, y el proyecto usa una sola familia. */}
         <p className="whitespace-pre-wrap rounded-2xl border border-border-soft bg-surface px-4 py-3 text-xs leading-relaxed text-muted">
-          {comparar ? caption : captionSimple}
+          {conAnalisis(comparar ? caption : captionSimple, analisis)}
         </p>
       </section>
     </div>

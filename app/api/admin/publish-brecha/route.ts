@@ -3,6 +3,8 @@ import { COOKIE_SESION, esSesionValida } from "@/lib/admin-session";
 import { construirAlertaBrecha } from "@/lib/alerta-brecha";
 import { apiError, apiJson } from "@/lib/api";
 import { buildCaptionBrecha } from "@/lib/caption";
+import { sanearTextoIa } from "@/lib/ia";
+import { MAX_ANALISIS } from "@/lib/ia-textos";
 import { publishStory } from "@/lib/instagram";
 import { ejecutarPublicacion, urlAlertaBrecha } from "@/lib/publish-news";
 import { getRates } from "@/lib/rates";
@@ -28,7 +30,14 @@ import { getRates } from "@/lib/rates";
  * todas formas, para cuando sí se quiera subir a mano con sticker.
  *
  * La Historia no lleva caption: Meta lo ignora en `media_type=STORIES`. Por eso
- * el caption solo se compone en el camino del feed.
+ * el caption solo se compone en el camino del feed, y por eso el análisis solo
+ * cuenta ahí.
+ *
+ * `analisis` es el párrafo de contexto que el admin escribió o le pidió a la
+ * IA. Es lo único que viaja del navegador —las cifras y el titular se siguen
+ * recomponiendo aquí— y se vuelve a sanear con `sanearTextoIa()`: que el
+ * cliente ya lo hiciera no es algo en lo que se pueda confiar. Mismo trato que
+ * en `publish-semanal`.
  *
  * No anota `/hoy`: "el post del día" es el de tasas, y esto no lo pisa.
  */
@@ -50,6 +59,7 @@ export async function POST(request: NextRequest) {
   // principal. `comparar: false` es la elección explícita de publicar solo el
   // nivel de hoy.
   const comparar = body?.comparar !== false;
+  const analisis = typeof body?.analisis === "string" ? sanearTextoIa(body.analisis, MAX_ANALISIS) : null;
 
   try {
     const snapshot = await getRates();
@@ -62,7 +72,11 @@ export async function POST(request: NextRequest) {
     const { mediaId } =
       destino === "historia"
         ? await publishStory(urlAlertaBrecha("9:16", comparar))
-        : await ejecutarPublicacion({ tipo: "brecha", caption: buildCaptionBrecha(alerta), comparar });
+        : await ejecutarPublicacion({
+            tipo: "brecha",
+            caption: buildCaptionBrecha(alerta, analisis ?? undefined),
+            comparar,
+          });
 
     return apiJson({ ok: true, mediaId, destino });
   } catch (error) {

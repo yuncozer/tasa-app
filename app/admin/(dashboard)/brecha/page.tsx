@@ -5,6 +5,7 @@ import { AlertaBrechaPanel } from "@/components/AlertaBrechaPanel";
 import { construirAlertaBrecha } from "@/lib/alerta-brecha";
 import { buildCaptionBrecha } from "@/lib/caption";
 import { formatVariacion } from "@/lib/format";
+import { iaDisponible } from "@/lib/ia";
 import { getRates } from "@/lib/rates";
 
 export const metadata: Metadata = {
@@ -55,6 +56,7 @@ export default async function AdminBrechaPage() {
         caption={buildCaptionBrecha(alerta)}
         captionSimple={buildCaptionBrecha(alertaSimple)}
         titularSimple={alertaSimple.titular}
+        iaDisponible={iaDisponible()}
       />
     </>
   );

@@ -289,7 +289,7 @@ const HASHTAGS_BRECHA =
  * Los `pp` se explican pegados a su propio número, por el mismo motivo que en
  * `buildCaptionSemanal`: se aclaran una sola vez, donde de verdad se leen.
  */
-export function buildCaptionBrecha(alerta: AlertaBrecha): string {
+export function buildCaptionBrecha(alerta: AlertaBrecha, analisis?: string): string {
   const flecha = alerta.direccion === "sube" ? "↑" : alerta.direccion === "baja" ? "↓" : "";
   const magnitud = formatVariacion(alerta.variacion, "puntos");
 
@@ -317,7 +317,7 @@ export function buildCaptionBrecha(alerta: AlertaBrecha): string {
         ? `🕒 Hace una semana: ${alerta.brechaAntesTexto} (sin cambios)`
         : `🕒 Hace una semana: ${alerta.brechaAntesTexto} (${flecha} ${magnitud})`;
 
-  return [
+  const base = [
     apertura,
     "",
     `📊 Brecha hoy: ${alerta.brechaTexto}`,
@@ -331,6 +331,10 @@ export function buildCaptionBrecha(alerta: AlertaBrecha): string {
     "",
     HASHTAGS_BRECHA,
   ].join("\n");
+
+  // El párrafo de contexto entra en el mismo hueco que en el semanal, con la
+  // misma función: lo que se lee en la vista previa es lo que se publica.
+  return conAnalisis(base, analisis);
 }
 
 /** De dónde salen las dos cifras y contra cuál se mide. En la imagen va en el pie; aquí, buscable. */
@@ -355,13 +359,19 @@ const FUENTES_SEMANAL = "Fuentes: BCV, Binance P2P y Banco de la República (TRM
  * Mete el párrafo de análisis en su hueco: después de las cifras y antes de la
  * línea de la calculadora.
  *
- * Existe como función aparte —y no como un `if` dentro de `buildCaptionSemanal`—
- * porque el panel de `/admin/semanal` tiene que enseñar el caption exacto que se
- * va a publicar mientras se escribe, y ese panel recibe el caption ya compuesto
- * por el servidor. Con la inserción en dos sitios, la vista previa y lo
- * publicado podrían acabar colocando el párrafo en lugares distintos.
+ * Existe como función aparte —y no como un `if` dentro de cada plantilla—
+ * porque los paneles de `/admin/semanal` y `/admin/brecha` tienen que enseñar el
+ * caption exacto que se va a publicar mientras se escribe, y los dos reciben el
+ * caption ya compuesto por el servidor. Con la inserción en dos sitios, la vista
+ * previa y lo publicado podrían acabar colocando el párrafo en lugares
+ * distintos.
+ *
+ * La comparten el semanal y la alerta de brecha: las dos plantillas cierran con
+ * `LINEA_CALCULADORA`, así que el hueco es el mismo y no hay motivo para dos
+ * funciones que se puedan desincronizar — mismo criterio que `calcularBrecha()`,
+ * que también sirve a las dos.
  */
-export function conAnalisisSemanal(caption: string, analisis?: string): string {
+export function conAnalisis(caption: string, analisis?: string): string {
   const contexto = analisis?.trim();
   if (!contexto) return caption;
 
@@ -462,7 +472,7 @@ export function buildCaptionSemanal(reporte: ReporteSemanal, analisis?: string):
     HASHTAGS_SEMANAL,
   ].join("\n");
 
-  return conAnalisisSemanal(base, analisis);
+  return conAnalisis(base, analisis);
 }
 
 /**
