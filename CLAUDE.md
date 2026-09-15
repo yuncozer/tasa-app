@@ -1855,11 +1855,29 @@ Todo lo demás sigue saliendo de las plantillas de `lib/caption.ts`.
   mismo, `/api/admin/redactar` contesta **200 con `texto: null`** cuando ningún
   modelo respondió: no haber redactado no es un fallo de la petición, y la
   interfaz solo tiene que decir que se queda el texto de plantilla.
-- **La lista de modelos está en `OPENROUTER_MODELOS`, no en el código.** Los
-  `:free` de OpenRouter aparecen, se renombran y se retiran sin aviso; cambiar de
-  modelo no puede exigir un despliegue. Se recorren en orden y se pasa al
-  siguiente ante cualquier fallo, con un timeout propio de 20 s: un modelo
-  colgado no puede comerse el minuto de la función.
+- **La lista está en `IA_MODELOS`, no en el código, y cruza proveedores.** Los
+  modelos gratuitos aparecen, se renombran y se retiran sin aviso; cambiar de
+  modelo no puede exigir un despliegue. El mismo argumento vale un escalón más
+  arriba y por eso el endpoint también salió del código: el proveedor entero
+  puede dejar de convenir —la cuota libre de OpenRouter resultó ser la más
+  estrecha de las tres—. Cada entrada es `proveedor|modelo` (`google`, `groq` u
+  `openrouter`; el separador es `|` porque `:` y `/` ya aparecen dentro de los
+  nombres de modelo), se recorren en orden y se pasa a la siguiente ante
+  cualquier fallo, con un timeout propio de 20 s: un modelo colgado no puede
+  comerse el minuto de la función. Así un Google caído a las once de la mañana
+  cae a Groq sin que nadie toque nada.
+
+  Lo que **sí** vive en el código es el registro de los tres endpoints
+  (`PROVEEDORES` en `lib/ia.ts`): eso es transporte, y solo cambia si el
+  proveedor rompe su propia compatibilidad con el formato de OpenAI. Una entrada
+  sin `|` se entiende de OpenRouter, que es lo que mantiene válida la vieja
+  `OPENROUTER_MODELOS` de una instalación anterior a esto —y un nombre de
+  proveedor mal escrito se registra en el log en vez de quedarse mudo, porque el
+  síntoma sería «ningún modelo respondió» sin nada que mirar—.
+
+  **El tier gratuito de Google declara que usa los prompts para entrenar.** Para
+  lo que se redacta aquí —captions de cosas que van a salir públicas en
+  Instagram— es irrelevante, pero por ahí no va nada que no sea eso.
 - **Se dispara al pulsar un botón, nunca al abrir una pantalla.** Es lo que
   mantiene el gasto dentro del plan gratuito —ninguna visita de la portada
   consume cuota— y también lo que garantiza que alguien está mirando cuando el

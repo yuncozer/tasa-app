@@ -1,8 +1,8 @@
 import { quitarPieEnlaces } from "@/lib/caption";
 
 /**
- * Cliente mínimo de OpenRouter, para la única cosa que la IA hace en este
- * proyecto: **redactar prosa alrededor de números que ya existen.**
+ * Cliente mínimo de chat, para la única cosa que la IA hace en este proyecto:
+ * **redactar prosa alrededor de números que ya existen.**
  *
  * Las cifras nunca salen de aquí. Las calculan `convert()`, `lib/pesos.ts` y
  * `lib/semanal.ts`, y el modelo solo escribe el texto que las acompaña. Tampoco
@@ -14,17 +14,71 @@ import { quitarPieEnlaces } from "@/lib/caption";
  * el formato de OpenAI, y el SDK no aportaría nada que no sea peso en el bundle.
  */
 
-const ENDPOINT = "https://openrouter.ai/api/v1/chat/completions";
+interface Proveedor {
+  /** URL de chat completions, en formato OpenAI. */
+  endpoint: string;
+  /** Variable de entorno con su clave. Sin ella, el proveedor no se intenta. */
+  clave: string;
+}
 
 /**
- * Los modelos gratuitos de OpenRouter aparecen, cambian de nombre y se retiran
- * sin aviso, así que la lista vive en el entorno y no en el código: cambiar de
- * modelo no puede exigir un despliegue. Estos son solo el punto de partida.
+ * Los proveedores con tier gratuito que hablan el formato de OpenAI.
+ *
+ * Esto empezó clavado en OpenRouter, con la lista de modelos en el entorno y el
+ * argumento de que «cambiar de modelo no puede exigir un despliegue». El mismo
+ * argumento vale un escalón más arriba: los `:free` no solo se renombran, es que
+ * el proveedor entero puede dejar de convenir —la cuota libre de OpenRouter es
+ * la más estrecha de las tres, y eso no se sabía al escribir esto la primera
+ * vez—. Cambiar de proveedor tampoco puede exigir un despliegue.
+ *
+ * El registro sí vive en el código porque es transporte y no política: son tres
+ * URLs que solo cambian si el proveedor rompe su propia compatibilidad. Lo que
+ * se elige desde el entorno es **cuáles se usan y en qué orden** (`IA_MODELOS`).
+ *
+ * Aviso que conviene no perder: el tier gratuito de Google declara que usa los
+ * prompts para entrenar. Para lo que se redacta aquí —captions de cosas que van
+ * a salir públicas en Instagram— da igual, pero no mandes por aquí nada que no
+ * sea eso.
  */
-const MODELOS_POR_DEFECTO = [
-  "google/gemma-4-31b-it:free",
-  "openai/gpt-oss-20b:free",
-  "z-ai/glm-5.2:free",
+const PROVEEDORES: Record<string, Proveedor> = {
+  openrouter: {
+    endpoint: "https://openrouter.ai/api/v1/chat/completions",
+    clave: "OPENROUTER_API_KEY",
+  },
+  google: {
+    endpoint: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+    clave: "GOOGLE_AI_API_KEY",
+  },
+  groq: {
+    endpoint: "https://api.groq.com/openai/v1/chat/completions",
+    clave: "GROQ_API_KEY",
+  },
+};
+
+/**
+ * A qué proveedor va una entrada que no lo declara. Es lo que mantiene válido
+ * el `OPENROUTER_MODELOS` de las instalaciones anteriores a este cambio: una
+ * lista de modelos a secas se sigue leyendo como se leía.
+ */
+const PROVEEDOR_POR_DEFECTO = "openrouter";
+
+interface Candidato {
+  proveedor: string;
+  modelo: string;
+}
+
+/**
+ * Punto de partida, en orden de cuota: Google da 1.500 peticiones al día y Groq
+ * 1.000, las dos solo con un correo; OpenRouter queda de tercero porque su tier
+ * libre es el más estrecho. Son solo un default —los modelos gratuitos aparecen
+ * y se retiran sin aviso— y un nombre que ya no exista simplemente falla y cae
+ * al siguiente, que es el comportamiento de siempre.
+ */
+const CANDIDATOS_POR_DEFECTO: Candidato[] = [
+  { proveedor: "google", modelo: "gemini-3.7-flash" },
+  { proveedor: "groq", modelo: "openai/gpt-oss-120b" },
+  { proveedor: "openrouter", modelo: "google/gemma-4-31b-it:free" },
+  { proveedor: "openrouter", modelo: "openai/gpt-oss-20b:free" },
 ];
 
 /**
@@ -33,16 +87,55 @@ const MODELOS_POR_DEFECTO = [
  */
 const TIMEOUT_MS = 20_000;
 
-/** Si no hay clave, la app se comporta exactamente como antes de existir esto. */
-export function iaDisponible(): boolean {
-  return Boolean(process.env.OPENROUTER_API_KEY);
+/**
+ * Lee la lista del entorno.
+ *
+ * El separador es `|` y no `:` ni `/` porque los dos aparecen dentro de los
+ * nombres de modelo (`google/gemma-4-31b-it:free`), así que partir por ellos
+ * obligaría a adivinar dónde acaba el proveedor.
+ *
+ * `IA_MODELOS` manda; sin ella se lee `OPENROUTER_MODELOS`, que es lo que ya
+ * estaba configurado en producción y sigue significando lo mismo.
+ */
+function candidatos(): Candidato[] {
+  const crudo = process.env.IA_MODELOS ?? process.env.OPENROUTER_MODELOS;
+  const entradas = crudo
+    ?.split(",")
+    .map((entrada) => entrada.trim())
+    .filter(Boolean);
+
+  if (!entradas || entradas.length === 0) return CANDIDATOS_POR_DEFECTO;
+
+  const lista: Candidato[] = [];
+  for (const entrada of entradas) {
+    const corte = entrada.indexOf("|");
+    const proveedor = corte === -1 ? PROVEEDOR_POR_DEFECTO : entrada.slice(0, corte).trim();
+    const modelo = corte === -1 ? entrada : entrada.slice(corte + 1).trim();
+
+    if (!modelo) continue;
+    if (!PROVEEDORES[proveedor]) {
+      // Un nombre mal escrito en una variable de entorno no puede quedarse
+      // mudo: el síntoma sería «ningún modelo respondió» sin nada que mirar.
+      console.error(`[ia] proveedor desconocido en la lista: ${proveedor}`);
+      continue;
+    }
+    lista.push({ proveedor, modelo });
+  }
+
+  return lista;
 }
 
-function modelos(): string[] {
-  const lista = process.env.OPENROUTER_MODELOS?.split(",")
-    .map((m) => m.trim())
-    .filter(Boolean);
-  return lista && lista.length > 0 ? lista : MODELOS_POR_DEFECTO;
+/** Los candidatos cuyo proveedor tiene clave configurada. El resto no se intenta. */
+function candidatosUsables(): Candidato[] {
+  return candidatos().filter(({ proveedor }) => Boolean(process.env[PROVEEDORES[proveedor].clave]));
+}
+
+/**
+ * Si no hay ninguna clave utilizable, la app se comporta exactamente como antes
+ * de existir esto: los botones de «Redactar con IA» no se pintan.
+ */
+export function iaDisponible(): boolean {
+  return candidatosUsables().length > 0;
 }
 
 /**
@@ -73,20 +166,35 @@ export function sanearTextoIa(texto: string, maxLongitud: number): string | null
   return limpio.length > maxLongitud ? `${limpio.slice(0, maxLongitud).trimEnd()}…` : limpio;
 }
 
-async function pedirA(modelo: string, sistema: string, usuario: string, maxTokens: number): Promise<string | null> {
+async function pedirA(
+  candidato: Candidato,
+  sistema: string,
+  usuario: string,
+  maxTokens: number,
+): Promise<string | null> {
+  const { proveedor, modelo } = candidato;
+  const { endpoint, clave } = PROVEEDORES[proveedor];
+  // Para los logs: el mismo nombre de modelo puede servirse desde dos
+  // proveedores distintos, y saber cuál falló es la mitad del diagnóstico.
+  const etiqueta = `${proveedor}|${modelo}`;
   const control = new AbortController();
   const reloj = setTimeout(() => control.abort(), TIMEOUT_MS);
 
   try {
-    const response = await fetch(ENDPOINT, {
+    const response = await fetch(endpoint, {
       method: "POST",
       signal: control.signal,
       headers: {
-        Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+        Authorization: `Bearer ${process.env[clave]}`,
         "Content-Type": "application/json",
-        // Las dos que OpenRouter pide para atribuir el tráfico a la aplicación.
-        ...(process.env.SITE_URL ? { "HTTP-Referer": process.env.SITE_URL } : {}),
-        "X-Title": "La Tasa",
+        // Las dos que OpenRouter pide para atribuir el tráfico a la
+        // aplicación. Solo se mandan ahí: en los demás no significan nada.
+        ...(proveedor === "openrouter"
+          ? {
+              ...(process.env.SITE_URL ? { "HTTP-Referer": process.env.SITE_URL } : {}),
+              "X-Title": "La Tasa",
+            }
+          : {}),
       },
       body: JSON.stringify({
         model: modelo,
@@ -109,7 +217,7 @@ async function pedirA(modelo: string, sistema: string, usuario: string, maxToken
       // los logs de la función de Vercel, acotado para no volcar HTML entero
       // si OpenRouter responde con una página de error.
       const detalle = await response.text().catch(() => "");
-      console.error(`[ia] ${modelo} respondió ${response.status}: ${detalle.slice(0, 300)}`);
+      console.error(`[ia] ${etiqueta} respondió ${response.status}: ${detalle.slice(0, 300)}`);
       return null;
     }
 
@@ -119,7 +227,7 @@ async function pedirA(modelo: string, sistema: string, usuario: string, maxToken
   } catch (error) {
     // Timeout, red caída o JSON inesperado: para el caller son el mismo caso,
     // pero también queda registrado para poder distinguirlos en los logs.
-    console.error(`[ia] ${modelo} falló:`, error);
+    console.error(`[ia] ${etiqueta} falló:`, error);
     return null;
   } finally {
     clearTimeout(reloj);
@@ -127,7 +235,11 @@ async function pedirA(modelo: string, sistema: string, usuario: string, maxToken
 }
 
 /**
- * Pide un texto al primer modelo de la lista que responda.
+ * Pide un texto al primer candidato de la lista que responda.
+ *
+ * La lista cruza proveedores, así que un Google caído a las once de la mañana
+ * cae a Groq y luego a OpenRouter sin que nadie toque nada. Es la misma cascada
+ * que ya existía entre modelos, un escalón más arriba.
  *
  * **Nunca lanza.** Devuelve `null` ante cualquier fallo —sin clave, 401, 429 por
  * cuota agotada del plan gratuito, timeout, respuesta vacía— y el caller cae a
@@ -144,10 +256,8 @@ export async function redactar(opciones: {
   usuario: string;
   maxTokens?: number;
 }): Promise<string | null> {
-  if (!iaDisponible()) return null;
-
-  for (const modelo of modelos()) {
-    const texto = await pedirA(modelo, opciones.sistema, opciones.usuario, opciones.maxTokens ?? 600);
+  for (const candidato of candidatosUsables()) {
+    const texto = await pedirA(candidato, opciones.sistema, opciones.usuario, opciones.maxTokens ?? 600);
     if (texto) return texto;
   }
   return null;

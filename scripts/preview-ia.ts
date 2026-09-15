@@ -16,8 +16,10 @@ import { cargarEnvLocal } from "./_env";
  * formulario obliga a cargar una imagen y a mirar el teléfono para cada
  * cambio de una coma.
  *
- * Necesita `OPENROUTER_API_KEY` en `.env.local` (y, para `semanal`, las dos de
- * Supabase, salvo que el histórico esté vacío: entonces sale sin comparaciones).
+ * Necesita la clave de al menos un proveedor de `IA_MODELOS` en `.env.local`
+ * —`GOOGLE_AI_API_KEY`, `GROQ_API_KEY` u `OPENROUTER_API_KEY`— y, para
+ * `semanal`, las dos de Supabase, salvo que el histórico esté vacío: entonces
+ * sale sin comparaciones.
  * No necesita `npm run dev`: no hay ninguna URL que servir.
  *
  * Imprime también el texto de plantilla, que es a lo que la aplicación cae
@@ -53,7 +55,9 @@ async function main() {
   cargarEnvLocal();
 
   if (!iaDisponible()) {
-    console.error("Falta OPENROUTER_API_KEY en .env.local");
+    console.error(
+      "Ningún proveedor de IA configurado: falta GOOGLE_AI_API_KEY, GROQ_API_KEY u OPENROUTER_API_KEY en .env.local",
+    );
     process.exit(1);
   }
 
