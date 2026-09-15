@@ -5,9 +5,15 @@ import { sugerirCifrasParada } from "@/lib/ia-textos";
 import { leerParadaPendiente } from "@/lib/parada";
 
 /**
- * Le pide a un modelo con visión que lea la pizarra de la foto del borrador y
- * devuelve lo que creyó ver, para que `/admin/parada` lo enseñe **al lado** de
+ * Le pide a un modelo con visión que lea la compra y la venta de las dos
+ * fuentes del borrador —la foto de la pizarra y el texto del artículo— y
+ * devuelve las dos lecturas para que `/admin/parada` las enseñe **al lado** de
  * los campos. No guarda nada y no publica nada.
+ *
+ * El texto va porque es la fuente fácil: el artículo dice con todas las letras
+ * a cuánto está el billete de 100, mientras que la foto obliga a distinguir
+ * dígitos pequeños en una pizarra. Mandar las dos no es redundancia — cuando
+ * discrepan, eso es justo lo que hay que saber antes de teclear.
  *
  * **La URL de la foto sale del borrador, no del cuerpo de la petición.** Es la
  * diferencia entre leer lo que el cron ya descargó de lanacionweb y aceptar
@@ -39,7 +45,10 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const sugerencia = await sugerirCifrasParada(pendiente.imagenUrl);
+    // El caption guardado lleva dentro el cuerpo scrapeado del artículo, que
+    // es donde el portal escribe las cifras. Sale del borrador, como la foto:
+    // nada de esto llega del navegador.
+    const sugerencia = await sugerirCifrasParada(pendiente.imagenUrl, pendiente.caption);
     // Igual que `/api/admin/redactar`: que ningún modelo respondiera —o que lo
     // que devolvió no pasara la validación— no es un fallo de la petición. La
     // interfaz solo tiene que decir que no se pudo leer y que se teclee.

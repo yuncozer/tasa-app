@@ -179,16 +179,23 @@ export async function redactarAnalisisBrecha(alerta: AlertaBrecha): Promise<stri
 }
 
 /**
- * Lo que la IA **sugiere** haber leído en la pizarra de la casa de cambio.
+ * Lo que la IA **sugiere** haber leído sobre el dólar de La Parada.
  *
- * No es un dato del proyecto: es una lectura de una foto que el admin tiene
- * que contrastar contra el artículo antes de teclear las cifras a mano. Por
- * eso el tipo se llama sugerencia y no cifras, y por eso `/admin/parada` la
- * enseña **al lado** de los campos y nunca dentro de ellos.
+ * No es un dato del proyecto: es una lectura que el admin contrasta antes de
+ * teclear las cifras a mano. Por eso el tipo se llama sugerencia y por eso
+ * `/admin/parada` la enseña **al lado** de los campos y nunca dentro.
+ *
+ * Trae las dos fuentes por separado —la foto de la pizarra y el texto del
+ * artículo— en vez de una cifra ya resuelta, porque en cuál de las dos se leyó
+ * es justo lo que le dice al admin cuánto fiarse. `coinciden` lo decide este
+ * módulo comparando las dos, no el modelo: preguntarle si concuerda consigo
+ * mismo es pedirle que se autocalifique.
  */
 export interface SugerenciaCifrasParada {
-  compra: string | null;
-  venta: string | null;
+  foto: { compra: string | null; venta: string | null };
+  texto: { compra: string | null; venta: string | null };
+  /** `true` solo si las dos fuentes dieron las dos cifras y dicen lo mismo. */
+  coinciden: boolean;
 }
 
 /**
@@ -209,41 +216,86 @@ function cifraParadaValida(valor: unknown): string | null {
 }
 
 /**
- * Le pide a un modelo con visión que lea la compra y la venta de la foto del
- * artículo, para **acompañar** —nunca sustituir— la confirmación a mano.
+ * Si dos lecturas son el mismo número escrito distinto.
+ *
+ * "3.900" y "3900" son la misma cifra, y una comparación de cadenas diría que
+ * no: el portal escribe con punto de miles y la pizarra casi nunca lo lleva,
+ * así que sin esto las dos fuentes "no coincidirían" prácticamente nunca y el
+ * aviso perdería todo su valor.
+ */
+function mismaCifra(a: string | null, b: string | null): boolean {
+  if (!a || !b) return false;
+  const numero = (valor: string) => valor.replace(/[.,](?=\d{3}\b)/g, "").replace(",", ".");
+  return numero(a) === numero(b);
+}
+
+function leerPar(valor: unknown): { compra: string | null; venta: string | null } {
+  if (typeof valor !== "object" || valor === null) return { compra: null, venta: null };
+  const par = valor as Record<string, unknown>;
+  return { compra: cifraParadaValida(par.compra), venta: cifraParadaValida(par.venta) };
+}
+
+/**
+ * Le pide a un modelo con visión que lea la compra y la venta **de las dos
+ * fuentes que hay** —la foto de la pizarra y el cuerpo del artículo— para
+ * **acompañar**, nunca sustituir, la confirmación a mano.
+ *
+ * Las dos fuentes y no solo la foto porque no cuestan lo mismo de leer: el
+ * artículo dice con todas las letras a cuánto está la compra y la venta del
+ * billete de 100, mientras que la foto obliga a distinguir dígitos pequeños en
+ * una pizarra fotografiada de lejos. El texto es la lectura fácil y la foto la
+ * que confirma que ese texto es el de hoy; juntas se sostienen, y cuando **no**
+ * coinciden eso es precisamente lo que el admin necesita saber antes de
+ * teclear nada.
+ *
+ * Que las dos lecturas vengan separadas es lo que permite que la comparación la
+ * haga este módulo (`mismaCifra`) y no el modelo. Preguntarle "¿concuerdan?"
+ * sería pedirle que se autocalifique, y la respuesta más probable es que sí.
  *
  * Esto se acerca más que ningún otro uso de IA del proyecto a la regla de que
  * el modelo no toca una cifra, así que conviene decir con precisión por qué no
  * la rompe: lo que devuelve **no entra en `compra`/`venta`**, no se guarda en
  * Supabase, no llega a la imagen ni al caption y no habilita el botón de
- * publicar. Se dibuja al lado de los campos como una pista para quien está
- * mirando la pizarra en la foto, que es justo la tarea tediosa —leer cuatro
- * dígitos pequeños en un teléfono— y no la decisión. El admin sigue tecleando
- * las dos cifras, que es lo que `lib/parada.ts` exige desde el principio.
+ * publicar. Se dibuja al lado de los campos como una pista. El admin sigue
+ * tecleando las dos cifras, que es lo que `lib/parada.ts` exige desde el
+ * principio.
  *
- * Devuelve `null` si ningún modelo respondió, si no hay visión configurada o
- * si lo que devolvió no pasa `cifraParadaValida()`.
+ * Devuelve `null` si ningún modelo respondió, si no hay visión configurada o si
+ * nada de lo que devolvió pasa `cifraParadaValida()`.
  */
-export async function sugerirCifrasParada(imagenUrl: string): Promise<SugerenciaCifrasParada | null> {
-  const texto = await redactar({
+export async function sugerirCifrasParada(
+  imagenUrl: string,
+  textoArticulo?: string,
+): Promise<SugerenciaCifrasParada | null> {
+  const conTexto = Boolean(textoArticulo?.trim());
+
+  const respuesta = await redactar({
     sistema: [
-      "Lees la pizarra de precios de una casa de cambio en la frontera colombo-venezolana.",
-      "La foto muestra el precio de compra y de venta del dólar en pesos colombianos.",
-      'Responde únicamente con JSON: {"compra": "3900", "venta": "3950"}.',
-      "Usa null en el campo que no puedas leer con seguridad. No adivines.",
+      "Lees a cuánto está el dólar en una casa de cambio de la frontera colombo-venezolana, en pesos colombianos.",
+      "Tienes dos fuentes: la foto de la pizarra de precios y, si se incluye, el texto del artículo que la acompaña.",
+      "El texto suele decir a cuánto compran y venden el billete de 100 dólares.",
+      "Lee cada fuente por separado y no dejes que una te influya sobre la otra: si no coinciden, devuélvelas distintas.",
+      'Responde únicamente con JSON: {"foto": {"compra": "3900", "venta": "3950"}, "texto": {"compra": null, "venta": null}}.',
+      "Usa null en cada campo que no puedas leer con seguridad en esa fuente. No adivines y no copies una fuente en la otra.",
       "No escribas explicaciones, ni unidades, ni rangos, ni texto fuera del JSON.",
     ].join(" "),
-    usuario: "¿Qué precio de compra y de venta del dólar se lee en esta imagen?",
+    usuario: conTexto
+      ? [
+          "¿A cuánto compran y venden el dólar según la pizarra de la imagen, y según este texto del artículo?",
+          "",
+          textoArticulo,
+        ].join("\n")
+      : "¿A cuánto compran y venden el dólar según la pizarra de esta imagen?",
     imagenUrl,
-    maxTokens: 120,
+    maxTokens: 200,
   });
 
-  if (!texto) return null;
+  if (!respuesta) return null;
 
   // El modelo suele envolver el JSON en prosa o en un bloque de markdown pese
   // a habérselo prohibido, así que se busca el objeto en vez de exigir que la
-  // respuesta entera lo sea.
-  const json = texto.match(/\{[^}]*\}/)?.[0];
+  // respuesta entera lo sea. Se admiten llaves anidadas, que aquí las hay.
+  const json = respuesta.match(/\{[\s\S]*\}/)?.[0];
   if (!json) return null;
 
   let datos: unknown;
@@ -254,10 +306,16 @@ export async function sugerirCifrasParada(imagenUrl: string): Promise<Sugerencia
   }
   if (typeof datos !== "object" || datos === null) return null;
 
-  const compra = cifraParadaValida((datos as Record<string, unknown>).compra);
-  const venta = cifraParadaValida((datos as Record<string, unknown>).venta);
+  const foto = leerPar((datos as Record<string, unknown>).foto);
+  const texto = leerPar((datos as Record<string, unknown>).texto);
 
-  // Sin ninguna de las dos no hay nada que sugerir, y una tarjeta vacía al
-  // lado del campo solo sería ruido.
-  return compra || venta ? { compra, venta } : null;
+  // Sin una sola cifra en ninguna fuente no hay nada que sugerir, y una
+  // tarjeta vacía al lado del campo solo sería ruido.
+  if (!foto.compra && !foto.venta && !texto.compra && !texto.venta) return null;
+
+  return {
+    foto,
+    texto,
+    coinciden: mismaCifra(foto.compra, texto.compra) && mismaCifra(foto.venta, texto.venta),
+  };
 }

@@ -1514,9 +1514,10 @@ antes de que salga nada.
   confirma a mano en `/admin/parada`, leyendo el artículo original, antes de
   que el botón "Publicar ahora" se habilite.
 
-  El botón "Leer cifras de la foto (IA)" **no cambia nada de lo anterior**: lo
-  que el modelo cree leer en la pizarra se muestra al lado de los campos y los
-  campos siguen vacíos hasta que alguien teclea. Ver la sección de la IA para
+  El botón "Leer cifras con IA" **no cambia nada de lo anterior**: lo que el
+  modelo cree leer —en el texto del artículo y en la foto de la pizarra, por
+  separado— se muestra al lado de los campos, y los campos siguen vacíos hasta
+  que alguien teclea. Ver la sección de la IA para
   por qué no es autocompletado y por qué no puede llegar a serlo.
 - **El correo de aviso es de conveniencia, no un requisito.** Lo manda
   `lib/notificar.ts` (ver más abajo) justo después de guardar un borrador
@@ -1934,11 +1935,10 @@ muestra al lado de los campos, nunca un dato que la app publique.
 - **El caption de noticia no marca la vista previa como desactualizada.** A
   diferencia del título y la fuente, no entra en la imagen firmada, así que
   cambiarlo no cambia lo que se publicaría.
-- **La lectura de la pizarra de La Parada sugiere, nunca rellena — y esa es
+- **La lectura de las cifras de La Parada sugiere, nunca rellena — y esa es
   toda la diferencia.** `sugerirCifrasParada()` le pide a un modelo con visión
-  que lea la compra y la venta de la foto del artículo, y `/admin/parada`
-  dibuja lo que creyó ver **al lado** de los campos, en gris y con un aviso de
-  contrastarlo. Lo que devuelve no entra en `compra`/`venta`, no se guarda en
+  que lea la compra y la venta, y `/admin/parada` dibuja lo que creyó leer **al
+  lado** de los campos, en gris y con un aviso de contrastarlo. Lo que devuelve no entra en `compra`/`venta`, no se guarda en
   Supabase, no llega a la imagen ni al caption y no habilita el botón de
   publicar: el admin sigue tecleando las dos cifras, que es lo que
   `lib/parada.ts` exige desde el principio. Lo que se ahorra es la parte
@@ -1947,6 +1947,23 @@ muestra al lado de los campos, nunca un dato que la app publique.
   botón de "usar esta lectura": eso convierte una pista en un dato, y esta es
   justo la serie donde no se puede — es el número que el lector se lleva de un
   vistazo y no se corrige después de publicar.
+
+  **Lee las dos fuentes, no solo la foto, y por qué importa el orden.** El
+  artículo dice con todas las letras a cuánto está la compra y la venta del
+  billete de 100; la foto obliga a distinguir dígitos pequeños en una pizarra
+  fotografiada de lejos. El texto es la lectura fácil y la foto es la que
+  confirma que ese texto es el de hoy. Las dos viajan en la misma petición —el
+  cuerpo scrapeado ya está dentro del `caption` guardado— y el modelo devuelve
+  una lectura **por fuente**, no una cifra ya resuelta.
+
+  **Quién decide si concuerdan es este código, no el modelo** (`mismaCifra()`).
+  Preguntarle "¿coinciden?" sería pedirle que se autocalifique, y la respuesta
+  más probable es que sí. La comparación normaliza el separador de miles,
+  porque el portal escribe `3.900` y la pizarra `3900`: sin eso las dos fuentes
+  no coincidirían casi nunca y el aviso perdería todo su valor. El panel
+  muestra las dos lecturas **por separado incluso cuando coinciden** —de dónde
+  salió cada cifra es la mitad de lo que esto aporta— y cuando no coinciden lo
+  dice en ámbar, que es el caso en que de verdad hace falta mirar el artículo.
 
   **Lo que vuelve se valida, no se muestra tal cual** (`cifraParadaValida()`):
   solo pasa lo que tiene forma de precio (`3900`, `3.900`, `3.900,50`) y se

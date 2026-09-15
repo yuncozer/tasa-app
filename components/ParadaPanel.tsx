@@ -9,13 +9,16 @@ import { Spinner } from "@/components/admin/Spinner";
  * lugar/compra/venta a mano —nunca se adivinan de la prosa scrapeada, ver
  * `lib/parada.ts`— y publica.
  *
- * El botón de leer la foto con IA **no rellena nada**: enseña lo que el modelo
- * creyó ver, al lado de los campos, y los campos siguen vacíos hasta que el
- * admin teclea. Lo que ahorra es la parte tediosa —distinguir cuatro dígitos
- * pequeños en la pizarra desde un teléfono— y no la decisión, que sigue
- * pidiendo contrastar contra el artículo. Autocompletar convertiría una pista
- * en un dato, que es justo lo que esta serie no puede permitirse: es el número
- * que el lector se lleva de un vistazo y no se corrige después de publicar.
+ * El botón de leer con IA **no rellena nada**: enseña lo que el modelo creyó
+ * leer, al lado de los campos, y los campos siguen vacíos hasta que el admin
+ * teclea. Autocompletar convertiría una pista en un dato, que es justo lo que
+ * esta serie no puede permitirse: es el número que el lector se lleva de un
+ * vistazo y no se corrige después de publicar.
+ *
+ * Enseña las **dos fuentes por separado** —el texto del artículo y la foto de
+ * la pizarra— y si concuerdan, porque de dónde salió cada cifra es la mitad de
+ * lo que esto aporta: dos lecturas que coinciden valen mucho más que una, y dos
+ * que no coinciden son el aviso de mirar el artículo con calma.
  *
  * La imagen la sirve `/api/og/instagram-post-parada`, que lee estos campos
  * directo de Supabase sin recibir nada por query string. Por eso "Actualizar
@@ -35,12 +38,19 @@ interface Borrador {
 }
 
 /** Estado del botón que lee la foto. Nunca toca los campos: solo se muestra. */
+type Lectura = { compra: string | null; venta: string | null };
+
 type Sugerencia =
   | { paso: "inicial" }
   | { paso: "leyendo" }
-  | { paso: "leida"; compra: string | null; venta: string | null }
+  | { paso: "leida"; foto: Lectura; texto: Lectura; coinciden: boolean }
   | { paso: "sin-lectura" }
   | { paso: "error"; mensaje: string };
+
+/** "compran 3.900 · venden 3.950", con guion donde no se leyó nada. */
+function resumenLectura({ compra, venta }: Lectura): string {
+  return `compran ${compra ?? "—"} · venden ${venta ?? "—"}`;
+}
 
 type Estado =
   | { paso: "inicial" }
@@ -98,7 +108,12 @@ export function ParadaPanel({
         setSugerencia({ paso: "sin-lectura" });
         return;
       }
-      setSugerencia({ paso: "leida", compra: leida.compra ?? null, venta: leida.venta ?? null });
+      setSugerencia({
+        paso: "leida",
+        foto: leida.foto,
+        texto: leida.texto,
+        coinciden: Boolean(leida.coinciden),
+      });
     } catch (error) {
       setSugerencia({ paso: "error", mensaje: error instanceof Error ? error.message : "Fallo de red" });
     }
@@ -241,22 +256,36 @@ export function ParadaPanel({
               className="flex items-center gap-1.5 self-start rounded-full border border-border-soft px-3 py-1 text-xs font-medium text-muted transition active:scale-95 disabled:opacity-50"
             >
               {sugerencia.paso === "leyendo" && <Spinner className="size-3.5" />}
-              {sugerencia.paso === "leyendo" ? "Leyendo la foto…" : "Leer cifras de la foto (IA)"}
+              {sugerencia.paso === "leyendo" ? "Leyendo el artículo…" : "Leer cifras con IA"}
             </button>
 
             {sugerencia.paso === "leida" && (
               /* Deliberadamente fuera de los campos y sin botón para copiarlo:
-                 es una pista que hay que contrastar, no un valor que aceptar. */
-              <p className="tabular text-xs leading-relaxed text-muted">
-                En la foto se lee: compran {sugerencia.compra ?? "—"} · venden {sugerencia.venta ?? "—"}.{" "}
-                <span className="text-warning">
-                  Contrastalo con el artículo y escribí las cifras vos: esto es una lectura de la IA, no el dato.
-                </span>
-              </p>
+                 es una pista que hay que contrastar, no un valor que aceptar.
+                 Las dos fuentes van separadas incluso cuando coinciden: saber
+                 de dónde salió cada cifra es la mitad de lo que esto aporta. */
+              <div className="flex flex-col gap-0.5">
+                <p className="tabular text-xs leading-relaxed text-muted">
+                  En el texto del artículo: {resumenLectura(sugerencia.texto)}
+                </p>
+                <p className="tabular text-xs leading-relaxed text-muted">
+                  En la foto de la pizarra: {resumenLectura(sugerencia.foto)}
+                </p>
+                {sugerencia.coinciden ? (
+                  <p className="text-xs leading-relaxed text-muted">
+                    Las dos fuentes coinciden. Aun así, escribí las cifras vos: esto es una lectura de la IA, no
+                    el dato.
+                  </p>
+                ) : (
+                  <p className="text-xs leading-relaxed text-warning">
+                    Las dos fuentes no dicen lo mismo, o una no se pudo leer. Mirá el artículo antes de teclear.
+                  </p>
+                )}
+              </div>
             )}
             {sugerencia.paso === "sin-lectura" && (
               <p className="text-xs leading-relaxed text-muted">
-                No se pudieron leer las cifras de la foto. Escribilas leyendo el artículo, como siempre.
+                No se pudieron leer las cifras. Escribilas leyendo el artículo, como siempre.
               </p>
             )}
             {sugerencia.paso === "error" && <p className="text-xs text-warning">{sugerencia.mensaje}</p>}
