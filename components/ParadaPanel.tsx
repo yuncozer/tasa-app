@@ -9,6 +9,14 @@ import { Spinner } from "@/components/admin/Spinner";
  * lugar/compra/venta a mano —nunca se adivinan de la prosa scrapeada, ver
  * `lib/parada.ts`— y publica.
  *
+ * El botón de leer la foto con IA **no rellena nada**: enseña lo que el modelo
+ * creyó ver, al lado de los campos, y los campos siguen vacíos hasta que el
+ * admin teclea. Lo que ahorra es la parte tediosa —distinguir cuatro dígitos
+ * pequeños en la pizarra desde un teléfono— y no la decisión, que sigue
+ * pidiendo contrastar contra el artículo. Autocompletar convertiría una pista
+ * en un dato, que es justo lo que esta serie no puede permitirse: es el número
+ * que el lector se lleva de un vistazo y no se corrige después de publicar.
+ *
  * La imagen la sirve `/api/og/instagram-post-parada`, que lee estos campos
  * directo de Supabase sin recibir nada por query string. Por eso "Actualizar
  * vista previa" primero guarda (PATCH a `/api/admin/parada`) y solo después
@@ -26,6 +34,14 @@ interface Borrador {
   caption: string;
 }
 
+/** Estado del botón que lee la foto. Nunca toca los campos: solo se muestra. */
+type Sugerencia =
+  | { paso: "inicial" }
+  | { paso: "leyendo" }
+  | { paso: "leida"; compra: string | null; venta: string | null }
+  | { paso: "sin-lectura" }
+  | { paso: "error"; mensaje: string };
+
 type Estado =
   | { paso: "inicial" }
   | { paso: "guardando" }
@@ -41,8 +57,11 @@ async function leerError(response: Response): Promise<string> {
 export function ParadaPanel({
   borrador,
   esDeHoy,
+  visionDisponible,
 }: {
   borrador: Borrador | null;
+  /** Si hay algún modelo con visión configurado. Sin él, el botón no se pinta. */
+  visionDisponible?: boolean;
   /**
    * Si la columna guardada es la de hoy (`null` = no se pudo saber). Solo se
    * usa para el diálogo de confirmación: la franja de aviso ya la pinta la
@@ -57,6 +76,33 @@ export function ParadaPanel({
   const [caption, setCaption] = useState(borrador?.caption ?? "");
   const [marca, setMarca] = useState("");
   const [estado, setEstado] = useState<Estado>({ paso: "inicial" });
+  /**
+   * Lo que el modelo creyó leer en la foto, o el motivo de que no haya nada.
+   * Vive aparte de `compra`/`venta` a propósito: son dos cosas distintas y
+   * mezclarlas en el mismo estado sería el primer paso hacia rellenarlos.
+   */
+  const [sugerencia, setSugerencia] = useState<Sugerencia>({ paso: "inicial" });
+
+  async function leerFoto() {
+    setSugerencia({ paso: "leyendo" });
+    try {
+      // Sin cuerpo: la URL de la foto la saca el servidor del borrador, para
+      // no dejar que el navegador elija qué imagen se manda a leer.
+      const response = await fetch("/api/admin/parada/cifras", { method: "POST" });
+      if (!response.ok) {
+        setSugerencia({ paso: "error", mensaje: await leerError(response) });
+        return;
+      }
+      const { sugerencia: leida } = await response.json();
+      if (!leida) {
+        setSugerencia({ paso: "sin-lectura" });
+        return;
+      }
+      setSugerencia({ paso: "leida", compra: leida.compra ?? null, venta: leida.venta ?? null });
+    } catch (error) {
+      setSugerencia({ paso: "error", mensaje: error instanceof Error ? error.message : "Fallo de red" });
+    }
+  }
 
   if (!borrador) {
     return (
@@ -184,6 +230,37 @@ export function ParadaPanel({
           <p className="text-xs leading-relaxed text-warning">
             Confirmá compra y venta (billete de 100) leyendo el artículo — no se extraen solas del texto.
           </p>
+        )}
+
+        {visionDisponible && (
+          <div className="flex flex-col gap-1">
+            <button
+              type="button"
+              onClick={leerFoto}
+              disabled={sugerencia.paso === "leyendo" || guardando || publicando}
+              className="flex items-center gap-1.5 self-start rounded-full border border-border-soft px-3 py-1 text-xs font-medium text-muted transition active:scale-95 disabled:opacity-50"
+            >
+              {sugerencia.paso === "leyendo" && <Spinner className="size-3.5" />}
+              {sugerencia.paso === "leyendo" ? "Leyendo la foto…" : "Leer cifras de la foto (IA)"}
+            </button>
+
+            {sugerencia.paso === "leida" && (
+              /* Deliberadamente fuera de los campos y sin botón para copiarlo:
+                 es una pista que hay que contrastar, no un valor que aceptar. */
+              <p className="tabular text-xs leading-relaxed text-muted">
+                En la foto se lee: compran {sugerencia.compra ?? "—"} · venden {sugerencia.venta ?? "—"}.{" "}
+                <span className="text-warning">
+                  Contrastalo con el artículo y escribí las cifras vos: esto es una lectura de la IA, no el dato.
+                </span>
+              </p>
+            )}
+            {sugerencia.paso === "sin-lectura" && (
+              <p className="text-xs leading-relaxed text-muted">
+                No se pudieron leer las cifras de la foto. Escribilas leyendo el artículo, como siempre.
+              </p>
+            )}
+            {sugerencia.paso === "error" && <p className="text-xs text-warning">{sugerencia.mensaje}</p>}
+          </div>
         )}
 
         <button

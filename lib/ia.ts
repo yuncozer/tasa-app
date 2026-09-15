@@ -82,6 +82,17 @@ const CANDIDATOS_POR_DEFECTO: Candidato[] = [
 ];
 
 /**
+ * Los candidatos que además **leen imágenes**, que son otra lista porque ser
+ * gratis y entender una foto no van juntos: la mayoría de los `:free` son solo
+ * de texto, y pedirle una imagen a uno de ellos no falla de forma limpia —
+ * ignora la foto y responde igual, que es peor que no responder—.
+ *
+ * Por defecto solo Gemini, que es el que lo tiene en el plan libre con holgura.
+ * Se cambia con `IA_MODELOS_VISION`, con el mismo formato `proveedor|modelo`.
+ */
+const CANDIDATOS_VISION_POR_DEFECTO: Candidato[] = [{ proveedor: "google", modelo: "gemini-3.7-flash" }];
+
+/**
  * Un modelo gratuito colgado no puede comerse el presupuesto de la función.
  * Se aborta pronto y se pasa al siguiente de la lista.
  */
@@ -97,14 +108,14 @@ const TIMEOUT_MS = 20_000;
  * `IA_MODELOS` manda; sin ella se lee `OPENROUTER_MODELOS`, que es lo que ya
  * estaba configurado en producción y sigue significando lo mismo.
  */
-function candidatos(): Candidato[] {
-  const crudo = process.env.IA_MODELOS ?? process.env.OPENROUTER_MODELOS;
+function candidatos(vision = false): Candidato[] {
+  const crudo = vision ? process.env.IA_MODELOS_VISION : (process.env.IA_MODELOS ?? process.env.OPENROUTER_MODELOS);
   const entradas = crudo
     ?.split(",")
     .map((entrada) => entrada.trim())
     .filter(Boolean);
 
-  if (!entradas || entradas.length === 0) return CANDIDATOS_POR_DEFECTO;
+  if (!entradas || entradas.length === 0) return vision ? CANDIDATOS_VISION_POR_DEFECTO : CANDIDATOS_POR_DEFECTO;
 
   const lista: Candidato[] = [];
   for (const entrada of entradas) {
@@ -126,8 +137,8 @@ function candidatos(): Candidato[] {
 }
 
 /** Los candidatos cuyo proveedor tiene clave configurada. El resto no se intenta. */
-function candidatosUsables(): Candidato[] {
-  return candidatos().filter(({ proveedor }) => Boolean(process.env[PROVEEDORES[proveedor].clave]));
+function candidatosUsables(vision = false): Candidato[] {
+  return candidatos(vision).filter(({ proveedor }) => Boolean(process.env[PROVEEDORES[proveedor].clave]));
 }
 
 /**
@@ -136,6 +147,16 @@ function candidatosUsables(): Candidato[] {
  */
 export function iaDisponible(): boolean {
   return candidatosUsables().length > 0;
+}
+
+/**
+ * Lo mismo para lo que necesita leer una imagen. Es una pregunta aparte porque
+ * la respuesta puede ser distinta: hay montajes con clave de un proveedor solo
+ * de texto, y ahí el botón que lee una foto no debe pintarse — la misma regla
+ * que "Pegar" o el botón de avisos, uno que nunca funciona es peor que ninguno.
+ */
+export function visionDisponible(): boolean {
+  return candidatosUsables(true).length > 0;
 }
 
 /**
@@ -171,6 +192,7 @@ async function pedirA(
   sistema: string,
   usuario: string,
   maxTokens: number,
+  imagenUrl?: string,
 ): Promise<string | null> {
   const { proveedor, modelo } = candidato;
   const { endpoint, clave } = PROVEEDORES[proveedor];
@@ -204,7 +226,18 @@ async function pedirA(
         temperature: 0.4,
         messages: [
           { role: "system", content: sistema },
-          { role: "user", content: usuario },
+          {
+            role: "user",
+            // Con imagen, el mensaje del usuario deja de ser una cadena y pasa
+            // a ser la lista de partes del formato de OpenAI. El texto va
+            // primero: es la instrucción sobre qué mirar en la foto.
+            content: imagenUrl
+              ? [
+                  { type: "text", text: usuario },
+                  { type: "image_url", image_url: { url: imagenUrl } },
+                ]
+              : usuario,
+          },
         ],
       }),
     });
@@ -255,9 +288,17 @@ export async function redactar(opciones: {
   sistema: string;
   usuario: string;
   maxTokens?: number;
+  /** Una foto que el modelo tiene que mirar. Cambia la lista de candidatos a la de visión. */
+  imagenUrl?: string;
 }): Promise<string | null> {
-  for (const candidato of candidatosUsables()) {
-    const texto = await pedirA(candidato, opciones.sistema, opciones.usuario, opciones.maxTokens ?? 600);
+  for (const candidato of candidatosUsables(Boolean(opciones.imagenUrl))) {
+    const texto = await pedirA(
+      candidato,
+      opciones.sistema,
+      opciones.usuario,
+      opciones.maxTokens ?? 600,
+      opciones.imagenUrl,
+    );
     if (texto) return texto;
   }
   return null;

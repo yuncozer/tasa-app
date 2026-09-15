@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { SelloDeHora } from "@/components/admin/SelloDeHora";
 import { ParadaPanel } from "@/components/ParadaPanel";
+import { visionDisponible } from "@/lib/ia";
 import { diaDeLaColumna, leerParadaPendiente } from "@/lib/parada";
 
 export const metadata: Metadata = {
@@ -59,7 +60,7 @@ export default async function AdminParadaPage() {
         }
       />
 
-      <ParadaPanel borrador={borrador} esDeHoy={esDeHoy} />
+      <ParadaPanel borrador={borrador} esDeHoy={esDeHoy} visionDisponible={visionDisponible()} />
     </>
   );
 }

@@ -1513,6 +1513,11 @@ antes de que salga nada.
   en `null` — nunca intenta leerlos del cuerpo del artículo. El admin los
   confirma a mano en `/admin/parada`, leyendo el artículo original, antes de
   que el botón "Publicar ahora" se habilite.
+
+  El botón "Leer cifras de la foto (IA)" **no cambia nada de lo anterior**: lo
+  que el modelo cree leer en la pizarra se muestra al lado de los campos y los
+  campos siguen vacíos hasta que alguien teclea. Ver la sección de la IA para
+  por qué no es autocompletado y por qué no puede llegar a serlo.
 - **El correo de aviso es de conveniencia, no un requisito.** Lo manda
   `lib/notificar.ts` (ver más abajo) justo después de guardar un borrador
   nuevo: si el correo falla, el borrador ya quedó guardado y `/admin/parada`
@@ -1836,8 +1841,13 @@ Tres textos de `/admin` se pueden pedir a un modelo gratuito: el caption de un
 post de noticia y los párrafos de análisis del reporte semanal y de la alerta de
 brecha. Todo lo demás sigue saliendo de las plantillas de `lib/caption.ts`.
 
-- **La IA no toca ni una cifra.** Los números los calculan `convert()`,
-  `lib/pesos.ts` y `lib/semanal.ts`, y el modelo solo escribe alrededor. Es la
+Hay un cuarto uso que **no** es un texto y que se explica aparte más abajo: leer
+la pizarra de la foto de La Parada. Lo que devuelve es una sugerencia que se
+muestra al lado de los campos, nunca un dato que la app publique.
+
+- **La IA no toca ni una cifra que la app publique.** Los números los calculan
+  `convert()`, `lib/pesos.ts` y `lib/semanal.ts`, y el modelo solo escribe
+  alrededor. Es la
   misma regla que ya gobierna el proyecto —lo que se muestra es lo que se
   calcula— llevada a su consecuencia obvia: un modelo que redondea de memoria
   publicaría un número que no cuadra con la calculadora, que es justo el daño
@@ -1924,6 +1934,41 @@ brecha. Todo lo demás sigue saliendo de las plantillas de `lib/caption.ts`.
 - **El caption de noticia no marca la vista previa como desactualizada.** A
   diferencia del título y la fuente, no entra en la imagen firmada, así que
   cambiarlo no cambia lo que se publicaría.
+- **La lectura de la pizarra de La Parada sugiere, nunca rellena — y esa es
+  toda la diferencia.** `sugerirCifrasParada()` le pide a un modelo con visión
+  que lea la compra y la venta de la foto del artículo, y `/admin/parada`
+  dibuja lo que creyó ver **al lado** de los campos, en gris y con un aviso de
+  contrastarlo. Lo que devuelve no entra en `compra`/`venta`, no se guarda en
+  Supabase, no llega a la imagen ni al caption y no habilita el botón de
+  publicar: el admin sigue tecleando las dos cifras, que es lo que
+  `lib/parada.ts` exige desde el principio. Lo que se ahorra es la parte
+  tediosa —distinguir cuatro dígitos pequeños en una pizarra desde un
+  teléfono—, no la decisión. No lo conviertas en autocompletado ni le añadas un
+  botón de "usar esta lectura": eso convierte una pista en un dato, y esta es
+  justo la serie donde no se puede — es el número que el lector se lleva de un
+  vistazo y no se corrige después de publicar.
+
+  **Lo que vuelve se valida, no se muestra tal cual** (`cifraParadaValida()`):
+  solo pasa lo que tiene forma de precio (`3900`, `3.900`, `3.900,50`) y se
+  descarta entero cualquier `3900 COP`, `≈3900` o "entre 3900 y 4000" en vez de
+  intentar rescatarlo. "Sin dato no se inventa un dato" vale también para lo
+  que dice una IA. Se le pide JSON y se busca el objeto dentro de la respuesta,
+  porque el modelo lo envuelve en prosa o en un bloque de markdown pese a
+  habérselo prohibido.
+
+  **La URL de la foto sale del borrador, no del navegador.**
+  `/api/admin/parada/cifras` la lee de `parada_pendiente`: es la diferencia
+  entre leer lo que el cron ya descargó de lanacionweb y dejar que una pestaña
+  abierta mande nuestra cuenta de IA a buscar cualquier imagen de internet.
+  Mismo criterio que `instagram-post-parada`, que tampoco recibe nada por query
+  string.
+
+  **Los modelos con visión son otra lista** (`IA_MODELOS_VISION`, y
+  `visionDisponible()` decide si el botón se pinta). Ser gratis y entender una
+  foto no van juntos: casi todos los `:free` son solo de texto y, si se les
+  manda una imagen, **no fallan** — la ignoran y contestan igual, que es peor
+  que no responder. Sin un proveedor de visión configurado el botón no aparece,
+  misma regla que "Pegar" o el botón de avisos.
 - Los prompts viven en `lib/ia-textos.ts`, aparte del cliente, por el mismo
   motivo que `lib/semanal.ts` vive aparte de la ruta de su imagen: son criterio
   editorial y se tocan mucho más que el transporte. Se iteran con

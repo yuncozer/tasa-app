@@ -4,9 +4,10 @@ import { redactar, sanearTextoIa } from "@/lib/ia";
 import type { ReporteSemanal } from "@/lib/semanal";
 
 /**
- * Los tres textos que la IA sabe redactar en este proyecto, con sus
- * instrucciones: el caption de una noticia y los párrafos de contexto del
- * reporte semanal y de la alerta de brecha.
+ * Lo que la IA sabe hacer en este proyecto, con sus instrucciones: tres textos
+ * —el caption de una noticia y los párrafos de contexto del reporte semanal y
+ * de la alerta de brecha— más la lectura de la pizarra de La Parada, que es
+ * una **sugerencia** para el admin y no un dato (ver `sugerirCifrasParada`).
  *
  * Viven aparte del cliente (`lib/ia.ts`) por el mismo motivo que `lib/semanal.ts`
  * vive aparte de la ruta que dibuja su imagen: esto es criterio editorial y se va
@@ -175,4 +176,88 @@ export async function redactarAnalisisBrecha(alerta: AlertaBrecha): Promise<stri
   });
 
   return texto === null ? null : sanearTextoIa(texto, MAX_ANALISIS);
+}
+
+/**
+ * Lo que la IA **sugiere** haber leído en la pizarra de la casa de cambio.
+ *
+ * No es un dato del proyecto: es una lectura de una foto que el admin tiene
+ * que contrastar contra el artículo antes de teclear las cifras a mano. Por
+ * eso el tipo se llama sugerencia y no cifras, y por eso `/admin/parada` la
+ * enseña **al lado** de los campos y nunca dentro de ellos.
+ */
+export interface SugerenciaCifrasParada {
+  compra: string | null;
+  venta: string | null;
+}
+
+/**
+ * Deja pasar solo lo que tiene forma de precio en pesos y descarta el resto.
+ *
+ * Es la guarda que hace sostenible pedirle cifras a un modelo: lo que vuelve
+ * no se muestra tal cual, se comprueba. Cualquier explicación, unidad, rango o
+ * texto de relleno se descarta entero en vez de intentar rescatarlo — "sin
+ * dato no se inventa un dato" vale también para lo que dice una IA.
+ */
+function cifraParadaValida(valor: unknown): string | null {
+  if (typeof valor !== "string" && typeof valor !== "number") return null;
+  const texto = String(valor).trim();
+  // Solo dígitos con separadores de miles o decimales: "3.900", "3900",
+  // "3.900,50". Nada de "≈3900", "3900 COP" ni "entre 3900 y 4000".
+  if (!/^\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{1,2})?$|^\d+$/.test(texto)) return null;
+  return texto;
+}
+
+/**
+ * Le pide a un modelo con visión que lea la compra y la venta de la foto del
+ * artículo, para **acompañar** —nunca sustituir— la confirmación a mano.
+ *
+ * Esto se acerca más que ningún otro uso de IA del proyecto a la regla de que
+ * el modelo no toca una cifra, así que conviene decir con precisión por qué no
+ * la rompe: lo que devuelve **no entra en `compra`/`venta`**, no se guarda en
+ * Supabase, no llega a la imagen ni al caption y no habilita el botón de
+ * publicar. Se dibuja al lado de los campos como una pista para quien está
+ * mirando la pizarra en la foto, que es justo la tarea tediosa —leer cuatro
+ * dígitos pequeños en un teléfono— y no la decisión. El admin sigue tecleando
+ * las dos cifras, que es lo que `lib/parada.ts` exige desde el principio.
+ *
+ * Devuelve `null` si ningún modelo respondió, si no hay visión configurada o
+ * si lo que devolvió no pasa `cifraParadaValida()`.
+ */
+export async function sugerirCifrasParada(imagenUrl: string): Promise<SugerenciaCifrasParada | null> {
+  const texto = await redactar({
+    sistema: [
+      "Lees la pizarra de precios de una casa de cambio en la frontera colombo-venezolana.",
+      "La foto muestra el precio de compra y de venta del dólar en pesos colombianos.",
+      'Responde únicamente con JSON: {"compra": "3900", "venta": "3950"}.',
+      "Usa null en el campo que no puedas leer con seguridad. No adivines.",
+      "No escribas explicaciones, ni unidades, ni rangos, ni texto fuera del JSON.",
+    ].join(" "),
+    usuario: "¿Qué precio de compra y de venta del dólar se lee en esta imagen?",
+    imagenUrl,
+    maxTokens: 120,
+  });
+
+  if (!texto) return null;
+
+  // El modelo suele envolver el JSON en prosa o en un bloque de markdown pese
+  // a habérselo prohibido, así que se busca el objeto en vez de exigir que la
+  // respuesta entera lo sea.
+  const json = texto.match(/\{[^}]*\}/)?.[0];
+  if (!json) return null;
+
+  let datos: unknown;
+  try {
+    datos = JSON.parse(json);
+  } catch {
+    return null;
+  }
+  if (typeof datos !== "object" || datos === null) return null;
+
+  const compra = cifraParadaValida((datos as Record<string, unknown>).compra);
+  const venta = cifraParadaValida((datos as Record<string, unknown>).venta);
+
+  // Sin ninguna de las dos no hay nada que sugerir, y una tarjeta vacía al
+  // lado del campo solo sería ruido.
+  return compra || venta ? { compra, venta } : null;
 }
