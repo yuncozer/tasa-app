@@ -47,6 +47,17 @@ type Sugerencia =
   | { paso: "sin-lectura" }
   | { paso: "error"; mensaje: string };
 
+/**
+ * Deja pasar solo lo que tiene forma de precio: dígitos y los separadores con
+ * los que se escriben acá ("3.100", "3.900,50"). El teclado va en `decimal` y
+ * no en `numeric` justamente porque aquel oculta el punto, así que la cifra de
+ * miles no se podía teclear; el filtro es lo que impide que, con el teclado
+ * completo de escritorio, se cuele texto en un campo que después se publica.
+ */
+function soloCifra(valor: string): string {
+  return valor.replace(/[^\d.,]/g, "");
+}
+
 /** "compran 3.900 · venden 3.950", con guion donde no se leyó nada. */
 function resumenLectura({ compra, venta }: Lectura): string {
   return `compran ${compra ?? "—"} · venden ${venta ?? "—"}`;
@@ -220,9 +231,9 @@ export function ParadaPanel({
             </label>
             <input
               id="compra-parada"
-              inputMode="numeric"
+              inputMode="decimal"
               value={compra}
-              onChange={(e) => setCompra(e.target.value)}
+              onChange={(e) => setCompra(soloCifra(e.target.value))}
               placeholder="Sin confirmar"
               className="rounded-xl border border-border-soft bg-surface-strong px-4 py-3 text-sm tabular text-foreground outline-none placeholder:text-muted"
             />
@@ -233,9 +244,9 @@ export function ParadaPanel({
             </label>
             <input
               id="venta-parada"
-              inputMode="numeric"
+              inputMode="decimal"
               value={venta}
-              onChange={(e) => setVenta(e.target.value)}
+              onChange={(e) => setVenta(soloCifra(e.target.value))}
               placeholder="Sin confirmar"
               className="rounded-xl border border-border-soft bg-surface-strong px-4 py-3 text-sm tabular text-foreground outline-none placeholder:text-muted"
             />
