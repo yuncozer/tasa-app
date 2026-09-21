@@ -174,6 +174,31 @@ export function Encabezado({ subtitulo, escala = 1 }: { subtitulo: string; escal
 }
 
 /**
+ * Cada línea del título de la Historia es un flex de ancho completo, y hacen
+ * falta `justifyContent` **y** `textAlign` juntos: el primero centra la línea
+ * suelta (una sola línea es un único hijo del flex) y el segundo alinea las
+ * demás cuando el texto envuelve. Es la misma lección del cintillo, y aquí se
+ * pagó igual: "20 de Septiembre" no cabe en una línea, así que la fecha se
+ * partía en dos y las dos mitades salían pegadas a la izquierda bajo un
+ * "Tasas de hoy" que sí estaba centrado.
+ *
+ * Por eso además la fecha va más pequeña que el titular (84 frente a 110): con
+ * los 968 px útiles del lienzo, a 110 px un mes largo no entra de ninguna
+ * manera. Centrar sin encoger dejaría el mismo texto partido, solo que
+ * simétrico — y la jerarquía correcta es esa: el protagonista es "Tasas de
+ * hoy" y la fecha lo acompaña.
+ */
+const LINEA_TITULO = {
+  display: "flex",
+  justifyContent: "center",
+  textAlign: "center" as const,
+  width: "100%",
+  fontWeight: 700,
+  color: COLOR.foreground,
+  lineHeight: 1.2,
+};
+
+/**
  * Título de tres líneas de la Historia automática: "Tasas de hoy", la fecha
  * corta y, entre paréntesis, la moneda del lado de la frontera que le
  * corresponde a esa Historia — bolívares con la bandera de Venezuela, pesos
@@ -193,12 +218,10 @@ export function TituloHistoria({
   banderaSrc: string;
 }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 20 }}>
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
-        <span style={{ fontSize: 110, fontWeight: 700, color: COLOR.foreground, lineHeight: 1.2 }}>
-          Tasas de hoy
-        </span>
-        <span style={{ fontSize: 110, fontWeight: 700, color: COLOR.foreground, lineHeight: 1.2 }}>{fecha}</span>
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 20, width: "100%" }}>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, width: "100%" }}>
+        <span style={{ ...LINEA_TITULO, fontSize: 110 }}>Tasas de hoy</span>
+        <span style={{ ...LINEA_TITULO, fontSize: 84 }}>{fecha}</span>
       </div>
       <div style={{ display: "flex", alignItems: "center" }}>
         <span style={{ fontSize: 52, fontWeight: 500, color: COLOR.muted }}>({moneda}</span>
