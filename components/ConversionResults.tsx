@@ -1,15 +1,18 @@
 "use client";
 
 import { Info } from "lucide-react";
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { BotonCompartir } from "@/components/BotonCompartir";
 import { BotonCopiar } from "@/components/BotonCopiar";
 import { Flag } from "@/components/Flag";
+import { RecomendacionPago } from "@/components/RecomendacionPago";
 import { Tooltip } from "@/components/Tooltip";
 import { FLAGS } from "@/lib/flags";
 import { formatAmount, formatRate } from "@/lib/format";
 import { destinoPrincipal } from "@/lib/convert";
+import { guardarZona, suscribirZona, zonaDeducida, zonaEnServidor, zonaGuardada } from "@/lib/preferencia-zona";
 import { RATE_ORDER, equivalenceHelp } from "@/lib/rates";
+import { recomendar } from "@/lib/recomendacion";
 import type { ConversionResult, RateKey, RatesSnapshot } from "@/lib/types";
 
 /**
@@ -57,6 +60,12 @@ export function ConversionResults({
 
   const valorDestacado = destino === "VES" ? conversion.bs : conversion.results[destino];
   const metaDestino = snapshot.rates[destino];
+
+  // Manda lo que el usuario eligió; si no eligió, se deduce de la moneda de
+  // origen. Solo se adapta el consejo: la lista enseña siempre todas las tasas.
+  const guardada = useSyncExternalStore(suscribirZona, zonaGuardada, zonaEnServidor);
+  const zona = guardada ?? zonaDeducida(conversion.from);
+  const recomendacion = recomendar(conversion, zona);
 
   const others = RATE_ORDER.filter((key) => key !== conversion.from && key !== destino);
 
@@ -158,10 +167,18 @@ export function ConversionResults({
                     </Tooltip>
                   )}
                 </div>
-                <p className="tabular text-xs text-[color:var(--muted)]">
+                <p className="tabular flex items-center gap-1.5 text-xs text-[color:var(--muted)]">
                   {rate.bsPerUnit === null
                     ? "Tasa no disponible"
                     : `a ${formatRate(rate.bsPerUnit)} Bs`}
+                  {/* Señala la fila que respalda "Qué rinde más", para que se
+                      vea de dónde sale sin repetir la cifra. Va en esta línea y
+                      no junto al nombre: a 390 px ahí truncaba la etiqueta. */}
+                  {recomendacion?.mejor === key && (
+                    <span className="rounded-full bg-accent/15 px-1.5 text-[10px] font-semibold uppercase tracking-wide text-accent">
+                      Rinde más
+                    </span>
+                  )}
                 </p>
               </div>
               <div className="flex shrink-0 items-center gap-1">
@@ -181,6 +198,8 @@ export function ConversionResults({
           );
         })}
       </ul>
+
+      <RecomendacionPago recomendacion={recomendacion} zona={zona} onZona={guardarZona} />
     </section>
   );
 }

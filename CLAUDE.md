@@ -249,6 +249,30 @@ renderizar sin fin.
   estiraba detrás sin tener la culpa—. Al tocar esa zona conviene comprobarlo a
   390 px con el tope de 12 dígitos, que es donde se nota.
 
+### "Qué rinde más" compara dos filas que ya están a la vista
+
+Bajo las equivalencias, una línea dice qué opción rinde más **a quien paga**
+el monto tecleado (`lib/recomendacion.ts`, `components/RecomendacionPago.tsx`),
+y la fila que la respalda lleva la insignia "Rinde más".
+
+- **No calcula ninguna cifra nueva.** Compara dos resultados de `convert()`
+  que la lista enseña justo encima, así que se puede comprobar a ojo. Es una
+  descripción ("gastas un 10 % menos"), nunca un consejo de inversión: el
+  aviso legal sigue valiendo.
+- **Dos zonas, porque son dos preguntas.** Interior: dólar BCV frente a
+  Binance **venta** (lo que recibe quien vende sus dólares para pagar).
+  Frontera: peso oficial frente a peso Binance. El peso no pinta nada en
+  Caracas, y el tip del interior no lo menciona.
+- **La zona la elige el usuario**, y se recuerda (`lib/preferencia-zona.ts`,
+  mismo patrón que la moneda recordada). No se adivina por ubicación: el GPS
+  pide un permiso solo para un tip, y la IP en Venezuela sale casi siempre por
+  Caracas, justo lo contrario de lo que haría falta. Sin elección, se deduce
+  del origen: quien calcula desde pesos es de frontera.
+- **La zona solo cambia el tip**, nunca las filas: esconder el peso por una
+  deducción equivocada dejaría a alguien de frontera sin su dato.
+- Sin una de las dos tasas, o con las dos iguales, no hay frase: sin dato no
+  se inventa un dato. Queda el selector.
+
 ### Hay tres cachés y cada una resuelve algo distinto
 
 | Dónde | Alcance | Para qué |
