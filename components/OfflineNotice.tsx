@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useSyncExternalStore } from "react";
+import { BotonActualizar } from "@/components/BotonActualizar";
 import { registrarEvento } from "@/lib/analitica-cliente";
 import { formatRelative } from "@/lib/format";
 
@@ -99,9 +100,17 @@ function suscribirReloj(alCambiar: () => void) {
 const relojActual = () => instante;
 const relojEnServidor = () => 0;
 
+/** Si las tasas en pantalla ya no pueden pasar por actuales. */
+export function useTasasViejas(fetchedAt: string): boolean {
+  const ahora = useSyncExternalStore(suscribirReloj, relojActual, relojEnServidor);
+  // `ahora === 0` es el servidor y el primer render del cliente: ahí no se
+  // opina sobre la edad de nada.
+  return ahora > 0 && ahora - Date.parse(fetchedAt) > VEJEZ_MS;
+}
+
 export function OfflineNotice({ fetchedAt }: { fetchedAt: string }) {
   const sinConexion = useSyncExternalStore(suscribir, estadoActual, estadoEnServidor);
-  const ahora = useSyncExternalStore(suscribirReloj, relojActual, relojEnServidor);
+  const viejas = useTasasViejas(fetchedAt);
 
   // El evento se anota **al volver la conexión**, no al perderla: sin red no
   // hay forma de mandarlo y la analítica no guarda cola en el dispositivo (ver
@@ -120,10 +129,6 @@ export function OfflineNotice({ fetchedAt }: { fetchedAt: string }) {
     }
   }, [sinConexion]);
 
-  // `ahora === 0` es el servidor y el primer render del cliente: ahí no se
-  // opina sobre la edad de nada.
-  const viejas = ahora > 0 && ahora - Date.parse(fetchedAt) > VEJEZ_MS;
-
   if (!sinConexion && !viejas) return null;
 
   // Se ancla al área segura y no al borde: instalada en iPhone, el borde queda
@@ -133,10 +138,17 @@ export function OfflineNotice({ fetchedAt }: { fetchedAt: string }) {
       role="status"
       className="sticky top-[env(safe-area-inset-top)] z-10 -mx-4 mb-1 border-b border-[color:var(--warning)]/40 bg-[color:var(--warning)]/15 px-4 py-2 text-center text-xs font-medium text-[color:var(--warning)] backdrop-blur sm:-mx-6 sm:px-6"
     >
+      {/* Sin conexión no se ofrece el botón: navegar sin red devuelve la
+          misma copia guardada y sería un botón que no hace nada. Con datos
+          viejos y red, en cambio, la franja es justo donde se mira, y el botón
+          de abajo quedaba fuera de pantalla en el teléfono. */}
       {sinConexion ? (
         <>Sin conexión · tasas de {formatRelative(fetchedAt)}</>
       ) : (
-        <>Tasas de {formatRelative(fetchedAt)} · pulsa &ldquo;Actualizar tasas&rdquo;</>
+        <span className="flex items-center justify-center gap-2">
+          <span>Tasas de {formatRelative(fetchedAt)}</span>
+          <BotonActualizar destacar />
+        </span>
       )}
     </div>
   );

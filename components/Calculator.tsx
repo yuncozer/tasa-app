@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, useSyncExternalStore, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { BotonActualizar } from "@/components/BotonActualizar";
 import { ConversionResults } from "@/components/ConversionResults";
+import { useTasasViejas } from "@/components/OfflineNotice";
 import { registrarEvento } from "@/lib/analitica-cliente";
 import { Keypad, type KeypadKey } from "@/components/Keypad";
 import { convert } from "@/lib/convert";
@@ -74,8 +75,7 @@ function displayValue(raw: string): string {
 export function Calculator({ snapshot }: { snapshot: RatesSnapshot }) {
   const [raw, setRaw] = useState("100");
   const [elegida, setElegida] = useState<RateKey | null>(null);
-  const [isRefreshing, startRefresh] = useTransition();
-  const router = useRouter();
+  const viejas = useTasasViejas(snapshot.fetchedAt);
 
   const guardada = useSyncExternalStore(suscribirMoneda, monedaGuardada, monedaEnServidor);
   const puedePegar = useSyncExternalStore(sinCambios, hayPortapapeles, noEnServidor);
@@ -174,17 +174,7 @@ export function Calculator({ snapshot }: { snapshot: RatesSnapshot }) {
           >
             Monto en
           </h2>
-          <button
-            type="button"
-            onClick={() => {
-              registrarEvento("actualizar");
-              startRefresh(() => router.replace(`/?actualizar=${Date.now()}`));
-            }}
-            disabled={isRefreshing}
-            className="rounded-full border border-[color:var(--border)] px-3 py-1 text-xs font-medium text-[color:var(--muted)] transition active:scale-95 disabled:opacity-50"
-          >
-            {isRefreshing ? "Actualizando…" : "↻ Actualizar tasas"}
-          </button>
+          <BotonActualizar destacar={viejas} />
         </div>
 
         <div className="grid grid-cols-3 gap-2">

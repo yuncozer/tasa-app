@@ -315,6 +315,15 @@ Lo que hay que respetar:
   `getSnapshot` devolviera un valor distinto cada vez y React renderizaría sin
   fin, y ese `0` es además lo que evita el desajuste de hidratación cuando la
   página sale de la caché horas después.
+- **La franja de tasas viejas lleva su propio "Actualizar tasas"**, y mientras
+  dura el aviso ese botón y el de la calculadora laten en ámbar
+  (`components/BotonActualizar.tsx`, `.latido-actualizar`). El de la
+  calculadora queda bajo las tarjetas y en el teléfono no se ve cuando la
+  franja aparece, así que el aviso decía qué hacer sin ofrecer cómo. El latido
+  usa `--warning` a propósito: es el mismo estado que pinta la franja —estas
+  cifras no son de fiar ahora mismo— y se apaga solo en cuanto dejan de ser
+  viejas. Sin conexión la franja no lleva botón: navegar sin red devuelve la
+  misma copia y sería un botón que no hace nada.
 - **Al probar esto, vacía la caché del navegador.** Es el mismo aviso del
   `stale-while-revalidate` de más abajo, con una vuelta más: el `fetch` interno
   del worker acierta en la caché HTTP y contesta en 100 ms aunque la red esté

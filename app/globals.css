@@ -123,3 +123,30 @@ body {
     animation: none;
   }
 }
+
+/*
+ * Latido del botón "Actualizar tasas" mientras las tasas están viejas. A
+ * diferencia de `.destello-compartir` no se apaga solo: dura lo que dura el
+ * problema, y se apaga en cuanto las tasas vuelven a ser frescas porque la
+ * clase deja de aplicarse. Es un anillo que se expande y no un cambio de
+ * color, para que el texto del botón se lea igual durante todo el ciclo.
+ */
+@keyframes latido-actualizar {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--warning) 45%, transparent);
+  }
+  70%,
+  100% {
+    box-shadow: 0 0 0 8px transparent;
+  }
+}
+
+.latido-actualizar {
+  animation: latido-actualizar 2s ease-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .latido-actualizar {
+    animation: none;
+  }
+}
