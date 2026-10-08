@@ -18,6 +18,8 @@ export function Tooltip({ children, content, className }: TooltipProps) {
     <>
       <button
         type="button"
+        // El ancla solo trae un icono decorativo: sin nombre, el lector de pantalla dice "botón"
+        aria-label="Más información"
         // Atributo requerido por react-tooltip para enlazar el ancla con el panel
         data-tooltip-id={tooltipId} 
         // Mantenemos las clases originales que controlan el área de toque y layout

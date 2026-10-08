@@ -128,7 +128,7 @@ export function RateCard({
                 className={`tabular leading-none ${stacked ? "text-lg font-semibold sm:text-xl" : "text-2xl font-semibold sm:text-3xl"
                   }`}
               >
-                <span className="text-[10px] lg:text-sm leading-none text-[color:var(--muted)]/50">{`1${symbol}`} =  </span>
+                <span className="text-[10px] lg:text-sm leading-none text-[color:var(--muted)]">{`1${symbol}`} =  </span>
                 {formatRate(amount.value)}
                 <span className="ml-1 text-sm font-normal text-[color:var(--muted)]">Bs</span>
               </p>
