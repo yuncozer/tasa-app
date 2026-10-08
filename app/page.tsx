@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AtajosPortada } from "@/components/AtajosPortada";
 import { Calculator } from "@/components/Calculator";
 import { Footer } from "@/components/Footer";
 import { InstallPrompt } from "@/components/InstallPrompt";
@@ -49,6 +50,8 @@ export default async function Home({
           <p className="text-sm text-[color:var(--muted)]">Cuánto vale tu dinero hoy</p>
         </div>
       </header>
+
+      <AtajosPortada />
 
       {/* Debajo de la cabecera: al final de la página nadie llegaba a verlo. */}
       <InstallPrompt />

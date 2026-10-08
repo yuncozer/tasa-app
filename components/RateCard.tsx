@@ -1,151 +1,139 @@
-import { Info } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import { Flag, type Pais } from "@/components/Flag";
-import { Tooltip } from "@/components/Tooltip";
 import { formatDate, formatInverseRate, formatRate, formatRelative } from "@/lib/format";
-
-interface RateAmount {
-  /** Prefijo antes del valor, p. ej. "Compra". Solo se ve cuando hay más de un monto. */
-  label?: string;
-  value: number | null;
-}
 
 interface RateCardProps {
   label: string;
   /** País de la moneda, para dibujar su bandera (decorativa). */
   flag: Pais;
-  /** Símbolo de la moneda, p. ej. "$" o "€". */
-  symbol: string;
   /** Ruta a un logo adicional junto a la bandera, p. ej. el de Binance en el P2P. */
   platformLogo?: string;
-  /**
-   * Bolívares por unidad. Casi siempre un solo monto; Binance trae dos
-   * (compra y venta) porque a partir de cierto monto la diferencia entre
-   * ambas es real y no un detalle menor.
-   */
-  amounts: RateAmount[];
+  /** Cuánto vale una unidad en `unidad`. `null` si la fuente falló. */
+  valor: number | null;
+  /** Moneda en que se expresa `valor`: "Bs" en el tablero en bolívares, "COP" en el de pesos. */
+  unidad?: "Bs" | "COP";
+  /** Qué significa este monto, para el panel que se abre al tocar la fila. */
+  help?: string;
   source: string;
   updatedAt: string | null;
   /** Detalle propio de la tasa, p. ej. la operación de referencia del P2P. */
   note?: string;
-  /** Descripción breve de la tasa (para tooltip). */
+  /** Qué es esta tasa, en una frase. Va dentro del panel, no en un tooltip. */
   description?: string;
-  /** Texto de ayuda para cada monto (string único o array para múltiples montos). */
-  amountHelp?: string | string[];
   /**
-   * Valor inverso (p. ej. pesos por bolívar), se muestra más chico debajo del
-   * monto principal. Solo lo usan las tarjetas de peso.
+   * Valor inverso (p. ej. pesos por bolívar). Solo lo usan las filas de peso.
    */
   inverse?: { value: number | null; prefix: string; help?: string; symbol: string };
 }
 
 /**
- * Una tasa del día: fila con dos contenedores.
+ * Una tasa del día, como una fila del tablero.
  *
- * El primero (`flex-1`, con `min-w-0` para poder truncar) lleva toda la
- * información que no cambia de ancho: nombre, detalle y fuente. El segundo
- * (`shrink-0`) nunca se comprime —los montos no deben partirse— y lleva una
- * fila por cada monto; Binance trae dos (compra y venta) porque a partir de
- * cierto monto la diferencia entre ambas es real y no un detalle menor.
+ * Es la misma información que antes ocupaba una tarjeta entera, ordenada por
+ * lo que se necesita de un vistazo: **qué moneda es, cuánto vale y qué tan
+ * vieja es la cifra**. Todo lo demás —la operación de referencia del P2P, el
+ * inverso del peso, la fecha exacta, las explicaciones que antes colgaban de
+ * ocho íconos ⓘ— está un toque más abajo, dentro de un `<details>`.
+ *
+ * `<details>` y no un estado de React: abre y cierra sin JavaScript, así que
+ * esta fila sigue siendo un componente de servidor y funciona igual cuando el
+ * teléfono no ha terminado de cargar los scripts.
+ *
+ * **La antigüedad no se esconde.** Es la única regla dura de estas pantallas
+ * (una tasa vieja servida como fresca es el daño que la app no puede causar),
+ * así que "fuente · hace X" va siempre en la segunda línea, sin abrir nada.
  */
 export function RateCard({
   label,
   flag,
-  symbol,
   platformLogo,
-  amounts,
+  valor,
+  unidad = "Bs",
+  help,
   source,
   updatedAt,
   note,
   description,
-  amountHelp,
   inverse,
 }: RateCardProps) {
-  const unavailable = amounts.every((amount) => amount.value === null);
-  const stacked = amounts.length > 1;
-  const amountHelpArray = Array.isArray(amountHelp) ? amountHelp : amountHelp ? [amountHelp] : [];
+  const unavailable = valor === null;
+  const hayDetalle = Boolean(description || note || inverse || help) || !unavailable;
 
   return (
-    <article
-      className={`flex items-center gap-3 rounded-2xl border px-4 py-3 sm:py-4 ${unavailable
-        ? "border-[color:var(--warning)]/40 bg-[color:var(--warning)]/5"
-        : "border-[color:var(--border)] bg-[color:var(--surface)]"
-        }`}
-    >
-      <div className="min-w-0 flex-1">
-        <h3 className="flex items-center gap-1.5 text-sm font-medium text-[color:var(--muted)]">
-          {/* La bandera acompaña al nombre; el lector de pantalla ya lee la moneda. */}
-          <Flag pais={flag} className="shrink-0" />
-          {/* El logo de la plataforma (p. ej. Binance) va aparte de la bandera:
-              el P2P no es una tasa de ningún país, es de quien opera el mercado. */}
-          {platformLogo && (
-            // eslint-disable-next-line @next/next/no-img-element -- SVG estático y decorativo.
-            <img src={platformLogo} alt="" width={16} height={16} className="shrink-0" />
-          )}
-          {/* El truncado va en el texto, no en el contenedor flex: ahí solo
-              recortaría, sin puntos suspensivos y empujando al ícono fuera. */}
-          <span className="truncate">{label}</span>
-          {description && (
-            <Tooltip className="shrink-0" content={description}>
-              <Info aria-hidden="true" className="size-3.5 opacity-60" />
-            </Tooltip>
-          )}
-        </h3>
+    <li className={unavailable ? "bg-warning/5" : undefined}>
+      <details className="group">
+        {/* Cuadrícula y no una fila flex: el nombre y la cifra comparten la
+            primera línea, con la cifra a la derecha, y "fuente · hace X" ocupa
+            la segunda **a todo el ancho**. La cuadrícula va en un `div` dentro
+            del `summary` y no en el `summary` mismo: ese elemento tiene un
+            comportamiento de pantalla propio y en escritorio la cuadrícula se
+            le deshacía, apilando nombre, cifra y flecha en una sola columna. */}
+        <summary
+          className={`block px-4 py-3 transition active:bg-surface-strong/60 [&::-webkit-details-marker]:hidden ${
+            hayDetalle ? "cursor-pointer" : ""
+          } list-none`}
+        >
+          <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-x-3 gap-y-1">
+            <h3 className="flex items-start gap-1.5 text-sm font-medium leading-snug">
+              {/* La bandera acompaña al nombre; el lector de pantalla ya lee la moneda. */}
+              <Flag pais={flag} className="mt-[3px] shrink-0" />
+              {/* El P2P no es una tasa de ningún país: el logo de la plataforma
+                  va aparte de la bandera. */}
+              {platformLogo && (
+                // eslint-disable-next-line @next/next/no-img-element -- SVG estático y decorativo.
+                <img src={platformLogo} alt="" width={16} height={16} className="mt-0.5 shrink-0" />
+              )}
+              {/* Sin `truncate`: "Dólar Binance (compra)" y "(venta)" solo se
+                  distinguen al final, y recortado no se sabe cuál es cuál. */}
+              <span>{label}</span>
+            </h3>
 
-        <div className="mt-1 text-xs text-[color:var(--muted)]">
-          {unavailable ? (
-            <p className="text-[color:var(--warning)]">Dato no disponible ahora mismo</p>
-          ) : (
-            <>
-              {note && <p>{note}</p>}
-              {/* La fecha exacta queda en el título, al alcance del ratón. */}
-              <p className="truncate" title={formatDate(updatedAt)}>
+            {unavailable ? (
+              <span aria-hidden="true" />
+            ) : (
+              <p className="tabular flex items-baseline gap-1.5 text-xl font-semibold leading-none sm:text-2xl">
+                <span>{formatRate(valor)}</span>
+                <span className="text-sm font-normal text-muted">{unidad}</span>
+              </p>
+            )}
+
+            {hayDetalle ? (
+              <ChevronDown
+                aria-hidden="true"
+                className="size-4 text-muted transition group-open:rotate-180"
+              />
+            ) : (
+              <span aria-hidden="true" />
+            )}
+
+            {unavailable ? (
+              <p className="col-span-3 text-xs text-warning">Dato no disponible ahora mismo</p>
+            ) : (
+              // La fecha exacta queda en el título, al alcance del ratón.
+              <p className="col-span-3 text-xs text-muted" title={formatDate(updatedAt)}>
                 {source} · {formatRelative(updatedAt)}
               </p>
-            </>
-          )}
-        </div>
-      </div>
+            )}
+          </div>
+        </summary>
 
-      <div className="flex shrink-0 flex-col items-end gap-1">
-        {amounts.map((amount, index) => {
-          const help = amountHelpArray[index];
-          return (
-            <div key={amount.label ?? index} className="text-right">
-              {/* El prefijo va arriba del monto, no delante: así no le quita
-                  ancho horizontal a la columna de info. La ayuda cuelga de un
-                  ícono visible: nadie adivina que un texto suelto se toca. */}
-              {(amount.label || help) && (
-                <div className="mb-0.5 flex items-center justify-end gap-1 text-xs leading-none text-[color:var(--muted)]">
-                  {amount.label}
-                  {help && (
-                    <Tooltip content={help}>
-                      <Info aria-hidden="true" className="size-3 opacity-60" />
-                    </Tooltip>
-                  )}
-                </div>
-              )}
-              <p
-                className={`tabular leading-none ${stacked ? "text-lg font-semibold sm:text-xl" : "text-2xl font-semibold sm:text-3xl"
-                  }`}
-              >
-                <span className="text-[10px] lg:text-sm leading-none text-[color:var(--muted)]">{`1${symbol}`} =  </span>
-                {formatRate(amount.value)}
-                <span className="ml-1 text-sm font-normal text-[color:var(--muted)]">Bs</span>
-              </p>
-              {inverse && inverse.value !== null && (
-                <div className="mt-2 flex items-center justify-end gap-1 text-xs lg:text-sm leading-none text-[color:var(--muted)]">
+        {hayDetalle && (
+          <div className="flex flex-col gap-2 px-4 pb-3 text-xs leading-relaxed text-muted">
+            {description && <p>{description}</p>}
+            {note && <p>{note}</p>}
+            {help && <p>{help}</p>}
+            {inverse && inverse.value !== null && (
+              <p>
+                <strong className="tabular font-semibold text-foreground">
                   {inverse.prefix} {formatInverseRate(inverse.value)} {inverse.symbol}
-                  {inverse.help && (
-                    <Tooltip content={inverse.help}>
-                      <Info aria-hidden="true" className="size-3 opacity-60" />
-                    </Tooltip>
-                  )}
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-    </article>
+                </strong>
+                {inverse.help && <> · {inverse.help}</>}
+              </p>
+            )}
+            {!unavailable && <p>Dato de {formatDate(updatedAt)}</p>}
+          </div>
+        )}
+      </details>
+    </li>
   );
 }

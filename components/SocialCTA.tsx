@@ -19,10 +19,8 @@ export function SocialCTA() {
   const whatsapp = enlaceWhatsapp();
 
   return (
-    <div className="flex flex-col gap-3 rounded-2xl border border-accent/40 bg-accent/10 px-4 py-3">
-      <p className="text-center text-sm font-medium text-foreground">
-        📲 Tasas del día y noticias clave de interés económico
-      </p>
+    <div className="flex flex-col gap-2">
+      <p className="text-center text-xs text-muted">Tasas del día y noticias de la economía fronteriza</p>
 
       <div className={`grid gap-2 ${whatsapp ? "grid-cols-2" : "grid-cols-1"}`}>
         {/* Por `/ig` y no al perfil directo, igual que WhatsApp va por `/wa`:
@@ -35,7 +33,7 @@ export function SocialCTA() {
           href="/ig"
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-center justify-center gap-2 rounded-xl border border-accent bg-accent/15 px-3 py-3 text-sm font-semibold text-accent transition active:scale-95"
+          className="flex items-center justify-center gap-2 rounded-xl border border-border-soft bg-surface px-3 py-2 text-sm font-semibold text-muted transition active:scale-95"
         >
           <img src="/SVG/instagram-icon.svg" width={18} height={18} alt="" aria-hidden="true" />
           Instagram
@@ -46,7 +44,7 @@ export function SocialCTA() {
             href="/wa"
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center justify-center gap-2 rounded-xl border border-accent bg-accent/15 px-3 py-3 text-sm font-semibold text-accent transition active:scale-95"
+            className="flex items-center justify-center gap-2 rounded-xl border border-border-soft bg-surface px-3 py-2 text-sm font-semibold text-muted transition active:scale-95"
           >
             <MessageCircle className="size-[18px]" aria-hidden="true" />
             Canal de WhatsApp

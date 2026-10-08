@@ -165,7 +165,7 @@ export function Calculator({ snapshot }: { snapshot: RatesSnapshot }) {
   const originRate = snapshot.rates[from];
 
   return (
-    <div className="flex flex-col gap-5">
+    <div id="calculadora" className="flex scroll-mt-16 flex-col gap-5">
       <section aria-labelledby="monto-titulo" className="flex flex-col gap-3">
         <div className="flex items-center justify-between gap-2">
           <h2
@@ -177,7 +177,12 @@ export function Calculator({ snapshot }: { snapshot: RatesSnapshot }) {
           <BotonActualizar destacar={viejas} />
         </div>
 
-        <div className="grid grid-cols-3 gap-2">
+        {/* Siempre a la vista: esconderlas tras un desplegable obligaba a un
+            toque solo para descubrir que hay opciones. El espacio se gana por
+            otro lado: chips más pequeños (`text-xs`) y con el ancho justo de su
+            texto en vez de tres columnas iguales, que caben en dos filas en
+            vez de tres. */}
+        <div role="group" aria-label="Moneda del monto" className="flex flex-wrap gap-1.5">
           {RATE_ORDER.map((key) => {
             const rate = snapshot.rates[key];
             const selected = key === from;
@@ -189,7 +194,7 @@ export function Calculator({ snapshot }: { snapshot: RatesSnapshot }) {
                 onClick={() => elegir(key)}
                 aria-pressed={selected}
                 disabled={rate.bsPerUnit === null}
-                className={`rounded-xl border px-2 py-2 text-sm font-semibold transition active:scale-95 disabled:opacity-40 ${
+                className={`whitespace-nowrap rounded-xl border px-3 py-1.5 text-xs font-semibold transition active:scale-95 disabled:opacity-40 ${
                   selected
                     ? "border-[color:var(--accent)] bg-[color:var(--accent)]/15 text-[color:var(--accent)]"
                     : "border-[color:var(--border)] bg-[color:var(--surface)] text-[color:var(--muted)]"

@@ -1,98 +1,113 @@
 import { Brecha } from "@/components/Brecha";
 import { RateCard } from "@/components/RateCard";
+import { VistasTasas } from "@/components/VistasTasas";
 import { FLAGS } from "@/lib/flags";
+import { buildFilasPesos, type FilaPesosId } from "@/lib/pesos";
 import { RATE_ORDER, rateHelp, inverseHelp } from "@/lib/rates";
-import type { RatesSnapshot } from "@/lib/types";
+import type { RateKey, RatesSnapshot } from "@/lib/types";
+
+const LISTA =
+  "divide-y divide-border-soft overflow-hidden rounded-2xl border border-border-soft bg-surface";
+
+/** País de cada fila de la lámina en pesos: el dólar es de EE. UU. y el bolívar, de Venezuela. */
+const PAIS_PESOS: Record<FilaPesosId, "US" | "VE"> = {
+  TRM: "US",
+  FRONTERA_BUY: "US",
+  FRONTERA_SELL: "US",
+  VES_PROMEDIO: "VE",
+};
 
 /**
- * Las cinco referencias del día.
+ * Qué tasa respalda la fuente y la antigüedad de cada fila en pesos: la TRM
+ * es del Banco de la República y las otras tres cruzan por el peso Binance.
+ */
+const RESPALDO_PESOS: Record<FilaPesosId, RateKey> = {
+  TRM: "COP_OFICIAL",
+  FRONTERA_BUY: "COP_FRONTERA",
+  FRONTERA_SELL: "COP_FRONTERA",
+  VES_PROMEDIO: "COP_FRONTERA",
+};
+
+/**
+ * Las tasas del día, en las dos láminas del post diario: bolívares y pesos.
  *
- * El peso ocupa dos tarjetas —oficial y frontera— en vez de amontonar ambas
- * cifras en una: son dos precios distintos del mismo billete y conviene
- * compararlos de un vistazo.
+ * **Bolívares** lleva las mismas filas, en el mismo orden y con los mismos
+ * nombres que la primera lámina —Binance compra y venta cada una en su fila,
+ * como ahí—, más el peso oficial, que el post no muestra pero la web sí: es el
+ * otro precio del mismo billete y conviene verlo junto al de Binance.
  *
- * Binance es al revés: compra y venta comparten bandera, fuente y nota (salen
- * del mismo fetch), así que van en una sola tarjeta con los dos montos
- * apilados en vez de duplicar toda esa información en dos tarjetas.
+ * **Pesos** sale de `buildFilasPesos()`, la misma lista que arma la segunda
+ * lámina y su caption. No se rehace aquí: es el mismo informe y no pueden
+ * decir cosas distintas.
  *
- * Debajo de la cuadrícula va la brecha, que no es una tasa más sino la
- * distancia entre dos de las de arriba: por eso está aquí, pegada a las
- * tarjetas de las que sale, y no en una sección propia.
+ * Debajo va la brecha, que no es una tasa más sino la distancia entre dos de
+ * las de arriba. Ni ella ni La Parada están en el post diario porque tienen su
+ * propio post; aquí acompañan al tablero y no dependen de la vista elegida.
  */
 export function RatePanel({ snapshot }: { snapshot: RatesSnapshot }) {
-  const keys = RATE_ORDER.filter((key) => key !== "VES" && key !== "USD_BINANCE_SELL");
+  const claves = RATE_ORDER.filter((key) => key !== "VES");
 
-  return (
-    <section aria-labelledby="tasas-titulo" className="flex flex-col gap-3">
-      <h2
-        id="tasas-titulo"
-        className="text-sm font-semibold uppercase tracking-wide text-[color:var(--muted)]"
-      >
-        Tasas de hoy
-      </h2>
-
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-        {keys.map((key) => {
-          if (key === "USD_BINANCE_BUY") {
-            const buy = snapshot.rates.USD_BINANCE_BUY;
-            const sell = snapshot.rates.USD_BINANCE_SELL;
-            const buyHelp = rateHelp("USD_BINANCE_BUY");
-            const sellHelp = rateHelp("USD_BINANCE_SELL");
-
-            return (
-              <RateCard
-                key="binance"
-                label="Dólar Binance"
-                symbol={"$"}
-                flag={FLAGS.USD_BINANCE_BUY}
-                platformLogo="/SVG/binance.svg"
-                amounts={[
-                  { label: "Compra", value: buy.bsPerUnit },
-                  { label: "Venta", value: sell.bsPerUnit },
-                ]}
-                source={buy.source}
-                updatedAt={buy.updatedAt}
-                note={buy.note}
-                description={buyHelp.cardDescription}
-                amountHelp={[
-                  buyHelp.amountHelp?.[0] || "",
-                  sellHelp.amountHelp?.[0] || "",
-                ]}
-              />
-            );
-          }
-
-          const rate = snapshot.rates[key];
-          const help = rateHelp(key);
-          const inverse =
-            key === "COP_OFICIAL" || key === "COP_FRONTERA"
-              ? {
+  const bolivares = (
+    <ul className={LISTA}>
+      {claves.map((key) => {
+        const rate = snapshot.rates[key];
+        const help = rateHelp(key);
+        const inverse =
+          key === "COP_OFICIAL" || key === "COP_FRONTERA"
+            ? {
                 value: rate.bsPerUnit ? 1 / rate.bsPerUnit : null,
                 prefix: `1Bs = `,
                 help: inverseHelp(key),
                 symbol: rate.symbol,
               }
-              : undefined;
+            : undefined;
+        const ayudaMonto = Array.isArray(help.amountHelp) ? help.amountHelp[0] : help.amountHelp;
 
-          return (
-            <RateCard
-              key={key}
-              label={rate.label}
-              symbol={rate.symbol}
-              flag={FLAGS[key]}
-              amounts={[{ value: rate.bsPerUnit }]}
-              source={rate.source}
-              updatedAt={rate.updatedAt}
-              note={rate.note}
-              description={help.cardDescription}
-              amountHelp={typeof help.amountHelp === "string" ? help.amountHelp : undefined}
-              inverse={inverse}
-            />
-          );
-        })}
-      </div>
+        return (
+          <RateCard
+            key={key}
+            label={rate.label}
+            flag={FLAGS[key]}
+            platformLogo={
+              key === "USD_BINANCE_BUY" || key === "USD_BINANCE_SELL" ? "/SVG/binance.svg" : undefined
+            }
+            valor={rate.bsPerUnit}
+            help={ayudaMonto || undefined}
+            source={rate.source}
+            updatedAt={rate.updatedAt}
+            note={rate.note}
+            description={help.cardDescription}
+            inverse={inverse}
+          />
+        );
+      })}
+    </ul>
+  );
 
+  const pesos = (
+    <ul className={LISTA}>
+      {buildFilasPesos(snapshot).map((fila) => {
+        const respaldo = snapshot.rates[RESPALDO_PESOS[fila.id]];
+        return (
+          <RateCard
+            key={fila.id}
+            label={fila.label}
+            flag={PAIS_PESOS[fila.id]}
+            platformLogo={fila.fuente ? "/SVG/binance.svg" : undefined}
+            valor={fila.copPerUnit}
+            unidad="COP"
+            source={respaldo.source}
+            updatedAt={respaldo.updatedAt}
+          />
+        );
+      })}
+    </ul>
+  );
+
+  return (
+    <div id="tasas" className="flex scroll-mt-4 flex-col gap-3">
+      <VistasTasas bolivares={bolivares} pesos={pesos} />
       <Brecha snapshot={snapshot} />
-    </section>
+    </div>
   );
 }

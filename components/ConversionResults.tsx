@@ -1,19 +1,106 @@
 "use client";
 
-import { Info } from "lucide-react";
+import { Check, Copy } from "lucide-react";
 import { useState, useSyncExternalStore } from "react";
 import { BotonCompartir } from "@/components/BotonCompartir";
 import { BotonCopiar } from "@/components/BotonCopiar";
 import { Flag } from "@/components/Flag";
 import { RecomendacionPago } from "@/components/RecomendacionPago";
-import { Tooltip } from "@/components/Tooltip";
 import { FLAGS } from "@/lib/flags";
-import { formatAmount, formatRate } from "@/lib/format";
+import { registrarEvento } from "@/lib/analitica-cliente";
+import { formatAmount } from "@/lib/format";
 import { destinoPrincipal } from "@/lib/convert";
 import { guardarZona, suscribirZona, zonaDeducida, zonaEnServidor, zonaGuardada } from "@/lib/preferencia-zona";
-import { RATE_ORDER, equivalenceHelp } from "@/lib/rates";
+import { RATE_ORDER } from "@/lib/rates";
 import { recomendar } from "@/lib/recomendacion";
-import type { ConversionResult, RateKey, RatesSnapshot } from "@/lib/types";
+import type { ConversionResult, Rate, RateKey, RatesSnapshot } from "@/lib/types";
+
+
+/**
+ * Una equivalencia. **Toda la fila es el botón de copiar**: eran siete
+ * íconos pequeños apilados en la columna derecha, cada uno un blanco de
+ * apenas 28 px, y la fila entera ya era el blanco más natural. El ícono se
+ * queda como pista de que se puede tocar, y cambia a un visto al copiar.
+ *
+ * Ya no lleva la tasa ("a 1.022,87 Bs") ni el ⓘ: las dos cosas están en el
+ * tablero de arriba, y repetirlas en cada fila era la mitad del ruido de esta
+ * lista. Copia **el número tal como se ve**, igual que `BotonCopiar`.
+ */
+function FilaEquivalencia({
+  rate,
+  claveRate,
+  valor,
+  mejor,
+}: {
+  rate: Rate;
+  claveRate: RateKey;
+  valor: number | null;
+  mejor: boolean;
+}) {
+  const [copiado, setCopiado] = useState(false);
+  const texto = formatAmount(valor, claveRate);
+  const sinValor = valor === null;
+
+  const copiar = async () => {
+    try {
+      await navigator.clipboard.writeText(texto);
+      setCopiado(true);
+      registrarEvento("copiar", `monto en ${rate.label}`);
+      // Vuelve solo: un "copiado" permanente dejaría de significar que lo
+      // guardado es esta cifra y no otra.
+      setTimeout(() => setCopiado(false), 2000);
+    } catch {
+      // Sin permiso de portapapeles no hay nada que hacer.
+    }
+  };
+
+  return (
+    <li>
+      <button
+        type="button"
+        onClick={copiar}
+        disabled={sinValor}
+        aria-label={copiado ? `${rate.label} copiado` : `Copiar monto en ${rate.label}`}
+        className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition active:bg-[color:var(--surface-strong)]/60 disabled:opacity-50"
+      >
+        <div className="min-w-0">
+          <div className="flex items-center gap-1.5 text-sm font-medium">
+          <Flag pais={FLAGS[claveRate]} className="shrink-0" />
+          {/* El P2P no es una tasa de ningún país: el logo de Binance va
+              aparte de la bandera, igual que en el tablero. */}
+          {(claveRate === "USD_BINANCE_BUY" || claveRate === "USD_BINANCE_SELL") && (
+            // eslint-disable-next-line @next/next/no-img-element -- SVG estático y decorativo.
+            <img src="/SVG/binance.svg" alt="" width={14} height={14} className="shrink-0" />
+          )}
+          <span className="truncate">{rate.label}</span>
+          </div>
+          {/* Señala la fila que respalda "Qué rinde más", para que se vea de
+              dónde sale sin repetir la cifra. Va debajo del nombre y no a su
+              lado: a 390 px ahí le quitaba el sitio y truncaba la etiqueta. */}
+          {mejor && (
+            <span className="mt-1 inline-block rounded-full bg-accent/15 px-1.5 text-[10px] font-semibold uppercase tracking-wide text-accent">
+              Rinde más
+            </span>
+          )}
+        </div>
+        <span className="flex shrink-0 items-center gap-2">
+          <span className="tabular text-lg font-semibold">
+            <span className="mr-1 text-xs font-normal text-[color:var(--muted)]">{rate.symbol}</span>
+            {texto}
+          </span>
+          {/* Sin valor no hay nada que copiar: el ícono desaparece en vez de
+              ofrecer copiar un guion. */}
+          {!sinValor &&
+            (copiado ? (
+              <Check aria-hidden="true" className="size-4 text-[color:var(--accent)]" />
+            ) : (
+              <Copy aria-hidden="true" className="size-4 opacity-60" />
+            ))}
+        </span>
+      </button>
+    </li>
+  );
+}
 
 /**
  * Equivalentes del monto en todas las demás bases.
@@ -68,6 +155,7 @@ export function ConversionResults({
   const recomendacion = recomendar(conversion, zona);
 
   const others = RATE_ORDER.filter((key) => key !== conversion.from && key !== destino);
+
 
   return (
     <section aria-labelledby="resultados-titulo" className="flex flex-col gap-2">
@@ -143,60 +231,15 @@ export function ConversionResults({
       )}
 
       <ul className="divide-y divide-[color:var(--border)] overflow-hidden rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface)]">
-        {others.map((key) => {
-          const rate = snapshot.rates[key];
-          const value = conversion.results[key];
-          const help = equivalenceHelp(key);
-          return (
-            <li key={key} className="flex items-center justify-between gap-3 px-4 py-3">
-              <div className="min-w-0">
-                {/* La ayuda cuelga del nombre, no del monto: el nombre es lo
-                    que el usuario no entiende, y así el número queda intacto. */}
-                <div className="flex items-center gap-1.5 text-sm font-medium">
-                  <Flag pais={FLAGS[key]} className="shrink-0" />
-                  {/* El P2P no es una tasa de ningún país: el logo de Binance
-                      va aparte de la bandera, igual que en RateCard. */}
-                  {(key === "USD_BINANCE_BUY" || key === "USD_BINANCE_SELL") && (
-                    // eslint-disable-next-line @next/next/no-img-element -- SVG estático y decorativo.
-                    <img src="/SVG/binance.svg" alt="" width={14} height={14} className="shrink-0" />
-                  )}
-                  <span className="truncate">{rate.label}</span>
-                  {help.cardDescription && (
-                    <Tooltip className="shrink-0" content={help.cardDescription}>
-                      <Info aria-hidden="true" className="size-3.5 opacity-60" />
-                    </Tooltip>
-                  )}
-                </div>
-                <p className="tabular flex items-center gap-1.5 text-xs text-[color:var(--muted)]">
-                  {rate.bsPerUnit === null
-                    ? "Tasa no disponible"
-                    : `a ${formatRate(rate.bsPerUnit)} Bs`}
-                  {/* Señala la fila que respalda "Qué rinde más", para que se
-                      vea de dónde sale sin repetir la cifra. Va en esta línea y
-                      no junto al nombre: a 390 px ahí truncaba la etiqueta. */}
-                  {recomendacion?.mejor === key && (
-                    <span className="rounded-full bg-accent/15 px-1.5 text-[10px] font-semibold uppercase tracking-wide text-accent">
-                      Rinde más
-                    </span>
-                  )}
-                </p>
-              </div>
-              <div className="flex shrink-0 items-center gap-1">
-                <p className="tabular text-lg font-semibold">
-                  <span className="mr-1 text-xs font-normal text-[color:var(--muted)]">
-                    {rate.symbol}
-                  </span>
-                  {formatAmount(value, key)}
-                </p>
-                {/* Sin valor no hay nada que copiar: el botón desaparece en vez
-                    de dejar copiar un guion. */}
-                {value !== null && (
-                  <BotonCopiar texto={formatAmount(value, key)} etiqueta={`monto en ${rate.label}`} />
-                )}
-              </div>
-            </li>
-          );
-        })}
+        {others.map((key) => (
+          <FilaEquivalencia
+            key={key}
+            rate={snapshot.rates[key]}
+            valor={conversion.results[key]}
+            claveRate={key}
+            mejor={recomendacion?.mejor === key}
+          />
+        ))}
       </ul>
 
       <RecomendacionPago recomendacion={recomendacion} zona={zona} onZona={guardarZona} />
