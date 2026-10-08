@@ -33,6 +33,7 @@ export type TipoEvento =
   | "compartir"
   | "avisos"
   | "pegar"
+  | "operacion"
   | "actualizar"
   | "instalar"
   | "sin_conexion";

@@ -32,6 +32,7 @@ const TIPOS = new Set([
   "compartir",
   "avisos",
   "pegar",
+  "operacion",
   "actualizar",
   "instalar",
   "sin_conexion",

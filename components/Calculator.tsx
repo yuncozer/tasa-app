@@ -1,5 +1,6 @@
 "use client";
 
+import { ClipboardPaste } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { BotonActualizar } from "@/components/BotonActualizar";
 import { ConversionResults } from "@/components/ConversionResults";
@@ -7,7 +8,17 @@ import { useTasasViejas } from "@/components/OfflineNotice";
 import { registrarEvento } from "@/lib/analitica-cliente";
 import { Keypad, type KeypadKey } from "@/components/Keypad";
 import { convert } from "@/lib/convert";
-import { normalizarMontoPegado, parseInput } from "@/lib/format";
+import {
+  MAX_DECIMALES,
+  MAX_ENTEROS,
+  MENSAJE_ERROR,
+  aplicarTecla,
+  evaluar,
+  formatoCuenta,
+  terminaEnOperador,
+  tieneOperador,
+} from "@/lib/expresion";
+import { normalizarMontoPegado } from "@/lib/format";
 // Las tres viven en `lib/portapapeles.ts` porque el botón "Pegar" de
 // `/admin/noticia` necesita exactamente la misma comprobación.
 import { hayPortapapeles, noEnServidor, sinCambios } from "@/lib/portapapeles";
@@ -19,10 +30,6 @@ import {
 } from "@/lib/preferencia-moneda";
 import { RATE_ORDER } from "@/lib/rates";
 import type { RateKey, RatesSnapshot } from "@/lib/types";
-
-/** Máximo de dígitos enteros: evita que el display se desborde. */
-const MAX_INTEGER_DIGITS = 12;
-const MAX_DECIMALS = 2;
 
 /**
  * La primera base que hoy tiene precio, en el orden en que se muestran.
@@ -41,28 +48,12 @@ function primeraDisponible(snapshot: RatesSnapshot): RateKey {
   return RATE_ORDER.find((key) => snapshot.rates[key].bsPerUnit !== null) ?? "USD_BCV";
 }
 
-/** Aplica una tecla al monto que se está escribiendo. */
-function applyKey(current: string, key: KeypadKey): string {
-  if (key === "back") return current.slice(0, -1);
-
-  if (key === ",") {
-    if (current.includes(",")) return current;
-    return current === "" ? "0," : `${current},`;
-  }
-
-  const [integer, decimals] = current.split(",");
-  if (decimals !== undefined) {
-    if (decimals.length >= MAX_DECIMALS) return current;
-    return `${current}${key}`;
-  }
-  if (integer.length >= MAX_INTEGER_DIGITS) return current;
-  // "0" solo se conserva como parte de un decimal.
-  if (integer === "0") return key;
-
-  return `${current}${key}`;
-}
-
-/** Agrupa los miles del monto tecleado para que se lea "74.878,64". */
+/**
+ * Agrupa los miles del monto tecleado para que se lea "74.878,64".
+ *
+ * Solo para un monto suelto: conserva lo que el usuario va escribiendo, como
+ * la coma que acaba de pulsar ("12,"), que un número ya evaluado perdería.
+ */
 function displayValue(raw: string): string {
   if (raw === "") return "0";
 
@@ -95,7 +86,7 @@ export function Calculator({ snapshot }: { snapshot: RatesSnapshot }) {
   }, []);
 
   const escribir = useCallback((key: KeypadKey) => {
-    setRaw((current) => applyKey(current, key));
+    setRaw((current) => aplicarTecla(current, key));
   }, []);
 
   const limpiar = useCallback(() => setRaw(""), []);
@@ -103,7 +94,7 @@ export function Calculator({ snapshot }: { snapshot: RatesSnapshot }) {
   const pegar = useCallback(async () => {
     try {
       const texto = await navigator.clipboard.readText();
-      const monto = normalizarMontoPegado(texto, MAX_INTEGER_DIGITS, MAX_DECIMALS);
+      const monto = normalizarMontoPegado(texto, MAX_ENTEROS, MAX_DECIMALES);
       // Sin monto reconocible no se toca lo que ya había: vaciar el display
       // por pegar una cadena cualquiera sería peor que no hacer nada.
       if (monto !== null) {
@@ -134,9 +125,13 @@ export function Calculator({ snapshot }: { snapshot: RatesSnapshot }) {
       }
 
       const { key } = evento;
-      if (/^\d$/.test(key)) setRaw((actual) => applyKey(actual, key));
-      else if (key === "," || key === ".") setRaw((actual) => applyKey(actual, ","));
-      else if (key === "Backspace") setRaw((actual) => applyKey(actual, "back"));
+      if (/^\d$/.test(key)) setRaw((actual) => aplicarTecla(actual, key));
+      else if (key === "," || key === ".") setRaw((actual) => aplicarTecla(actual, ","));
+      else if (key === "+") setRaw((actual) => aplicarTecla(actual, "+"));
+      else if (key === "-") setRaw((actual) => aplicarTecla(actual, "−"));
+      else if (key === "*" || key === "x" || key === "X") setRaw((actual) => aplicarTecla(actual, "×"));
+      else if (key === "/") setRaw((actual) => aplicarTecla(actual, "÷"));
+      else if (key === "Backspace") setRaw((actual) => aplicarTecla(actual, "back"));
       else if (key === "Escape") setRaw("");
       else return;
 
@@ -147,20 +142,31 @@ export function Calculator({ snapshot }: { snapshot: RatesSnapshot }) {
     return () => window.removeEventListener("keydown", alPulsar);
   }, []);
 
+  // Lo que se convierte es el **resultado** de la cuenta, no lo tecleado: con un
+  // solo monto es ese mismo monto, y con una suma es el total. Si la cuenta no
+  // tiene resultado (dividir entre cero, un negativo) no se convierte nada: ver
+  // más abajo, donde se avisa en lugar de mostrar ceros.
+  const resultado = useMemo(() => evaluar(raw), [raw]);
+  const hayOperacion = tieneOperador(raw);
+  const monto = resultado.valor ?? 0;
+
   // Una conversión se anota cuando el usuario **deja de teclear**, no en cada
   // dígito: escribir "74878" son cinco cambios de estado y una sola cuenta que
   // el usuario quería hacer. El detalle es la moneda de origen —de conjunto
   // cerrado— y nunca el monto: lo que se teclea es asunto de quien lo teclea.
+  // Si además hubo operadores se anota `operacion`, que dice si esas teclas se
+  // usan; sin ese dato no hay forma de saber si la columna de operaciones
+  // sirve o solo ocupa sitio.
   useEffect(() => {
-    if (parseInput(raw) <= 0) return;
-    const espera = setTimeout(() => registrarEvento("conversion", from), 1500);
+    if (monto <= 0) return;
+    const espera = setTimeout(() => {
+      registrarEvento("conversion", from);
+      if (hayOperacion) registrarEvento("operacion", from);
+    }, 1500);
     return () => clearTimeout(espera);
-  }, [raw, from]);
+  }, [monto, hayOperacion, from]);
 
-  const conversion = useMemo(
-    () => convert(parseInput(raw), from, snapshot),
-    [raw, from, snapshot],
-  );
+  const conversion = useMemo(() => convert(monto, from, snapshot), [monto, from, snapshot]);
 
   const originRate = snapshot.rates[from];
 
@@ -206,15 +212,54 @@ export function Calculator({ snapshot }: { snapshot: RatesSnapshot }) {
           })}
         </div>
 
-        <output
-          aria-live="polite"
-          className="tabular block truncate rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface)] px-4 py-4 text-right text-4xl font-semibold sm:text-5xl"
-        >
-          <span className="mr-2 align-middle text-lg font-normal text-[color:var(--muted)]">
-            {originRate.symbol}
-          </span>
-          {displayValue(raw)}
-        </output>
+        {/* Con una cuenta, la cuenta va pequeña arriba y el resultado —lo que se
+            convierte— grande abajo. Con un solo monto el visor es idéntico al de
+            siempre. */}
+        <div className="relative">
+          {/* "Pegar" es un ícono dentro del visor y no una tecla: pegar un
+              monto es algo que se hace antes de teclear, sobre el monto
+              mismo, y como tecla ocupaba un sitio del teclado a la altura de
+              las que sí se usan dígito a dígito. Solo se pinta donde el
+              navegador deja leer el portapapeles: un botón que nunca funciona
+              es peor que no tenerlo. Va **fuera** del `<output>`, que es una
+              región que se anuncia al cambiar y no debe contener controles. */}
+          {puedePegar && (
+            <button
+              type="button"
+              onClick={pegar}
+              aria-label="Pegar monto"
+              className="absolute left-1.5 top-1.5 z-10 rounded-xl p-2.5 text-[color:var(--muted)] transition active:scale-95"
+            >
+              <ClipboardPaste aria-hidden="true" className="size-5" />
+            </button>
+          )}
+          <output
+            aria-live="polite"
+            className={`tabular block rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface)] py-4 pr-4 text-right ${
+              puedePegar ? "pl-14" : "pl-4"
+            }`}
+          >
+            {hayOperacion && (
+              <span className="mb-1 block break-words text-sm font-normal leading-snug text-[color:var(--muted)]">
+                {formatoCuenta(raw)}
+              </span>
+            )}
+            {resultado.error ? (
+              <span className="block text-base font-semibold text-[color:var(--warning)]">
+                {MENSAJE_ERROR[resultado.error]}
+              </span>
+            ) : (
+              <span className="block truncate text-4xl font-semibold sm:text-5xl">
+                <span className="mr-2 align-middle text-lg font-normal text-[color:var(--muted)]">
+                  {originRate.symbol}
+                </span>
+                {hayOperacion
+                  ? new Intl.NumberFormat("es-VE", { maximumFractionDigits: MAX_DECIMALES }).format(monto)
+                  : displayValue(raw)}
+              </span>
+            )}
+          </output>
+        </div>
       </section>
 
       {/* `min-w-0` en los hijos: una celda de grid no se encoge por debajo de
@@ -222,8 +267,26 @@ export function Calculator({ snapshot }: { snapshot: RatesSnapshot }) {
           equivalencias ensanchaba la columna y, con ella, la página entera —el
           teclado se estiraba detrás sin tener la culpa. */}
       <div className="grid gap-5 [&>*]:min-w-0 lg:grid-cols-2">
-        <Keypad onKey={escribir} onClear={limpiar} onPaste={puedePegar ? pegar : undefined} />
-        <ConversionResults conversion={conversion} snapshot={snapshot} />
+        <Keypad
+          onKey={escribir}
+          onClear={limpiar}
+          operadorPendiente={terminaEnOperador(raw) ? raw[raw.length - 1] : null}
+        />
+        {resultado.error ? (
+          // Sin resultado no hay equivalencias que enseñar, y mostrarlas en cero
+          // diría que el monto vale cero. Se explica qué hacer en su lugar.
+          <section
+            aria-label="Equivalencias"
+            className="rounded-2xl border border-warning/40 bg-warning/5 px-4 py-3 text-sm"
+          >
+            <p className="font-medium text-warning">{MENSAJE_ERROR[resultado.error]}</p>
+            <p className="mt-1 text-xs text-muted">
+              Corrige la cuenta con la tecla de borrar para ver las equivalencias.
+            </p>
+          </section>
+        ) : (
+          <ConversionResults conversion={conversion} snapshot={snapshot} />
+        )}
       </div>
     </div>
   );
